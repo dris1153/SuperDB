@@ -1,6 +1,9 @@
 node_modules
 .next
 out
-.env*.local
 next-env.d.ts
 *.tsbuildinfo
+
+# Every env file except the template. `.env*.local` alone does NOT match a plain `.env`.
+.env*
+!.env.example
