@@ -50,8 +50,9 @@ export const getDiskUtil = (t: string, ref: string) => call<DiskUtil>(t, `/v1/pr
 export const listApiKeys = (t: string, ref: string) => call<ApiKey[]>(t, `/v1/projects/${ref}/api-keys?reveal=false`);
 
 const SERVICES = ["auth", "db", "pooler", "realtime", "rest", "storage"] as const;
+// No timeout_ms: the API validates it as a number and rejects the query string with a 400.
 export const getHealth = (t: string, ref: string) =>
-  call<ServiceHealth[]>(t, `/v1/projects/${ref}/health?services=${SERVICES.join(",")}&timeout_ms=4000`);
+  call<ServiceHealth[]>(t, `/v1/projects/${ref}/health?services=${SERVICES.join(",")}`);
 
 /** Read-only SQL. The endpoint rejects unqualified entity references, so schema-qualify everything. */
 export const readOnlyQuery = <T = Record<string, unknown>>(t: string, ref: string, query: string) =>
