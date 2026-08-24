@@ -13,10 +13,33 @@ owns it — nothing to label by hand.
 Create one (or reuse one), open the SQL editor, and run [`supabase/schema.sql`](supabase/schema.sql).
 It creates `public.supabase_accounts` with row level security on.
 
-**2. Your login**
+**2. Authentication**
 
-In that project: *Authentication → Sign In / Providers* → turn **off** "Allow new users to sign up".
-Then *Authentication → Users → Add user* and create your own account.
+Signup is open — anyone can register. In the same project:
+
+- *Authentication → Sign In / Providers* → allow new users to sign up.
+- **GitHub provider**: create a GitHub OAuth App with callback
+  `https://<project-ref>.supabase.co/auth/v1/callback`, then paste its client ID and secret in.
+- **SMTP** (*Authentication → SMTP Settings*): a real provider such as Resend or Postmark, with a
+  verified sending domain. The built-in mailer is capped at a few messages per hour and is not meant
+  for production. DNS verification is the slow part — start it first.
+- **Email templates** — required, not optional. Change *Confirm signup* and *Reset password* to:
+
+  ```
+  {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email
+  {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery
+  ```
+
+  The stock `{{ .ConfirmationURL }}` does not work with this flow and fails silently.
+- *Authentication → URL Configuration*: set Site URL, and add `<origin>/**` to the redirect allowlist.
+  A bare origin or a single `*` will not match `/auth/callback` — Supabase treats `/` as a separator,
+  so the globstar is required. Use the exact path instead of a globstar in production.
+- *Authentication → Attack Protection*: leaked-password protection needs a Pro plan; skip it on Free.
+
+Accounts with the same email are merged automatically — a person who signs up with GitHub and later
+with email/password ends up as one user. That is Supabase's default and needs no configuration. One
+consequence: signing up with an address that already has a GitHub identity returns success and sends
+no email, by design, to prevent account enumeration.
 
 **3. Environment**
 
@@ -29,8 +52,8 @@ npm run genkey        # paste the output into ENCRYPTION_KEY
 |---|---|
 | `SUPABASE_URL` | Project settings → API |
 | `SUPABASE_ANON_KEY` | Project settings → API (anon / publishable key) |
+| `SITE_URL` | This app's own origin, no trailing slash. `http://localhost:3000` in development. |
 | `ENCRYPTION_KEY` | `npm run genkey` — **back this up**, tokens are unreadable without it |
-| `ALLOWED_EMAIL` | Your email. Any other address is rejected before Supabase Auth is called. |
 
 **4. Run**
 

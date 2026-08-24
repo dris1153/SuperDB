@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/login", "/auth"];
+// /reset-password is deliberately absent: /auth/confirm establishes the recovery session first, so
+// reaching it without one should bounce to /login.
+const PUBLIC = ["/login", "/signup", "/forgot-password", "/auth"];
+const SIGNED_OUT_ONLY = ["/login", "/signup", "/forgot-password"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -26,7 +29,7 @@ export async function proxy(request: NextRequest) {
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  if (data.user && request.nextUrl.pathname === "/login") {
+  if (data.user && SIGNED_OUT_ONLY.includes(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
