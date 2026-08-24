@@ -46,22 +46,49 @@ in the system before MFA + audit log + KMS + ToS are in place.
 | Passwordless (GitHub only) | Rejected by user; would have removed SMTP, confirm and reset flows entirely. |
 | Magic link | Rejected — needs SMTP anyway and adds friction to a daily-use tool. |
 
+## Product direction (stated 2026-08-24, after the spike)
+
+The end goal is not an inventory board. It is a working multi-account Supabase dashboard: the user
+operates their databases from this web app the way they would in Supabase's own dashboard — table
+editing, SQL, and eventually auth/user management. Read-only inventory is the first slice, not the
+destination.
+
+Implications:
+
+- Write scopes are required. Settled above.
+- Phase 1 (auth) and Phase 2 (connections) are unchanged — they are the foundation either way, and
+  nothing in them assumes read-only.
+- A future Phase 4+ covers the dashboard surface itself (table editor, SQL editor, auth users,
+  storage). Not designed here. Do not let it distort Phases 1-3.
+
+The user also decided end-user-facing legal and gating work (ToS, restricting what users may do to
+their own databases) is out of scope: full control is the point of the product. Removed from the
+Phase 3 blocking list.
+
+Note the distinction that survives: restricting the *user* is out of scope, but protecting the
+*credential store* (encryption at rest, RLS, MFA) is not — it constrains nobody and only changes how
+bad a breach is. Those stay in Phase 3.
+
 ## Design
 
-### Phase 0 — Spike before writing any UI
+### Phase 0 — DONE (2026-08-24)
 
-Partly resolved from the docs already (see "OAuth capability matrix" below). What remains needs a
-real OAuth app plus a token; run `scripts/probe-token.mjs` once with a PAT and once with an OAuth
-access token, then diff.
+Ran against a live OAuth app. Results in "OAuth capability matrix" below.
 
-| Still unknown | Impact |
+| Question | Answer |
 |---|---|
-| Does `database/query/read-only` need `Database: Write`, or is `Database: Read` enough? | Docs list "Create a SQL query" under **Write**. If Write is required, listing tables costs a scope that also permits changing DB config and disabling read-only mode. |
-| Do `/health`, `/config/disk/util`, `/advisors/*` work under OAuth at all? | Absent from the scope table entirely. If unavailable, the OAuth detail page loses its stat row. |
-| Does `/v1/projects` under OAuth return only the authorized org? | Determines how many times a user must connect |
-| Is OAuth app creation gated by org plan? | Docs mention no plan restriction, but unverified |
+| Does `database/query/read-only` work over OAuth? | **Yes, 201.** (Granted scope set included Database:Write — see "Still open on scopes".) |
+| Do `/health`, `/config/disk/util`, `/advisors/*` work? | health **yes**, advisors **yes**, disk util **no** — `"does not support oauth access yet"` |
+| Does `/v1/projects` return only the authorized org? | **Yes.** 8 projects, all from the one authorized org. |
+| Is OAuth app creation plan-gated? | **No** — created without obstacle. |
 
-Register the OAuth app first: Supabase Dashboard → Organization settings → OAuth Apps.
+Bug found and fixed in existing app code: `getHealth` sent `timeout_ms=4000`, which the API rejects
+with `400 timeout_ms: Invalid input: expected number, received string`. Health was broken for every
+token type, not just OAuth. Parameter removed; the endpoint works without it.
+
+Two throwaway scripts remain in `scripts/` — `oauth-spike.mjs` (runs the OAuth dance locally, writes
+the token to `.env.spike-token.local`) and `probe-token.mjs` (prints a capability table for any
+token). Delete them once Phase 2 is done, or keep `probe-token.mjs` as a debugging aid.
 
 ### Phase 1 — Authentication
 
@@ -148,36 +175,71 @@ Scopes are fixed at app-registration time in the dashboard. **Changing them late
 existing user to re-authorize**, so the scope set is a near-permanent decision — pick it after the
 Phase 0 spike, not before.
 
-### OAuth capability matrix
+### OAuth capability matrix — measured, not guessed
 
-From the official scopes table. This is the reason supporting both connection kinds is a functional
-decision, not just a convenience: OAuth is lower risk **and** lower capability.
+Spike run 2026-08-24 against a live OAuth app granted Projects:Read, Organizations:Read,
+Database:Read **and** Database:Write. Probed with `scripts/probe-token.mjs`.
 
-| SuperDB feature | Scope required | Verdict |
+| SuperDB feature | Endpoint | OAuth result |
 |---|---|---|
-| List projects, project metadata | `Projects: Read` | works |
-| Organization name | `Organizations: Read` | works |
-| **Account email** | no scope exists | **impossible over OAuth** — OAuth rows group by org only |
-| Table list, sizes, RLS flags | `Database: Write` (probable) | heavy: that scope also allows changing DB config and disabling read-only mode |
-| API keys | `Secrets: Read` | heavy: also grants "retrieve a project's secrets". Recommend dropping this panel for OAuth connections. |
-| Service health, disk usage, advisors | not in the scope table | unknown, spike it |
+| Organization list | `GET /v1/organizations` | **200** |
+| Project list | `GET /v1/projects` | **200** — only the authorized org's projects |
+| Project metadata | `GET /v1/projects/{ref}` | **200** |
+| Service health | `GET /projects/{ref}/health` | **200** |
+| Security advisors | `GET /projects/{ref}/advisors/security` | **200** — unexpected bonus, not in the scope table |
+| **Table list, sizes, RLS** | `POST /database/query/read-only` | **201 — works** |
+| **Account email** | `GET /v1/profile` | **401** — `"does not support oauth access yet"` |
+| **Disk usage** | `GET /projects/{ref}/config/disk/util` | **401** — `"does not support oauth access yet"` |
+| API keys | `GET /projects/{ref}/api-keys` | **403** — needs scope `api_gateway_keys_read` |
 
-The guide also states plainly: *"Only some features are available until we roll out fine-grained
-access control. If you need full database access, you will need to prompt the user for their database
-password."*
+Better than the docs implied. The Tables panel — the main reason to explore a database at all —
+survives on OAuth. Only two panels are genuinely lost.
 
-Consequence for the UI: an OAuth connection renders a reduced project detail page. Decide whether to
-hide the missing panels or show them disabled with an explanation.
+Notes:
+
+- Authorization is strictly per-organization: 8 projects returned, all from the single authorized org.
+  **A user with N organizations must connect N times.** Design the connections UI around that.
+- The real scope name for API keys is `api_gateway_keys_read`, not the `Secrets: Read` label the docs
+  table uses. Trust the 403 message over the docs table when picking scopes.
+- Two endpoints answer with `"does not support oauth access yet"` — a platform limitation, not a scope
+  problem. Adding scopes will not fix them. Consistent with the guide's own "Current limitations" note.
+- Access token lifetime: 86400s (24h). A refresh token is returned.
+
+Consequence for the UI: an OAuth connection renders a project detail page without the "Disk used"
+stat and without the API keys panel, and its rows group by organization instead of by email. A PAT
+connection renders everything. Decide whether to hide those panels or show them disabled with a
+reason.
+
+### Scope decision — settled 2026-08-24
+
+**Request write scopes up front.** Not tested whether `Database: Read` alone suffices for read-only
+SQL, and deliberately so: the product direction (below) requires write access anyway, and the docs
+state that changing an OAuth app's scopes **forces every existing user to re-authorize**. Asking for
+the final scope set on day one avoids a forced re-authorization migration later.
+
+Registered scope set:
+
+```
+Organizations: Read
+Projects:      Read + Write
+Database:      Read + Write
+Auth:          Read + Write      (user management, per the product direction)
+api_gateway_keys_read            (API keys panel; real scope name, not the docs' "Secrets: Read")
+```
+
+Consequence accepted: the consent screen is longer and lists write permissions. That is honest — the
+app genuinely does write.
 
 ### Phase 3 — Hardening, gates public launch
 
 | Item | Rationale |
 |---|---|
-| TOTP MFA | Built into Supabase Auth. Phishing one SuperDB password yields that user's entire Supabase estate. Highest-value item on this list. |
+| TOTP MFA | Built into Supabase Auth. Phishing one SuperDB password yields that user's entire Supabase estate — more so now that the app holds write scopes. Highest-value item on this list. |
 | Audit log | One table, insert on connect / refresh / revoke. The thing you will want after an incident. |
 | KEK to a real KMS | See note below. |
-| ToS + Privacy + Security page | Processing other people's infrastructure credentials. |
 | Delete-account button | `on delete cascade` already handles the rows. |
+
+Dropped by user decision: ToS / Privacy / Security page. Available to add later; not blocking launch.
 
 Honest note on envelope encryption: per-connection DEKs wrapped by a master KEK is worth doing (~30
 LOC) because it makes key rotation a rewrap instead of a full re-encrypt, and makes a later KMS swap a
@@ -228,13 +290,21 @@ with an OAuth token to answer the remaining Phase 0 questions.
 
 ## Unresolved
 
-- Which scope set to register the OAuth app with. Decide after the spike; it is near-permanent because
-  changing it forces every user to re-authorize. Open question: is `Database: Write` an acceptable ask
-  just to list tables, or does the OAuth path ship without the Tables panel?
-- Whether to hide or disable the panels an OAuth connection cannot fill.
-- Account-linking behaviour between GitHub and email/password sign-ups: merge or keep separate?
+- Whether to hide or disable the two panels an OAuth connection cannot fill (disk usage, and account
+  email in the grouping column).
+- ~~Account-linking behaviour between GitHub and email/password sign-ups~~ — **resolved: merge.**
+  Nothing to configure; Supabase links identities sharing an email automatically and by default, and
+  removes unconfirmed identities on link, which closes the pre-account-takeover hole. Manual linking
+  stays off. Consequence handled in the signup page: signing up with an address that already has an
+  OAuth identity returns an obfuscated success and sends no email, so the "check your inbox" screen
+  carries a hint pointing at GitHub.
 - SMTP provider not chosen (Resend vs Postmark).
 - KMS provider not chosen; deployment target is Vercel, which has none.
 
-Resolved since the first draft: `/v1/profile` is unavailable over OAuth (no such scope exists), so
-OAuth connections group by organization. Email grouping remains a PAT-only feature.
+Resolved since the first draft:
+
+- `/v1/profile` is unavailable over OAuth — confirmed live, `"does not support oauth access yet"`. OAuth
+  connections group by organization; email grouping remains a PAT-only feature.
+- Read-only SQL works over OAuth. The Tables panel survives.
+- Scope set settled: request write up front, see "Scope decision".
+- ToS dropped from the blocking list by user decision.
