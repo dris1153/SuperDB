@@ -11,6 +11,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
+import { writeFileSync } from "node:fs";
 
 const CLIENT_ID = process.env.SB_CLIENT_ID;
 const CLIENT_SECRET = process.env.SB_CLIENT_SECRET;
@@ -80,11 +81,18 @@ const server = createServer(async (req, res) => {
   }
 
   const tokens = JSON.parse(body);
-  console.log("access_token :", tokens.access_token);
-  console.log("refresh_token:", tokens.refresh_token ?? "(none)");
+
+  // Written to a file rather than printed, so the token never lands in terminal scrollback.
+  writeFileSync(
+    ".env.spike-token.local",
+    `SB_TOKEN=${tokens.access_token}\nSB_REFRESH_TOKEN=${tokens.refresh_token ?? ""}\n`,
+    { mode: 0o600 },
+  );
+
+  console.log("access_token : written to .env.spike-token.local");
+  console.log("refresh_token:", tokens.refresh_token ? "received" : "NOT RETURNED");
   console.log("expires_in   :", tokens.expires_in, "seconds");
-  console.log("\nNow probe what it can reach:\n");
-  console.log(`  SB_TOKEN='${tokens.access_token}' node scripts/probe-token.mjs\n`);
+  console.log("scope        :", tokens.scope ?? "(not reported)");
   finish("Done — check the terminal.");
 });
 

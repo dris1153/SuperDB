@@ -45,10 +45,16 @@ const profile = await probe("GET /v1/profile", "/v1/profile");
 const orgs = await probe("GET /v1/organizations", "/v1/organizations");
 const projects = await probe("GET /v1/projects", "/v1/projects");
 
-const ref = projects?.[0]?.ref;
+// A paused project fails every database call for reasons unrelated to the token, which is exactly
+// the confusion this probe exists to avoid. Prefer a healthy one.
+const target = projects?.find((p) => p.status === "ACTIVE_HEALTHY") ?? projects?.[0];
+const ref = target?.ref;
+if (projects?.length) {
+  console.log(`probing against ${target.name} (${target.status})\n`);
+}
 if (ref) {
   await probe("GET /projects/{ref}", `/v1/projects/${ref}`);
-  await probe("GET health", `/v1/projects/${ref}/health?services=db,auth,rest&timeout_ms=4000`);
+  await probe("GET health", `/v1/projects/${ref}/health?services=db,auth,rest`);
   await probe("GET config/disk/util", `/v1/projects/${ref}/config/disk/util`);
   await probe("GET api-keys", `/v1/projects/${ref}/api-keys?reveal=false`);
   await probe("GET advisors/security", `/v1/projects/${ref}/advisors/security`);
@@ -79,4 +85,12 @@ if (projects?.length) {
     return acc;
   }, {});
   console.log(`projects per organization : ${JSON.stringify(bySlug)}`);
+}
+
+if (projects?.length) {
+  const byStatus = projects.reduce((acc, p) => {
+    acc[p.status] = (acc[p.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log(`project statuses          : ${JSON.stringify(byStatus)}`);
 }
