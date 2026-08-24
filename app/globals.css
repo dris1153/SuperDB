@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+/* Palette and type come from DESIGN.md. Density does not: this is an admin tool, so it uses the
+   Supabase dashboard's compact rhythm (6px radius, 8-16px gaps) rather than the landing page's
+   pill buttons and 64px section gaps. */
+@theme {
+  --color-canvas: #121212;
+  --color-panel: #171717;
+  --color-elevated: #1c1c1c;
+  --color-ash: #242424;
+  --color-line: #2e2e2e;
+  --color-line-strong: #393939;
+  --color-graphite: #4d4d4d;
+
+  --color-fg: #fafafa;
+  --color-fg-muted: #b4b4b4;
+  --color-fg-subtle: #898989;
+
+  --color-brand: #3ecf8e;
+  --color-brand-text: #00c573;
+  --color-brand-border: #1f4b37;
+  --color-brand-deep: #006239;
+
+  --color-warn: #f5a623;
+  --color-danger: #f56565;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    /* Signature uniform negative tracking from DESIGN.md. */
+    letter-spacing: -0.007em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* DESIGN.md caps emphasis at weight 500 — no bold anywhere in this system. */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+  }
+
+  /* Tailwind v4 Preflight drops the native pointer cursor on buttons. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  label:has(> input[type="checkbox"]),
+  select:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  ::selection {
+    background: var(--color-brand-deep);
+    color: var(--color-fg);
+  }
+}
