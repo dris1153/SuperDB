@@ -2,6 +2,8 @@
 
 Every Supabase project, across every one of your Supabase accounts, on one board.
 
+![The SuperDB projects board: nine projects from two connected Supabase accounts, with search, owner, status and tag filters](docs/images/board.png)
+
 Supabase gives each account its own dashboard. If you hold five accounts, you hold five dashboards,
 five tabs, and no way to remember which one owns which project. SuperDB connects all of them to a
 single board and lets you name each account whatever you actually call it.
@@ -14,17 +16,27 @@ single board and lets you name each account whatever you actually call it.
 
 ## What it does
 
-**Projects board** — every project from every connection in one grid. Filter by tag, see status,
-region (with a real flag), and which connection it came from.
+**Projects board** — every project from every connection in one grid, with counts across the top and
+filters for owner, status and tag. Each card carries its ref, the connection it came from, the
+organization and region, and whatever tags you gave it.
 
-**Per-project workspace** — a Supabase-style sidebar with Overview and Database built. Overview
-carries the status/compute/branch/migration/backup tiles, a Primary Database card with disk, RAM,
-connections and size, plus service usage charts. The other eleven nav items are visible and marked
-"soon" so the shape of the thing is honest.
+**Per-project workspace** — a Supabase-style sidebar with Overview and Database built. The other
+eleven nav items are visible and marked "soon", so the shape of the thing is honest rather than
+hidden.
+
+![Project Overview: status, compute, branch, migration and backup tiles beside a Primary Database card showing disk, RAM, connections and size, above the Get connected grid and service usage charts](docs/images/overview.png)
+
+Disk and RAM appear here because this project is reached through an access token. Over OAuth those
+two cards explain themselves instead — see [Connecting an account](#connecting-an-account).
 
 **Connect sheet** — the same right-hand sheet Supabase shows, with Direct, Server and MCP panels
-built (connection strings, `.env` output with a masked secret key, MCP command). Framework and ORM
-are stubbed.
+built. Framework and ORM are stubbed.
+
+![The Connect sheet open on the Direct tab, offering direct connection, transaction pooler and session pooler, with a connection string and a field-by-field parameter table](docs/images/connect.png)
+
+The connection string keeps Supabase's `[YOUR-PASSWORD]` placeholder: the Management API does not
+return a database password, and resetting one is destructive, so that stays in Supabase's own
+dashboard.
 
 **Credential vault** — store the Supabase account's sign-in method and email, plus the passwords for
 that account and the mailbox behind it. Encrypted in your browser, never in plaintext on the server.
