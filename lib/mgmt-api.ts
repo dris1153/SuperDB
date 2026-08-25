@@ -18,7 +18,14 @@ export type Project = {
 export type Org = { id: string; slug: string; name: string };
 export type ServiceHealth = { name: string; status: "COMING_UP" | "ACTIVE_HEALTHY" | "UNHEALTHY"; error?: string };
 export type DiskUtil = { timestamp: string; metrics: { fs_size_bytes: number; fs_avail_bytes: number; fs_used_bytes: number } };
-export type ApiKey = { id: string | null; name: string; type: string | null; prefix: string | null };
+export type ApiKey = {
+  id: string | null;
+  name: string;
+  type: "legacy" | "publishable" | "secret" | null;
+  prefix: string | null;
+  /** Only populated when reveal is true — this is the real credential. */
+  api_key: string | null;
+};
 
 export class MgmtError extends Error {
   constructor(public status: number, message: string) {
@@ -44,7 +51,9 @@ export const listProjects = (t: string) => call<Project[]>(t, "/v1/projects");
 export const listOrgs = (t: string) => call<Org[]>(t, "/v1/organizations");
 export const getProject = (t: string, ref: string) => call<Project>(t, `/v1/projects/${ref}`);
 export const getDiskUtil = (t: string, ref: string) => call<DiskUtil>(t, `/v1/projects/${ref}/config/disk/util`);
-export const listApiKeys = (t: string, ref: string) => call<ApiKey[]>(t, `/v1/projects/${ref}/api-keys?reveal=false`);
+/** reveal returns the actual key values; leave it false unless the user asked to see them. */
+export const listApiKeys = (t: string, ref: string, reveal = false) =>
+  call<ApiKey[]>(t, `/v1/projects/${ref}/api-keys?reveal=${reveal}`);
 
 const SERVICES = ["auth", "db", "pooler", "realtime", "rest", "storage"] as const;
 // No timeout_ms: the API validates it as a number and rejects the query string with a 400.

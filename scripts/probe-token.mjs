@@ -66,6 +66,17 @@ if (ref) {
     method: "POST",
     body: JSON.stringify({ query: READ_ONLY_SQL, read_only: true }),
   });
+
+  // Everything the project Overview needs. 403 names a missing scope and is fixable by
+  // re-authorizing; 401 "does not support oauth access yet" is a platform gap no scope can close.
+  await probe("GET api-keys?reveal=true", `/v1/projects/${ref}/api-keys?reveal=true`);
+  await probe("GET analytics/metrics", `/v1/projects/${ref}/analytics/endpoints/metrics`);
+  await probe("GET usage.api-counts", `/v1/projects/${ref}/analytics/endpoints/usage.api-counts?interval=1hr`);
+  await probe("GET billing/addons", `/v1/projects/${ref}/billing/addons`);
+  await probe("GET branches", `/v1/projects/${ref}/branches`);
+  await probe("GET database/migrations", `/v1/projects/${ref}/database/migrations`);
+  await probe("GET database/backups", `/v1/projects/${ref}/database/backups`);
+  await probe("GET config/database/pooler", `/v1/projects/${ref}/config/database/pooler`);
 }
 
 console.log(`\ntoken prefix: ${token.slice(0, 4)}…  (${token.length} chars)\n`);

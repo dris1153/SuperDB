@@ -7,7 +7,6 @@ import {
   getMetricsText,
   getPoolerConfig,
   listAddons,
-  listApiKeys,
   listBackups,
   listBranches,
   listMigrations,
@@ -16,7 +15,7 @@ import {
 import { dbOverview } from "@/lib/db-introspect";
 import { memoryUsedPercent, parseMetrics } from "@/lib/prometheus";
 import { computeLabel, regionCountry, regionLabel, statusLabel } from "@/lib/regions";
-import { safe } from "@/lib/safe";
+import { attempt, safe } from "@/lib/safe";
 import { bytes, date } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/copy-button";
@@ -45,38 +44,34 @@ export default async function ProjectOverviewPage({
   if (!found) notFound();
   const { token, connection, project } = found;
 
-  // Disk utilisation and API keys answer 401/403 over OAuth — a platform limit, not a scope one.
-  const viaOAuth = connection.kind === "oauth";
-
-  const [addons, branches, migrations, backups, disk, overview, metricsText, pooler, keys] =
+  const [addons, branches, migrations, backups, disk, overview, metricsText, pooler] =
     await Promise.all([
       safe(() => listAddons(token, ref)),
       safe(() => listBranches(token, ref)),
       safe(() => listMigrations(token, ref)),
       safe(() => listBackups(token, ref)),
-      viaOAuth ? null : safe(() => getDiskUtil(token, ref)),
+      attempt(() => getDiskUtil(token, ref)),
       safe(() => dbOverview(token, ref)),
-      safe(() => getMetricsText(token, ref)),
+      attempt(() => getMetricsText(token, ref)),
       safe(() => getPoolerConfig(token, ref)),
-      viaOAuth ? null : safe(() => listApiKeys(token, ref)),
     ]);
 
   const compute = computeLabel(addons?.selected_addons ?? []);
   const branch = branches?.find((b) => b.is_default) ?? branches?.[0];
   const migration = migrations?.[migrations.length - 1];
   const backup = backups?.backups?.[0];
-  const memory = metricsText ? memoryUsedPercent(parseMetrics(metricsText)) : null;
+  const memory = metricsText.ok ? memoryUsedPercent(parseMetrics(metricsText.data)) : null;
   const diskPercent =
-    disk && disk.metrics.fs_size_bytes > 0
-      ? Math.round((disk.metrics.fs_used_bytes / disk.metrics.fs_size_bytes) * 100)
+    disk.ok && disk.data.metrics.fs_size_bytes > 0
+      ? Math.round((disk.data.metrics.fs_used_bytes / disk.data.metrics.fs_size_bytes) * 100)
       : null;
 
-  // Distinguish the three ways a metric can be missing, so the card never shows a bare dash: the
-  // endpoint refused us, the feed came back without the series, or the value is genuinely absent.
+  // Reasons come from the API response rather than from an assumption about what OAuth allows, so a
+  // scope the user can fix reads differently from a limit only Supabase can lift.
   const notes: string[] = [];
-  if (viaOAuth) notes.push("Disk usage is unavailable over OAuth.");
-  if (!metricsText) notes.push("Instance metrics could not be read.");
-  else if (memory === null) notes.push("The metrics feed did not report memory.");
+  if (!disk.ok) notes.push(`Disk: ${disk.reason}`);
+  if (!metricsText.ok) notes.push(`Memory: ${metricsText.reason}`);
+  else if (memory === null) notes.push("Memory: the metrics feed did not include it.");
 
   const primaryPooler = pooler?.find((p) => p.database_type === "PRIMARY") ?? pooler?.[0];
   const projectUrl = `https://${ref}.supabase.co`;
@@ -153,14 +148,14 @@ export default async function ProjectOverviewPage({
 
       <GetConnected
         info={{
+          projectRef: ref,
           projectUrl,
-          directConnection: project.database
-            ? `postgresql://postgres:[YOUR-PASSWORD]@${project.database.host}:5432/postgres`
-            : null,
-          poolerConnection: primaryPooler?.connection_string ?? null,
-          poolerMode: primaryPooler?.pool_mode ?? null,
-          apiKeys: keys?.map((k) => ({ name: k.name, prefix: k.prefix })) ?? null,
-          apiKeysBlocked: viaOAuth,
+          dbHost: project.database?.host ?? null,
+          transactionPooler:
+            pooler?.find((p) => p.pool_mode === "transaction")?.connection_string ??
+            primaryPooler?.connection_string ??
+            null,
+          sessionPooler: pooler?.find((p) => p.pool_mode === "session")?.connection_string ?? null,
         }}
       />
 
