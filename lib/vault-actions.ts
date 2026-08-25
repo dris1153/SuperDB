@@ -6,9 +6,8 @@ export type VaultMeta = { salt: string; iterations: number; check_blob: string }
 
 export type ConnectionSecret = {
   connection_id: string;
-  supabase_login_method: "email" | "github" | "google" | null;
+  supabase_login_method: "email" | "github" | "chatgpt" | "sso" | null;
   supabase_email: string | null;
-  provider_email: string | null;
   vault_blob: string | null;
 };
 
@@ -52,12 +51,12 @@ export async function listConnectionSecrets(): Promise<ConnectionSecret[]> {
   const { supabase } = await requireUser();
   const { data, error } = await supabase
     .from("connection_secrets")
-    .select("connection_id, supabase_login_method, supabase_email, provider_email, vault_blob");
+    .select("connection_id, supabase_login_method, supabase_email, vault_blob");
   if (error) throw new Error(error.message);
   return (data ?? []) as ConnectionSecret[];
 }
 
-const METHODS = ["email", "github", "google"] as const;
+const METHODS = ["email", "github", "chatgpt", "sso"] as const;
 
 /**
  * The blob is stored verbatim. The server cannot read it, cannot validate it, and must not try —
@@ -67,7 +66,6 @@ export async function saveConnectionSecret(input: {
   connectionId: string;
   supabaseLoginMethod: string | null;
   supabaseEmail: string | null;
-  providerEmail: string | null;
   vaultBlob: string | null;
 }): Promise<void> {
   const { supabase, user } = await requireUser();
@@ -83,7 +81,6 @@ export async function saveConnectionSecret(input: {
       user_id: user.id,
       supabase_login_method: method,
       supabase_email: input.supabaseEmail?.trim() || null,
-      provider_email: input.providerEmail?.trim() || null,
       vault_blob: input.vaultBlob,
       updated_at: new Date().toISOString(),
     },

@@ -6,16 +6,13 @@ import { IconLock, IconSearch } from "@tabler/icons-react";
 import type { InventoryProject } from "@/lib/inventory";
 import { ProjectStatus } from "./status";
 import { Badge } from "./ui/badge";
+import { Card } from "./ui/card";
 import { Empty } from "./ui/empty-state";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { date } from "@/lib/format";
 
 // Radix Select reserves the empty string for "no value", so the unfiltered option needs a sentinel.
 const ALL = "__all__";
-
-const HEAD = "text-xs font-normal text-subtle";
 
 export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
   const [q, setQ] = useState("");
@@ -96,58 +93,52 @@ export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
       {rows.length === 0 ? (
         <Empty>No project matches these filters.</Empty>
       ) : (
-        <div className="rounded-lg border border-border">
-          <Table className="min-w-3xl">
-            <TableHeader className="bg-card">
-              <TableRow className="hover:bg-transparent">
-                {["Project", "Owner", "Tags", "Organization", "Status", "Region", "Postgres", "Created"].map((h) => (
-                  <TableHead key={h} className={HEAD}>{h}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((p) => (
-                <TableRow key={p.ref}>
-                  <TableCell>
-                    <Link href={`/p/${p.ref}`} className="text-foreground hover:text-brand-text">
-                      {p.name}
-                    </Link>
-                    <div className="font-mono text-xs text-subtle">{p.ref}</div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      {/* OAuth rows are named by organization: /v1/profile is unavailable to them. */}
-                      <IconLock
-                        size={13}
-                        stroke={1.5}
-                        className={p.kind === "oauth" ? "text-primary" : "text-subtle"}
-                        title={p.kind === "oauth" ? "OAuth connection" : "Access token connection"}
-                      />
-                      {p.owner}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {p.tags.length === 0 ? (
-                      <span className="text-subtle">—</span>
-                    ) : (
-                      <span className="flex flex-wrap gap-1">
-                        {p.tags.map((t) => (
-                          <Badge key={t} variant="outline" className="rounded-full">{t}</Badge>
-                        ))}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{p.orgName}</TableCell>
-                  <TableCell><ProjectStatus status={p.status} /></TableCell>
-                  <TableCell className="font-mono text-xs text-subtle">{p.region}</TableCell>
-                  <TableCell className="font-mono text-xs text-subtle">{p.database?.version ?? "—"}</TableCell>
-                  <TableCell className="text-subtle">{date(p.created_at)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {rows.map((p) => (
+            <ProjectCard key={p.ref} project={p} />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Postgres version and creation date are deliberately absent — both are on the project page, and
+ * neither drives a decision while scanning a list.
+ */
+function ProjectCard({ project }: { project: InventoryProject }) {
+  return (
+    <Link href={`/p/${project.ref}`} className="group">
+      <Card className="h-full gap-0 p-4 transition-colors group-hover:border-brand-border">
+        <div className="flex items-start justify-between gap-2">
+          <span className="text-sm text-foreground group-hover:text-brand-text">{project.name}</span>
+          <ProjectStatus status={project.status} />
+        </div>
+        <div className="font-mono text-xs text-subtle">{project.ref}</div>
+
+        <div className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+          {/* OAuth connections are named by organization: /v1/profile is unavailable to them. */}
+          <IconLock
+            size={13}
+            stroke={1.5}
+            className={project.kind === "oauth" ? "text-primary" : "text-subtle"}
+            title={project.kind === "oauth" ? "OAuth connection" : "Access token connection"}
+          />
+          <span className="truncate">{project.owner}</span>
+        </div>
+        <div className="truncate text-xs text-subtle">
+          {project.orgName} · {project.region}
+        </div>
+
+        {project.tags.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-1">
+            {project.tags.map((t) => (
+              <Badge key={t} variant="outline" className="rounded-full">{t}</Badge>
+            ))}
+          </div>
+        ) : null}
+      </Card>
+    </Link>
   );
 }

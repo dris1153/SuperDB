@@ -57,3 +57,59 @@ export const readOnlyQuery = <T = Record<string, unknown>>(t: string, ref: strin
     method: "POST",
     body: JSON.stringify({ query }),
   });
+
+export type Addon = {
+  type: "compute_instance" | "custom_domain" | "pitr" | "ipv4" | string;
+  variant: { id: string; name: string };
+};
+export type Branch = { id: string; name: string; is_default: boolean; status: string; created_at: string };
+export type Migration = { version: string; name?: string };
+export type Backup = { id: number; status: string; inserted_at: string; is_physical_backup: boolean };
+export type BackupsResponse = { region: string; pitr_enabled: boolean; backups: Backup[] };
+
+/** The four series the API actually reports. Supabase's own chart row also folds in log-derived ones. */
+export type ApiCountPoint = {
+  timestamp: string;
+  total_auth_requests: number;
+  total_realtime_requests: number;
+  total_rest_requests: number;
+  total_storage_requests: number;
+};
+
+export type UsageInterval = "15min" | "30min" | "1hr" | "3hr" | "1day" | "3day";
+
+export const listAddons = (t: string, ref: string) =>
+  call<{ selected_addons: Addon[] }>(t, `/v1/projects/${ref}/billing/addons`);
+export const listBranches = (t: string, ref: string) =>
+  call<Branch[]>(t, `/v1/projects/${ref}/branches`);
+export const listMigrations = (t: string, ref: string) =>
+  call<Migration[]>(t, `/v1/projects/${ref}/database/migrations`);
+export const listBackups = (t: string, ref: string) =>
+  call<BackupsResponse>(t, `/v1/projects/${ref}/database/backups`);
+export const getApiCounts = (t: string, ref: string, interval: UsageInterval) =>
+  call<{ result: ApiCountPoint[] }>(t, `/v1/projects/${ref}/analytics/endpoints/usage.api-counts?interval=${interval}`);
+export const getApiRequestsCount = (t: string, ref: string) =>
+  call<{ result: { count: number }[] }>(t, `/v1/projects/${ref}/analytics/endpoints/usage.api-requests-count`);
+
+/** Prometheus exposition format, not JSON — parse it with lib/prometheus.ts. */
+export async function getMetricsText(token: string, ref: string): Promise<string> {
+  const res = await fetch(`${BASE}/v1/projects/${ref}/analytics/endpoints/metrics`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new MgmtError(res.status, `metrics → ${res.status}`);
+  return res.text();
+}
+
+export type PoolerConfig = {
+  database_type: "PRIMARY" | "READ_REPLICA";
+  db_host: string;
+  db_port: number;
+  db_name: string;
+  db_user: string;
+  pool_mode: string;
+  connection_string: string;
+};
+
+export const getPoolerConfig = (t: string, ref: string) =>
+  call<PoolerConfig[]>(t, `/v1/projects/${ref}/config/database/pooler`);

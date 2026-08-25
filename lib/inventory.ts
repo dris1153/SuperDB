@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { connectionsWithTokens, type Connection, type ConnectionKind } from "./connections";
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
 
@@ -63,8 +64,11 @@ export const isProjectRef = (ref: string) => /^[a-z]{20}$/.test(ref);
 /**
  * Finds which connection owns a ref by asking all of them at once.
  * Returns the token so the caller can make follow-up calls without a second lookup.
+ *
+ * Wrapped in cache() because the project layout and the page inside it both need this, and each call
+ * fans out one request per connection — without deduplication every navigation would double them.
  */
-export async function resolveProject(ref: string) {
+export const resolveProject = cache(async (ref: string) => {
   if (!isProjectRef(ref)) return null;
   const connections = await connectionsWithTokens();
 
@@ -79,4 +83,4 @@ export async function resolveProject(ref: string) {
     }),
   );
   return hits.find((h) => h !== null) ?? null;
-}
+});

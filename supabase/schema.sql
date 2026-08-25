@@ -141,11 +141,12 @@ create table if not exists public.connection_secrets (
   user_id               uuid not null default auth.uid() references auth.users (id) on delete cascade,
 
   -- Identity stays readable: it is what answers "whose account is this org", and it is not a secret.
-  supabase_login_method text check (supabase_login_method in ('email', 'github', 'google')),
+  -- Methods match the Supabase dashboard sign-in page: GitHub, ChatGPT, SSO, or email + password.
+  -- There is no Google option there, despite the habit of assuming one.
+  supabase_login_method text check (supabase_login_method in ('email', 'github', 'chatgpt', 'sso')),
   supabase_email        text,
-  provider_email        text,
 
-  -- Client-encrypted {"supabase_password": "...", "provider_password": "..."}. One blob rather than a
+  -- Client-encrypted {"supabase_password": "...", "email_password": "..."}. One blob rather than a
   -- column per password: a single IV, and adding a field later is a JSON change, not a migration.
   vault_blob            text,
   updated_at            timestamptz not null default now()
@@ -160,6 +161,15 @@ create policy "own connection secrets" on public.connection_secrets
   with check (user_id = auth.uid());
 
 revoke all on public.connection_secrets from anon;
+
+-- Converge an existing table: provider_email is gone (every method now has exactly one email) and
+-- google was never a Supabase sign-in option to begin with.
+alter table public.connection_secrets drop column if exists provider_email;
+alter table public.connection_secrets
+  drop constraint if exists connection_secrets_supabase_login_method_check;
+alter table public.connection_secrets
+  add constraint connection_secrets_supabase_login_method_check
+  check (supabase_login_method in ('email', 'github', 'chatgpt', 'sso'));
 
 -- Account deletion. Removing a row from auth.users normally needs the service_role key, which
 -- bypasses RLS everywhere — far too much reach to add to the app just for this. A security definer

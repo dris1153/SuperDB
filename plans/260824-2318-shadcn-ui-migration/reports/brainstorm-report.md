@@ -121,6 +121,34 @@ sed -i -e 's/focus-visible:ring-\[3px\] focus-visible:ring-ring\/50//g' \
 So the honest split: shadows, font weight and radius scale are configuration; focus rings and a few
 component-specific defaults remain manual.
 
+## The dead import, in full
+
+`shadcn init` writes `@import "shadcn/tailwind.css"` into globals.css. **The `shadcn` package ships no
+CSS at all** — verified against `shadcn@4.19.0`: no `./tailwind.css` export, no `.css` file anywhere
+in the published files. The import resolves to nothing, silently, and everything that file was meant
+to provide is simply absent.
+
+Three separate breakages traced back to it, each found only by looking at rendered output:
+
+| Missing piece | Symptom | Fix |
+|---|---|---|
+| `@theme inline` token mapping | `bg-card`, `border-border`, `bg-primary` never generated. Borders fell back to `currentColor`, so everything was white-bordered and transparent. | Declare the mapping in globals.css |
+| `* { border-color: var(--border) }` | Tailwind v4 defaults border-color to `currentColor`, and Table/Dialog/AlertDialog use bare `border-b`. Same white borders, second time. | One base rule |
+| `@custom-variant` definitions | shadcn writes `data-open:`, `data-active:`, `data-horizontal:`; Radix emits `data-state="open"`, `data-orientation="horizontal"`. Tailwind read them as literal `[data-open]` attributes and dropped 33 rules — every dialog/popover/select open-close animation, the active tab styling, and the tabs axis. | Five `@custom-variant` lines |
+
+```css
+@custom-variant data-open (&[data-state="open"]);
+@custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+```
+
+The lesson worth keeping: **every one of these compiled cleanly and typechecked cleanly.** A missing
+CSS import produces no error anywhere in the toolchain. Verifying that a token exists is not the same
+as verifying that a utility class was generated — check the compiled CSS for the selector, not the
+variable.
+
 ## Class migration map
 
 Roughly 150 occurrences across 11 files — mechanical find-and-replace.
@@ -174,3 +202,42 @@ text-graphite      -> text-subtle
 4. Run the class migration across `app/` and `components/`
 5. Delete `buttonClass`, rewire the one call site
 6. Verify against the success criteria
+
+## Deviation: shadows on floating overlays (2026-08-25)
+
+DESIGN.md says "Don't add box-shadows to cards, popovers, or modals". That rule is now followed for
+cards and broken for overlays, deliberately.
+
+Reasoning: DESIGN.md was extracted from the supabase.com landing page, which contains no dropdowns,
+selects or modals. The no-shadow rule was **observed on cards and extrapolated** to floating surfaces
+that were never in the sample. A menu overlapping the page needs a depth cue a 1px border cannot give,
+and the real Supabase dashboard shadows its dropdowns.
+
+Scoped by shadow size rather than by component, because the sizes already map cleanly:
+
+| Size | Used by | Value |
+|---|---|---|
+| `shadow-md` / `shadow-lg` | select, dropdown-menu, popover — nothing else | restored, much darker than Tailwind defaults |
+| `shadow-sm` / `xs` / `2xs` | tabs trigger only | still `none` |
+
+So cards and every component added later stay flat with no per-component work.
+
+Tailwind's default `rgb(0 0 0 / 0.1)` is invisible over #121212; the restored values run at 0.4–0.6.
+
+### Surface ladder
+
+The real cause of "the popover blends into the background" was not the missing shadow: DialogContent
+and SelectContent both used `bg-popover`, so they were **the same colour**. Now:
+
+```
+#121212  page
+#171717  card and dialog
+#1c1c1c  select, dropdown, popover — floating above
+```
+
+### Rings replaced with borders
+
+Six components outlined their surface with `ring-1 ring-foreground/10` — a translucent white ring,
+not the #2e2e2e border DESIGN.md specifies: alert-dialog, card, dialog, dropdown-menu, popover,
+select. All now use `border border-border`. PopoverContent had no border utility at all, so the tag
+picker rendered with no outline whatsoever.

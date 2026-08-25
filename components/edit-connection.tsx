@@ -7,7 +7,8 @@ import { ConnectionCredentials } from "./connection-credentials";
 import { TagPicker } from "./tag-picker";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { SlidingTabsList, SlidingTabsTrigger } from "./sliding-tabs";
+import { Tabs, TabsContent } from "./ui/tabs";
 import type { ConnectionSecret } from "@/lib/vault-actions";
 import {
   Dialog,
@@ -70,10 +71,10 @@ export function EditConnection({
         </DialogHeader>
 
         <Tabs defaultValue="details">
-          <TabsList>
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="credentials">Credentials</TabsTrigger>
-          </TabsList>
+          <SlidingTabsList className="w-full">
+            <SlidingTabsTrigger value="details">Details</SlidingTabsTrigger>
+            <SlidingTabsTrigger value="credentials">Credentials</SlidingTabsTrigger>
+          </SlidingTabsList>
 
           <TabsContent value="details" className="space-y-4 pt-2">
           <div>

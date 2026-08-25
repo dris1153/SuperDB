@@ -4,6 +4,22 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
+ * shadcn components are written against these shorthand variants — `data-open:`, `data-active:` and
+ * friends — but Radix emits `data-state="open"` and `data-orientation="horizontal"` instead. Without
+ * the mapping, Tailwind reads `data-open:` as the literal attribute `[data-open]`, matches nothing,
+ * and silently drops the rule.
+ *
+ * That is 27 `data-open` + 25 `data-closed` (every dialog, popover, select and menu animation),
+ * 11 `data-active` (the active tab styling) and the tabs orientation. Normally supplied by the
+ * `shadcn/tailwind.css` import that shadcn init writes but the package does not ship.
+ */
+@custom-variant data-open (&[data-state="open"]);
+@custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+
+/*
  * Palette and type come from DESIGN.md, mapped onto shadcn's token names.
  * Density does not: this is an admin tool, so it uses the Supabase dashboard's compact rhythm
  * (6px radius, 8-16px gaps) rather than the landing page's pill buttons and 64px section gaps.
@@ -112,10 +128,23 @@
   --shadow-xs: none;
   --shadow-sm: none;
   --shadow: none;
-  --shadow-md: none;
-  --shadow-lg: none;
   --shadow-xl: none;
   --shadow-2xl: none;
+
+  /*
+   * Deliberate deviation from DESIGN.md, which says not to shadow "cards, popovers, or modals".
+   * That document was extracted from the supabase.com landing page, which contains no dropdowns,
+   * selects or modals at all — the rule was observed on cards and extrapolated to floating surfaces
+   * that were never in the sample. A menu that overlaps the page needs a depth cue that a 1px border
+   * cannot give; the real Supabase dashboard shadows its dropdowns too.
+   *
+   * Scoped by size rather than by class: md and lg are used only by select, dropdown-menu and
+   * popover. Cards, and anything added later, stay flat because sm and xs remain none.
+   *
+   * Values are much darker than Tailwind's defaults — rgb(0 0 0 / 0.1) is invisible over #121212.
+   */
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 24px -4px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.4);
   --font-weight-semibold: 500;
   --font-weight-bold: 500;
 }
