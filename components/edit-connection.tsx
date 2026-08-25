@@ -3,9 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { IconPencil } from "@tabler/icons-react";
+import { ConnectionCredentials } from "./connection-credentials";
 import { TagPicker } from "./tag-picker";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import type { ConnectionSecret } from "@/lib/vault-actions";
 import {
   Dialog,
   DialogContent,
@@ -21,12 +24,14 @@ export function EditConnection({
   displayName,
   tags,
   availableTags,
+  secret,
   action,
 }: {
   id: string;
   displayName: string;
   tags: string[];
   availableTags: string[];
+  secret: ConnectionSecret | null;
   action: (id: string, displayName: string, tags: string[]) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -64,7 +69,13 @@ export function EditConnection({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <Tabs defaultValue="details">
+          <TabsList>
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="credentials">Credentials</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="space-y-4 pt-2">
           <div>
             <label className="mb-1 block text-xs text-subtle" htmlFor={`name-${id}`}>
               Name
@@ -83,7 +94,12 @@ export function EditConnection({
           </div>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="credentials" className="pt-2">
+            <ConnectionCredentials connectionId={id} secret={secret} />
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>

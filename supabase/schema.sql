@@ -111,6 +111,56 @@ create policy "own events appendable" on public.connection_events
 
 revoke all on public.connection_events from anon;
 
+-- ---------------------------------------------------------------------------
+-- Credential vault. Everything here is written by the browser and is opaque to this database and to
+-- the server: the key is derived from a master password that never leaves the client. The server
+-- cannot validate, search or recover any of it, by design.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.vault (
+  user_id     uuid primary key default auth.uid() references auth.users (id) on delete cascade,
+  kdf         text not null default 'PBKDF2-SHA256',
+  iterations  int  not null,
+  salt        text not null,             -- base64url; a salt is not secret
+  check_blob  text not null,             -- AES-GCM over a known constant, to detect a wrong password
+  created_at  timestamptz not null default now()
+);
+
+alter table public.vault enable row level security;
+
+drop policy if exists "own vault" on public.vault;
+create policy "own vault" on public.vault
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+revoke all on public.vault from anon;
+
+create table if not exists public.connection_secrets (
+  connection_id         uuid primary key references public.connections (id) on delete cascade,
+  user_id               uuid not null default auth.uid() references auth.users (id) on delete cascade,
+
+  -- Identity stays readable: it is what answers "whose account is this org", and it is not a secret.
+  supabase_login_method text check (supabase_login_method in ('email', 'github', 'google')),
+  supabase_email        text,
+  provider_email        text,
+
+  -- Client-encrypted {"supabase_password": "...", "provider_password": "..."}. One blob rather than a
+  -- column per password: a single IV, and adding a field later is a JSON change, not a migration.
+  vault_blob            text,
+  updated_at            timestamptz not null default now()
+);
+
+alter table public.connection_secrets enable row level security;
+
+drop policy if exists "own connection secrets" on public.connection_secrets;
+create policy "own connection secrets" on public.connection_secrets
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+revoke all on public.connection_secrets from anon;
+
 -- Account deletion. Removing a row from auth.users normally needs the service_role key, which
 -- bypasses RLS everywhere — far too much reach to add to the app just for this. A security definer
 -- function scoped to auth.uid() does the same job and can delete nobody else.

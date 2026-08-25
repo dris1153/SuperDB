@@ -5,6 +5,7 @@ import { removeFactor } from "@/lib/mfa-actions";
 import { deleteAccount } from "@/lib/account-actions";
 import { MfaEnroll } from "@/components/mfa-enroll";
 import { ConfirmAction } from "@/components/confirm-action";
+import { VaultStatus } from "@/components/vault-status";
 import { ToastFromParams } from "@/components/toast-from-params";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,15 @@ export default async function SettingsPage() {
         ) : (
           <MfaEnroll />
         )}
+      </Card>
+
+      <Card className="gap-3 p-4">
+        <h2 className="text-sm text-foreground">Credential vault</h2>
+        <p className="text-sm text-subtle">
+          Account passwords are encrypted in your browser with a master password the server never
+          sees. Nobody running this instance can read them — and nobody can recover them for you.
+        </p>
+        <VaultStatus />
       </Card>
 
       <section className="space-y-2">

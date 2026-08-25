@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { listConnectionSecrets } from "@/lib/vault-actions";
 import { ConnectTokenForm } from "@/components/connect-token-form";
 import { DisconnectConnection } from "@/components/disconnect-connection";
 import { EditConnection } from "@/components/edit-connection";
@@ -35,7 +36,12 @@ export const dynamic = "force-dynamic";
 const HEAD = "text-xs font-normal text-subtle";
 
 export default async function ConnectionsPage() {
-  const [connections, availableTags] = await Promise.all([listConnections(), listTags()]);
+  const [connections, availableTags, secrets] = await Promise.all([
+    listConnections(),
+    listTags(),
+    listConnectionSecrets(),
+  ]);
+  const secretByConnection = new Map(secrets.map((s) => [s.connection_id, s]));
   const oauth = modeEnabled("oauth");
   const pat = modeEnabled("pat");
 
@@ -186,6 +192,7 @@ export default async function ConnectionsPage() {
                         displayName={c.display_name}
                         tags={c.tags}
                         availableTags={availableTags}
+                        secret={secretByConnection.get(c.id) ?? null}
                         action={saveConnection}
                       />
                       <DisconnectConnection
