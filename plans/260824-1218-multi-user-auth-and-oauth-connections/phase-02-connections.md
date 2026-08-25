@@ -131,7 +131,9 @@ Delete:
    `SAFE_COLUMNS` list so ciphertext columns cannot leak into a client component by accident.
    - `listConnections()` — safe columns only
    - `connectionsWithTokens()` — decrypts, refreshing OAuth rows whose `expires_at` is within 5 minutes
-   - `addPatConnection(pat, label)` — verify with `GET /v1/profile`, which also supplies the email
+   - `addPatConnection(pat, label)` — validate and name the row with a single `GET /v1/organizations`,
+     exactly as the OAuth path does. **Do not call `/v1/profile`**: Supabase no longer issues
+     user-scoped tokens, so it answers 403 for every token this app can be given. `email` stays null.
    - `addOAuthConnection(tokens)` — read `GET /v1/organizations` to name the row
    - `removeConnection(id)` — call `revoke()` first for OAuth rows
 5. **Refresh handling.** Proactive refresh with a 5-minute margin, plus one reactive retry: if a
@@ -148,9 +150,11 @@ Delete:
    the filter dropdown key off a single `owner` label: email for PAT rows, org name for OAuth rows.
 9. **Detail page.** For OAuth connections skip the disk-util and api-keys calls entirely rather than
    letting them 401 through `safe()` — one less round trip, and the UI can say why the panel is absent.
-10. **Connections page.** OAuth button first. PAT form inside a `<details>` labelled Advanced, with one
-    plain sentence that a PAT grants full account control and a link to Supabase's token page. A row in
-    `last_error` renders a Reconnect button.
+10. **Connections page.** Two equal options, no "Advanced" disclosure — the measurements show neither
+    dominates. State the real trade-off in one line each: OAuth expires and refreshes itself and the
+    user can revoke it from their own Supabase settings; a scoped token additionally reaches disk usage
+    and API keys but is pasted here and does not renew. A row with `last_error` renders a Reconnect
+    button.
 11. `npx tsc --noEmit && npx next build && npm test`.
 
 ## Success Criteria

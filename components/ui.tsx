@@ -10,23 +10,22 @@ const BUTTON = {
   danger: "bg-transparent text-danger border-line-strong hover:bg-danger/10 hover:border-danger/50",
 } as const;
 
+/** Exported so a link can look like a button without dragging in a Slot/asChild abstraction. */
+export const buttonClass = (variant: keyof typeof BUTTON = "ghost", className?: string) =>
+  cx(
+    "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+    "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand",
+    "disabled:opacity-50",
+    BUTTON[variant],
+    className,
+  );
+
 export function Button({
   variant = "ghost",
   className,
   ...props
 }: ComponentProps<"button"> & { variant?: keyof typeof BUTTON }) {
-  return (
-    <button
-      {...props}
-      className={cx(
-        "inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand",
-        "disabled:opacity-50",
-        BUTTON[variant],
-        className,
-      )}
-    />
-  );
+  return <button {...props} className={buttonClass(variant, className)} />;
 }
 
 export function Input({ className, ...props }: ComponentProps<"input">) {

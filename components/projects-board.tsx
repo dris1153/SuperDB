@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { IconSearch } from "@tabler/icons-react";
+import { IconLock, IconSearch } from "@tabler/icons-react";
 import type { InventoryProject } from "@/lib/inventory";
 import { ProjectStatus } from "./status";
 import { Empty, Input } from "./ui";
@@ -13,22 +13,22 @@ const SELECT =
 
 export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
   const [q, setQ] = useState("");
-  const [account, setAccount] = useState("");
+  const [owner, setOwner] = useState("");
   const [status, setStatus] = useState("");
 
-  const accounts = useMemo(() => [...new Set(projects.map((p) => p.accountEmail))].sort(), [projects]);
+  const owners = useMemo(() => [...new Set(projects.map((p) => p.owner))].sort(), [projects]);
   const statuses = useMemo(() => [...new Set(projects.map((p) => p.status))].sort(), [projects]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return projects.filter((p) => {
-      if (account && p.accountEmail !== account) return false;
+      if (owner && p.owner !== owner) return false;
       if (status && p.status !== status) return false;
       if (!needle) return true;
-      return [p.name, p.ref, p.orgName, p.region, p.accountEmail, p.accountLabel]
+      return [p.name, p.ref, p.orgName, p.region, p.owner, p.label]
         .some((v) => v?.toLowerCase().includes(needle));
     });
-  }, [projects, q, account, status]);
+  }, [projects, q, owner, status]);
 
   return (
     <div className="space-y-4">
@@ -42,9 +42,9 @@ export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
             className="pl-8"
           />
         </div>
-        <select value={account} onChange={(e) => setAccount(e.target.value)} className={SELECT}>
-          <option value="">All accounts</option>
-          {accounts.map((a) => (
+        <select value={owner} onChange={(e) => setOwner(e.target.value)} className={SELECT}>
+          <option value="">All owners</option>
+          {owners.map((a) => (
             <option key={a} value={a}>{a}</option>
           ))}
         </select>
@@ -63,7 +63,7 @@ export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
           <table className="w-full min-w-3xl text-sm">
             <thead className="border-b border-line bg-panel text-left text-xs text-fg-subtle">
               <tr>
-                {["Project", "Account", "Organization", "Status", "Region", "Postgres", "Created"].map((h) => (
+                {["Project", "Owner", "Organization", "Status", "Region", "Postgres", "Created"].map((h) => (
                   <th key={h} className="px-3 py-2 font-normal">{h}</th>
                 ))}
               </tr>
@@ -76,8 +76,17 @@ export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
                     <div className="font-mono text-xs text-fg-subtle">{p.ref}</div>
                   </td>
                   <td className="px-3 py-2 text-fg-muted">
-                    {p.accountEmail}
-                    {p.accountLabel ? <span className="ml-1 text-fg-subtle">({p.accountLabel})</span> : null}
+                    <span className="inline-flex items-center gap-1.5">
+                      {/* OAuth rows are named by organization: /v1/profile is unavailable to them. */}
+                      <IconLock
+                        size={13}
+                        stroke={1.5}
+                        className={p.kind === "oauth" ? "text-brand" : "text-fg-subtle"}
+                        title={p.kind === "oauth" ? "OAuth connection" : "Access token connection"}
+                      />
+                      {p.owner}
+                    </span>
+                    {p.label ? <span className="ml-1 text-fg-subtle">({p.label})</span> : null}
                   </td>
                   <td className="px-3 py-2 text-fg-muted">{p.orgName}</td>
                   <td className="px-3 py-2"><ProjectStatus status={p.status} /></td>

@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconDatabase, IconKey, IconLayoutGrid, IconLogout } from "@tabler/icons-react";
+import { IconDatabase, IconLayoutGrid, IconLogout, IconPlugConnected } from "@tabler/icons-react";
 import { cx } from "./ui";
 
 const LINKS = [
   { href: "/", label: "Projects", icon: IconLayoutGrid },
-  { href: "/accounts", label: "Accounts", icon: IconKey },
+  { href: "/connections", label: "Connections", icon: IconPlugConnected },
 ];
 
 export function Sidebar({ email }: { email: string }) {

@@ -7,7 +7,7 @@ import { Card, Empty, Stat } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  const { projects, accounts, errors } = await loadInventory();
+  const { projects, connections, errors } = await loadInventory();
   const active = projects.filter((p) => p.status === "ACTIVE_HEALTHY").length;
   const idle = projects.filter((p) => p.status === "INACTIVE").length;
 
@@ -18,16 +18,16 @@ export default async function ProjectsPage() {
         <p className="text-sm text-fg-subtle">Every Supabase project across every connected account.</p>
       </header>
 
-      {accounts.length === 0 ? (
+      {connections.length === 0 ? (
         <Empty>
-          No account connected yet.{" "}
-          <Link href="/accounts" className="text-brand-text hover:underline">Add a personal access token</Link> to
+          Nothing connected yet.{" "}
+          <Link href="/connections" className="text-brand-text hover:underline">Connect a Supabase organization</Link> to
           pull in your projects.
         </Empty>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat label="Accounts" value={accounts.length} />
+            <Stat label="Connections" value={connections.length} />
             <Stat label="Projects" value={projects.length} />
             <Stat label="Active" value={active} />
             <Stat label="Paused" value={idle} />
@@ -37,12 +37,12 @@ export default async function ProjectsPage() {
             <Card className="border-warn/40 p-4">
               <div className="flex items-center gap-2 text-sm text-warn">
                 <IconAlertTriangle size={16} stroke={1.5} />
-                Some accounts could not be read
+                Some connections could not be read
               </div>
               <ul className="mt-2 space-y-1 text-xs text-fg-subtle">
                 {errors.map((e) => (
-                  <li key={e.email}>
-                    <span className="text-fg-muted">{e.email}</span> — {e.message}
+                  <li key={e.owner}>
+                    <span className="text-fg-muted">{e.owner}</span> — {e.message}
                   </li>
                 ))}
               </ul>

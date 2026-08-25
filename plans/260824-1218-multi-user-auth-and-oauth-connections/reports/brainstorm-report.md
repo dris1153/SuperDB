@@ -31,9 +31,14 @@ Consequences:
 | PAT on the public instance | **Enabled.** Advisor recommended OAuth-only in public mode; user overrode. | user (override) |
 | MFA / audit log / KMS | Phase 3, gating public launch | user |
 
-Risk explicitly accepted by the user: the public instance will hold unscoped PATs belonging to
-strangers. Mitigation retained: launch is gated behind Phase 3 hardening, so no stranger PAT exists
-in the system before MFA + audit log + KMS + ToS are in place.
+Risk explicitly accepted by the user: the public instance will hold PATs belonging to strangers.
+Mitigation retained: launch is gated behind Phase 3 hardening, so no stranger PAT exists in the
+system before MFA + audit log + KMS are in place.
+
+**Revised 2026-08-24 — this risk is smaller than first argued.** See "Access token types" below:
+Supabase now issues organization-scoped access tokens with custom expiry, so a user can hand SuperDB
+a least-privilege credential rather than an unscoped god-mode one. The original objection to accepting
+pasted tokens on a public instance assumed no such option existed. It was overstated.
 
 ## Approaches evaluated
 
@@ -210,6 +215,51 @@ stat and without the API keys panel, and its rows group by organization instead 
 connection renders everything. Decide whether to hide those panels or show them disabled with a
 reason.
 
+### Access token types — found 2026-08-24 while testing the PAT flow
+
+Supabase issues two kinds of access token, and only one of them can identify an account:
+
+| Kind | Bound to | `GET /v1/profile` |
+|---|---|---|
+| Classic personal access token | the **user** | works |
+| Scoped access token (capability picker, custom expiry) | an **organization / project** | `403 "This endpoint requires a user-scoped access token"` |
+
+Granting every capability does not help: the endpoint asks *who the token belongs to*, not what it may
+do, and an organization has no email. This is the same underlying limit that makes `/v1/profile`
+reject OAuth tokens, phrased differently.
+
+**Classic tokens can no longer be created.** Confirmed by the user against the dashboard: the token
+screen now always requires picking scopes. So `/v1/profile` is unreachable for every token this app
+will ever be handed.
+
+Consequences:
+
+- **Drop the `/v1/profile` call entirely.** Not "try it and fall back" — no new token can satisfy it,
+  so the fallback would be the only live branch. `GET /v1/organizations` both validates the token and
+  names the row, which is one call instead of two and makes the PAT path mirror the OAuth one.
+- `email` and `sb_account_id` stay in the schema as nullable columns. They cost nothing, `ownerLabel`
+  already falls back to the organization, and `sb_account_id` participates in the unique index
+  expression — removing them would churn the index for no gain.
+- The warning copy on the connections page ("full control of the whole Supabase account … no expiry")
+  is now simply wrong and must be rewritten around scoped tokens.
+- Rejected: requiring a user-scoped token. It is no longer even possible to create one.
+
+### Measured: scoped PAT vs OAuth
+
+Probed 2026-08-24 with a live scoped token. A scoped PAT is **more** capable than OAuth:
+
+| Endpoint | OAuth | Scoped PAT |
+|---|---|---|
+| `/v1/organizations`, `/v1/projects`, `health`, `advisors`, `query/read-only` | works | works |
+| `config/disk/util` | 401 | **200** |
+| `api-keys` | 403 | **200** |
+| `/v1/profile` | 401 | 403 |
+
+Both are limited to a single organization, so a user with N organizations needs N connections either
+way. Neither option dominates: OAuth is safer operationally (auto-refreshing, revocable from the
+user's own Supabase settings, nothing pasted), scoped PAT is more complete. **Decision: present them
+as equals** rather than burying the token form under an "Advanced" disclosure.
+
 ### Scope decision — settled 2026-08-24
 
 **Request write scopes up front.** Not tested whether `Database: Read` alone suffices for read-only
@@ -217,15 +267,24 @@ SQL, and deliberately so: the product direction (below) requires write access an
 state that changing an OAuth app's scopes **forces every existing user to re-authorize**. Asking for
 the final scope set on day one avoids a forced re-authorization migration later.
 
-Registered scope set:
+Registered scope set — these are the dashboard's checkboxes, one per row:
 
 ```
 Organizations: Read
 Projects:      Read + Write
 Database:      Read + Write
 Auth:          Read + Write      (user management, per the product direction)
-api_gateway_keys_read            (API keys panel; real scope name, not the docs' "Secrets: Read")
+Secrets:       Read              (the API keys panel)
 ```
+
+The dashboard offers only these ten families (Auth, Database, Domains, Edge Functions, Environment,
+Organizations, Projects, Rest, Secrets, Storage), each Read and/or Write. The API reports the
+underlying grant names in its errors instead — a 403 from `/api-keys` names `api_gateway_keys_read`,
+which is one of the grants behind **Secrets: Read**. Do not go looking for a checkbox by that name.
+
+Note what else `Secrets: Read` carries: "Retrieve a project's secrets" and the pgsodium config. It is
+a heavy scope to spend on one UI panel, but it is included now rather than later because adding it
+afterwards forces every existing user to re-authorize.
 
 Consequence accepted: the consent screen is longer and lists write permissions. That is honest — the
 app genuinely does write.

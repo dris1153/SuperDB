@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IconArrowLeft, IconLock, IconLockOpen } from "@tabler/icons-react";
 import { resolveProject } from "@/lib/inventory";
+import { ownerLabel } from "@/lib/connections";
 import { getDiskUtil, getHealth, listApiKeys } from "@/lib/mgmt-api";
 import { dbOverview, listTables } from "@/lib/db-introspect";
 import { safe } from "@/lib/safe";
@@ -15,13 +16,17 @@ export default async function ProjectPage({ params }: { params: Promise<{ ref: s
   const { ref } = await params;
   const found = await resolveProject(ref);
   if (!found) notFound();
-  const { token, account, project } = found;
+  const { token, connection, project } = found;
 
-  // Every one of these fails on a paused project; the page still renders what it can.
+  // Disk utilisation and API keys answer "does not support oauth access yet" — a platform limit, not a
+  // scope one. Skip the calls entirely rather than spending a round trip on a guaranteed 401.
+  const viaOAuth = connection.kind === "oauth";
+
+  // Every one of these fails on a paused project too; the page still renders what it can.
   const [health, disk, keys, overview, tables] = await Promise.all([
     safe(() => getHealth(token, ref)),
-    safe(() => getDiskUtil(token, ref)),
-    safe(() => listApiKeys(token, ref)),
+    viaOAuth ? null : safe(() => getDiskUtil(token, ref)),
+    viaOAuth ? null : safe(() => listApiKeys(token, ref)),
     safe(() => dbOverview(token, ref)),
     safe(() => listTables(token, ref)),
   ]);
@@ -39,7 +44,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ ref: s
         <ProjectStatus status={project.status} />
         <span className="font-mono text-xs text-fg-subtle">{ref}</span>
         <div className="ml-auto text-right text-sm">
-          <div className="text-fg-muted">{account.email}</div>
+          <div className="text-fg-muted">{ownerLabel(connection)}</div>
           <div className="text-xs text-fg-subtle">
             {project.organization_slug} · {project.region} · PG {project.database?.version ?? "—"} · created {date(project.created_at)}
           </div>
@@ -51,7 +56,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ ref: s
         <Stat
           label="Disk used"
           value={bytes(disk?.metrics.fs_used_bytes)}
-          hint={disk ? `of ${bytes(disk.metrics.fs_size_bytes)}` : undefined}
+          hint={
+            viaOAuth
+              ? "unavailable over OAuth"
+              : disk
+                ? `of ${bytes(disk.metrics.fs_size_bytes)}`
+                : undefined
+          }
         />
         <Stat
           label="Connections"
@@ -119,7 +130,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ ref: s
 
       <section className="space-y-2">
         <h2 className="text-sm text-fg-muted">API keys</h2>
-        {keys && keys.length > 0 ? (
+        {viaOAuth ? (
+          <p className="text-sm text-fg-subtle">
+            Unavailable over OAuth — reading API keys needs the Secrets: Read scope, which also grants access
+            to project secrets. Connect this account with an access token if you need it.
+          </p>
+        ) : keys && keys.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {keys.map((k) => (
               <Badge key={k.id ?? k.name} className="font-mono">

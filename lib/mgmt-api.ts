@@ -2,8 +2,6 @@ import "server-only";
 
 const BASE = "https://api.supabase.com";
 
-export type Profile = { gotrue_id: string; primary_email: string; username: string };
-
 export type Project = {
   ref: string;
   name: string;
@@ -42,7 +40,6 @@ async function call<T>(token: string, path: string, init?: RequestInit): Promise
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
-export const getProfile = (t: string) => call<Profile>(t, "/v1/profile");
 export const listProjects = (t: string) => call<Project[]>(t, "/v1/projects");
 export const listOrgs = (t: string) => call<Org[]>(t, "/v1/organizations");
 export const getProject = (t: string, ref: string) => call<Project>(t, `/v1/projects/${ref}`);
