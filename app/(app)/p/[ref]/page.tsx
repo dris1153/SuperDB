@@ -2,15 +2,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IconArrowLeft, IconLock, IconLockOpen } from "@tabler/icons-react";
 import { resolveProject } from "@/lib/inventory";
-import { ownerLabel } from "@/lib/connections";
 import { getDiskUtil, getHealth, listApiKeys } from "@/lib/mgmt-api";
 import { dbOverview, listTables } from "@/lib/db-introspect";
 import { safe } from "@/lib/safe";
 import { bytes, count, date } from "@/lib/format";
-import { Badge, Card, Empty, Stat } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Empty } from "@/components/ui/empty-state";
+import { Stat } from "@/components/ui/stat";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProjectStatus, ServiceStatus } from "@/components/status";
 
 export const dynamic = "force-dynamic";
+
+const HEAD = "text-xs font-normal text-subtle";
 
 export default async function ProjectPage({ params }: { params: Promise<{ ref: string }> }) {
   const { ref } = await params;
@@ -35,17 +40,17 @@ export default async function ProjectPage({ params }: { params: Promise<{ ref: s
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
-      <Link href="/" className="inline-flex items-center gap-1 text-sm text-fg-subtle hover:text-fg">
+      <Link href="/" className="inline-flex items-center gap-1 text-sm text-subtle hover:text-foreground">
         <IconArrowLeft size={15} stroke={1.5} /> Projects
       </Link>
 
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl">{project.name}</h1>
         <ProjectStatus status={project.status} />
-        <span className="font-mono text-xs text-fg-subtle">{ref}</span>
+        <span className="font-mono text-xs text-subtle">{ref}</span>
         <div className="ml-auto text-right text-sm">
-          <div className="text-fg-muted">{ownerLabel(connection)}</div>
-          <div className="text-xs text-fg-subtle">
+          <div className="text-muted-foreground">{connection.display_name}</div>
+          <div className="text-xs text-subtle">
             {project.organization_slug} · {project.region} · PG {project.database?.version ?? "—"} · created {date(project.created_at)}
           </div>
         </div>
@@ -77,74 +82,79 @@ export default async function ProjectPage({ params }: { params: Promise<{ ref: s
       </div>
 
       <section className="space-y-2">
-        <h2 className="text-sm text-fg-muted">Services</h2>
+        <h2 className="text-sm text-muted-foreground">Services</h2>
         {health && health.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {health.map((s) => <ServiceStatus key={s.name} service={s} />)}
           </div>
         ) : (
-          <p className="text-sm text-fg-subtle">Health unavailable — the project may be paused.</p>
+          <p className="text-sm text-subtle">Health unavailable — the project may be paused.</p>
         )}
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm text-fg-muted">Tables</h2>
+        <h2 className="text-sm text-muted-foreground">Tables</h2>
         {!tables ? (
           <Empty>Could not query this database. Paused projects and restricted tokens return nothing here.</Empty>
         ) : tables.length === 0 ? (
           <Empty>No user tables yet.</Empty>
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-line">
-            <table className="w-full min-w-2xl text-sm">
-              <thead className="border-b border-line bg-panel text-left text-xs text-fg-subtle">
-                <tr>
+          <div className="rounded-lg border border-border">
+            <Table className="min-w-2xl">
+              <TableHeader className="bg-card">
+                <TableRow className="hover:bg-transparent">
                   {["Schema", "Table", "Rows (est.)", "Size", "Columns", "RLS"].map((h) => (
-                    <th key={h} className="px-3 py-2 font-normal">{h}</th>
+                    <TableHead key={h} className={HEAD}>{h}</TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {tables.map((t) => (
-                  <tr key={`${t.schema}.${t.name}`} className="border-b border-line last:border-0 hover:bg-ash/40">
-                    <td className="px-3 py-2 font-mono text-xs text-fg-subtle">{t.schema}</td>
-                    <td className="px-3 py-2 text-fg">{t.name}</td>
-                    <td className="px-3 py-2 tabular-nums text-fg-muted">{count(t.est_rows)}</td>
-                    <td className="px-3 py-2 tabular-nums text-fg-muted">{bytes(t.total_bytes)}</td>
-                    <td className="px-3 py-2 tabular-nums text-fg-subtle">{t.columns}</td>
-                    <td className="px-3 py-2">
+                  <TableRow key={`${t.schema}.${t.name}`}>
+                    <TableCell className="font-mono text-xs text-subtle">{t.schema}</TableCell>
+                    <TableCell className="text-foreground">{t.name}</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">{count(t.est_rows)}</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">{bytes(t.total_bytes)}</TableCell>
+                    <TableCell className="tabular-nums text-subtle">{t.columns}</TableCell>
+                    <TableCell>
                       {t.rls ? (
-                        <Badge tone="brand"><IconLock size={12} stroke={1.5} /> on</Badge>
+                        <Badge variant="outline" className="rounded-full border-brand-border text-primary">
+                          <IconLock size={12} stroke={1.5} /> on
+                        </Badge>
                       ) : (
-                        <Badge tone={t.schema === "public" ? "warn" : "neutral"}>
+                        <Badge
+                          variant="outline"
+                          className={t.schema === "public" ? "rounded-full border-warn/40 text-warn" : "rounded-full"}
+                        >
                           <IconLockOpen size={12} stroke={1.5} /> off
                         </Badge>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm text-fg-muted">API keys</h2>
+        <h2 className="text-sm text-muted-foreground">API keys</h2>
         {viaOAuth ? (
-          <p className="text-sm text-fg-subtle">
+          <p className="text-sm text-subtle">
             Unavailable over OAuth — reading API keys needs the Secrets: Read scope, which also grants access
             to project secrets. Connect this account with an access token if you need it.
           </p>
         ) : keys && keys.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {keys.map((k) => (
-              <Badge key={k.id ?? k.name} className="font-mono">
+              <Badge key={k.id ?? k.name} variant="outline" className="rounded-full font-mono">
                 {k.name}{k.prefix ? ` · ${k.prefix}…` : ""}
               </Badge>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-fg-subtle">No keys returned. Values are never revealed here.</p>
+          <p className="text-sm text-subtle">No keys returned. Values are never revealed here.</p>
         )}
       </section>
     </div>

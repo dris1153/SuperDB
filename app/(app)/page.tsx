@@ -2,7 +2,9 @@ import Link from "next/link";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { loadInventory } from "@/lib/inventory";
 import { ProjectsBoard } from "@/components/projects-board";
-import { Card, Empty, Stat } from "@/components/ui";
+import { Card } from "@/components/ui/card";
+import { Empty } from "@/components/ui/empty-state";
+import { Stat } from "@/components/ui/stat";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +17,7 @@ export default async function ProjectsPage() {
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <header>
         <h1 className="text-xl">Projects</h1>
-        <p className="text-sm text-fg-subtle">Every Supabase project across every connected account.</p>
+        <p className="text-sm text-subtle">Every Supabase project across every connected account.</p>
       </header>
 
       {connections.length === 0 ? (
@@ -39,10 +41,10 @@ export default async function ProjectsPage() {
                 <IconAlertTriangle size={16} stroke={1.5} />
                 Some connections could not be read
               </div>
-              <ul className="mt-2 space-y-1 text-xs text-fg-subtle">
+              <ul className="mt-2 space-y-1 text-xs text-subtle">
                 {errors.map((e) => (
                   <li key={e.owner}>
-                    <span className="text-fg-muted">{e.owner}</span> — {e.message}
+                    <span className="text-muted-foreground">{e.owner}</span> — {e.message}
                   </li>
                 ))}
               </ul>

@@ -34,6 +34,20 @@ export async function proxy(request: NextRequest) {
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
+
+  // nextLevel is aal2 only for users who actually enrolled a factor, so MFA stays opt-in per account
+  // and nobody without one is ever sent here. /mfa and /auth/* stay reachable, otherwise someone
+  // mid-challenge could neither verify nor sign out.
+  if (data.user && !request.nextUrl.pathname.startsWith("/mfa") && !isPublic) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/mfa";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return response;
 }
 

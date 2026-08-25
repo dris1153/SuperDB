@@ -1,13 +1,13 @@
 import "server-only";
-import { connectionsWithTokens, ownerLabel, type Connection, type ConnectionKind } from "./connections";
+import { connectionsWithTokens, type Connection, type ConnectionKind } from "./connections";
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
 
 export type InventoryProject = Project & {
   connectionId: string;
   kind: ConnectionKind;
-  /** Account email for token connections, organization name for OAuth ones. */
+  /** The name the user gave this connection, not the organization name. */
   owner: string;
-  label: string | null;
+  tags: string[];
   orgName: string;
 };
 
@@ -24,7 +24,7 @@ export async function loadInventory(): Promise<Inventory> {
 
   const perConnection = await Promise.all(
     connections.map(async ({ token, ...connection }) => {
-      const owner = ownerLabel(connection);
+      const owner = connection.display_name;
       if (!token) {
         errors.push({ owner, message: connection.last_error ?? "Reconnect required" });
         return [];
@@ -37,7 +37,7 @@ export async function loadInventory(): Promise<Inventory> {
           connectionId: connection.id,
           kind: connection.kind,
           owner,
-          label: connection.label,
+          tags: connection.tags,
           orgName: orgName.get(p.organization_slug) ?? p.organization_slug,
         }));
       } catch (e) {

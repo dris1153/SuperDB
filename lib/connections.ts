@@ -1,4 +1,6 @@
 import "server-only";
+import { recordEvent } from "./audit";
+import { normaliseTags } from "./tags";
 import { open, seal } from "./crypto";
 import { listOrgs } from "./mgmt-api";
 import { refreshTokens, revoke, type OAuthTokens } from "./oauth";
@@ -8,7 +10,7 @@ export type ConnectionKind = "pat" | "oauth";
 
 /** Never selects dek_wrapped or secret_cipher — safe to hand to a client component. */
 const SAFE_COLUMNS =
-  "id, kind, sb_account_id, email, org_slug, org_name, label, token_hint, created_at, synced_at, last_error";
+  "id, kind, sb_account_id, email, org_slug, org_name, display_name, tags, token_hint, created_at, synced_at, last_error";
 
 export type Connection = {
   id: string;
@@ -17,15 +19,13 @@ export type Connection = {
   email: string | null;
   org_slug: string | null;
   org_name: string | null;
-  label: string | null;
+  display_name: string;
+  tags: string[];
   token_hint: string;
   created_at: string;
   synced_at: string | null;
   last_error: string | null;
 };
-
-/** Organization name: no token kind can reach an account email any more. Email is a legacy column. */
-export const ownerLabel = (c: Connection) => c.email ?? c.org_name ?? c.org_slug ?? "unknown";
 
 export function connectModes(): ConnectionKind[] {
   const raw = process.env.CONNECT_MODES ?? "pat,oauth";
@@ -85,10 +85,23 @@ async function accessTokenFor(
       .from("connections")
       .update({ ...oauthColumns(tokens), synced_at: new Date().toISOString(), last_error: null })
       .eq("id", row.id);
+    await recordEvent(supabase, {
+      connectionId: row.id,
+      owner: row.display_name,
+      kind: row.kind,
+      event: "refreshed",
+    });
     return tokens.access_token;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     await supabase.from("connections").update({ last_error: message }).eq("id", row.id);
+    await recordEvent(supabase, {
+      connectionId: row.id,
+      owner: row.display_name,
+      kind: row.kind,
+      event: "refresh_failed",
+      detail: message,
+    });
     throw new Error(`Reconnect required: ${message}`);
   }
 }
@@ -151,7 +164,7 @@ async function orgFor(token: string) {
   return org;
 }
 
-export async function addPatConnection(pat: string, label: string | null) {
+export async function addPatConnection(pat: string, tags: string[]) {
   if (!modeEnabled("pat")) throw new Error("Token connections are disabled on this instance");
 
   const token = pat.trim();
@@ -162,11 +175,9 @@ export async function addPatConnection(pat: string, label: string | null) {
   const org = await orgFor(token);
   await write({
     kind: "pat",
-    match: { org_slug: org.slug },
+    org,
+    tags,
     values: {
-      org_slug: org.slug,
-      org_name: org.name,
-      label,
       ...sealSecret({ access: token, refresh: null }),
       token_hint: token.slice(-4),
       expires_at: null,
@@ -179,45 +190,93 @@ export async function addOAuthConnection(tokens: OAuthTokens) {
   if (!modeEnabled("oauth")) throw new Error("OAuth connections are disabled on this instance");
 
   const org = await orgFor(tokens.access_token);
-  await write({
-    kind: "oauth",
-    match: { org_slug: org.slug },
-    values: { org_slug: org.slug, org_name: org.name, ...oauthColumns(tokens) },
-  });
+  await write({ kind: "oauth", org, tags: [], values: oauthColumns(tokens) });
   return org;
 }
 
-/** Select-then-write: the unique index guards integrity, and this avoids upserting onto an expression. */
+/**
+ * Select-then-write: the unique index guards integrity, and this avoids upserting onto an expression.
+ *
+ * display_name and tags are set on insert only. They belong to the user, and folding them into the
+ * update would mean every OAuth re-authorization or re-pasted token silently reset the name they
+ * chose and erased their tags. org_name is the opposite case: it mirrors Supabase, so it does follow
+ * a rename upstream.
+ */
 async function write({
   kind,
-  match,
+  org,
+  tags,
   values,
 }: {
   kind: ConnectionKind;
-  match: Record<string, string>;
+  org: { slug: string; name: string };
+  tags: string[];
   values: Record<string, unknown>;
 }) {
   const { supabase, user } = await requireUser();
-  const row = { ...values, synced_at: new Date().toISOString(), last_error: null };
+  const always = {
+    ...values,
+    org_slug: org.slug,
+    org_name: org.name,
+    synced_at: new Date().toISOString(),
+    last_error: null,
+  };
 
   const { data: existing } = await supabase
     .from("connections")
     .select("id")
     .eq("kind", kind)
-    .match(match)
+    .eq("org_slug", org.slug)
     .maybeSingle();
 
   const { error } = existing
-    ? await supabase.from("connections").update(row).eq("id", existing.id)
-    : await supabase.from("connections").insert({ ...row, user_id: user.id, kind });
+    ? await supabase.from("connections").update(always).eq("id", existing.id)
+    : await supabase.from("connections").insert({
+        ...always,
+        user_id: user.id,
+        kind,
+        display_name: org.name,
+        tags: normaliseTags(tags),
+      });
   if (error) throw new Error(error.message);
+
+  await recordEvent(supabase, {
+    connectionId: existing?.id,
+    owner: org.name,
+    kind,
+    event: "connected",
+  });
+}
+
+/** The only path that may change display_name or tags after the first connect. */
+export async function updateConnection(
+  id: string,
+  fields: { display_name: string; tags: string[] },
+) {
+  const { supabase } = await requireUser();
+  const name = fields.display_name.trim();
+  if (!name) throw new Error("Name cannot be empty");
+
+  const { error } = await supabase
+    .from("connections")
+    .update({ display_name: name, tags: normaliseTags(fields.tags) })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/** Every tag the user has used, for the picker. */
+export async function listTags(): Promise<string[]> {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.from("connections").select("tags");
+  if (error) throw new Error(error.message);
+  return [...new Set((data ?? []).flatMap((r) => (r.tags as string[]) ?? []))].sort();
 }
 
 export async function removeConnection(id: string) {
   const { supabase } = await requireUser();
   const { data } = await supabase
     .from("connections")
-    .select("kind, dek_wrapped, secret_cipher")
+    .select("kind, display_name, dek_wrapped, secret_cipher")
     .eq("id", id)
     .maybeSingle();
 
@@ -229,4 +288,13 @@ export async function removeConnection(id: string) {
 
   const { error } = await supabase.from("connections").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  // Written after the delete so a failed delete is not logged as a success. connection_id survives
+  // as a dangling reference on purpose — it is the row most worth keeping.
+  await recordEvent(supabase, {
+    connectionId: id,
+    owner: (data as { display_name?: string } | null)?.display_name ?? null,
+    kind: data?.kind ?? null,
+    event: "disconnected",
+  });
 }
