@@ -76,6 +76,15 @@ export default async function ProjectOverviewPage({
   const primaryPooler = pooler?.find((p) => p.database_type === "PRIMARY") ?? pooler?.[0];
   const projectUrl = `https://${ref}.supabase.co`;
 
+  const transactionPooler =
+    pooler?.find((p) => p.pool_mode === "transaction")?.connection_string ??
+    primaryPooler?.connection_string ??
+    null;
+  // Supabase returns no session-mode row; its own dashboard derives the string by swapping the
+  // transaction pooler port. Looking for pool_mode "session" matched nothing, which is why the
+  // Direct tab reported it unavailable.
+  const sessionPooler = transactionPooler?.replace(":6543", ":5432") ?? null;
+
   return (
     <div className="mx-auto max-w-7xl space-y-12 p-8">
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)]">
@@ -151,11 +160,8 @@ export default async function ProjectOverviewPage({
           projectRef: ref,
           projectUrl,
           dbHost: project.database?.host ?? null,
-          transactionPooler:
-            pooler?.find((p) => p.pool_mode === "transaction")?.connection_string ??
-            primaryPooler?.connection_string ??
-            null,
-          sessionPooler: pooler?.find((p) => p.pool_mode === "session")?.connection_string ?? null,
+          transactionPooler,
+          sessionPooler,
         }}
       />
 

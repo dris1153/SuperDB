@@ -23,7 +23,10 @@ export type ApiKey = {
   name: string;
   type: "legacy" | "publishable" | "secret" | null;
   prefix: string | null;
-  /** Only populated when reveal is true — this is the real credential. */
+  /**
+   * The real credential. Measured, not assumed: the API returns it at reveal=false too, so callers
+   * that only need the publishable key must drop the secret rather than rely on the flag.
+   */
   api_key: string | null;
 };
 

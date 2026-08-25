@@ -8,9 +8,9 @@ import { createHighlighter, type Highlighter } from "shiki";
  * A single highlighter is created lazily and reused — createHighlighter loads grammars, so calling
  * it per snippet would repeat that work on every request.
  */
-export type Lang = "bash" | "ini" | "json" | "typescript";
+export type Lang = "bash" | "html" | "ini" | "javascript" | "json" | "tsx" | "typescript";
 
-const LANGS: Lang[] = ["bash", "ini", "json", "typescript"];
+const LANGS: Lang[] = ["bash", "html", "ini", "javascript", "json", "tsx", "typescript"];
 const THEME = "github-dark-default";
 
 let highlighterPromise: Promise<Highlighter> | null = null;

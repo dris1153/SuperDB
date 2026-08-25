@@ -1,16 +1,6 @@
 "use client";
 
-import { IconBox, IconDatabase, IconPlugConnected, IconServer, IconSparkles } from "@tabler/icons-react";
-import { ConnectSheet, type ConnectInfo } from "./connect-sheet";
-
-/** The five entry points Supabase shows — all open the same sheet, as the real Connect button does. */
-const CELLS = [
-  { icon: IconBox, title: "Framework", subtitle: "Use a client library" },
-  { icon: IconServer, title: "Server", subtitle: "Build APIs" },
-  { icon: IconDatabase, title: "Direct", subtitle: "Connection string" },
-  { icon: IconPlugConnected, title: "ORM", subtitle: "Third-party library" },
-  { icon: IconSparkles, title: "MCP", subtitle: "Connect your agent" },
-];
+import { ConnectSheet, METHODS, type ConnectInfo } from "./connect-sheet";
 
 export function GetConnected({ info }: { info: ConnectInfo }) {
   return (
@@ -18,8 +8,10 @@ export function GetConnected({ info }: { info: ConnectInfo }) {
       <h2 className="text-lg text-foreground">Get connected</h2>
 
       <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-border md:grid-cols-5">
-        {CELLS.map(({ icon: Icon, title, subtitle }, index) => (
-          <ConnectSheet key={title} info={info}>
+        {METHODS.map(({ id, icon: Icon, title, subtitle }, index) => (
+          // Each tile opens the sheet on its own tab; without the id every one of them landed on
+          // Direct, since that is the sheet's default.
+          <ConnectSheet key={id} info={info} method={id}>
             <button
               className={[
                 "flex flex-col items-center gap-1.5 px-4 py-8 text-center transition-colors hover:bg-muted/40",

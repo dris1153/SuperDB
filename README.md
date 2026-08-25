@@ -29,8 +29,9 @@ hidden.
 Disk and RAM appear here because this project is reached through an access token. Over OAuth those
 two cards explain themselves instead — see [Connecting an account](#connecting-an-account).
 
-**Connect sheet** — the same right-hand sheet Supabase shows, with Direct, Server and MCP panels
-built. Framework and ORM are stubbed.
+**Connect sheet** — the same right-hand sheet Supabase shows. Framework covers ten frameworks with
+their real quickstart files, the shadcn toggle where Supabase publishes a registry item, and a Copy
+prompt button. Direct, Server, MCP and ORM (Prisma, Drizzle) are built too.
 
 ![The Connect sheet open on the Direct tab, offering direct connection, transaction pooler and session pooler, with a connection string and a field-by-field parameter table](docs/images/connect.png)
 
@@ -252,7 +253,8 @@ Theme follows `DESIGN.md` for palette and typography, but uses the Supabase *das
 ## Not built yet
 
 Eleven of the thirteen project nav items — Table Editor, SQL Editor, Auth, Storage, Edge Functions,
-Realtime, Advisors, Observability, Logs, Project Settings — are visible and disabled. Also: Framework
-and ORM panels in the Connect sheet, master-password rotation from the UI (the server action exists),
+Realtime, Advisors, Observability, Logs, Project Settings — are visible and disabled. Also: six mobile
+and non-JS frameworks listed in the Connect sheet as "soon" (Flask, Expo, Flutter, Ionic, Swift,
+Android Kotlin), master-password rotation from the UI (the server action exists),
 moving `ENCRYPTION_KEY` into a KMS, pause / restore / restart actions, and background sync with
 cached history.

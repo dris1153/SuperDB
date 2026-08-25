@@ -3,8 +3,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   IconBox,
-  IconCheck,
-  IconCopy,
   IconDatabase,
   IconExternalLink,
   IconEye,
@@ -16,6 +14,9 @@ import {
 } from "@tabler/icons-react";
 import { getServerEnv, type ServerEnv } from "@/lib/connect-actions";
 import { cn } from "@/lib/utils";
+import { FrameworkPanel } from "./connect-framework-panel";
+import { OrmPanel } from "./connect-orm-panel";
+import { Copyable, Snippet, Step } from "./connect-primitives";
 import { Button } from "./ui/button";
 import {
   Sheet,
@@ -41,9 +42,10 @@ export type ConnectInfo = {
   sessionPooler: string | null;
 };
 
-type Method = "framework" | "server" | "direct" | "orm" | "mcp";
+export type Method = "framework" | "server" | "direct" | "orm" | "mcp";
 
-const METHODS: {
+/** Also drives the Overview tiles, so the two lists cannot drift apart. */
+export const METHODS: {
   id: Method;
   icon: typeof IconBox;
   title: string;
@@ -75,73 +77,6 @@ const METHODS: {
     subtitle: "Connect your agent",
   },
 ];
-
-function Copyable({ value, className }: { value: string; className?: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <Button
-      variant="outline"
-      size="icon-sm"
-      aria-label="Copy"
-      className={className}
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          // Denied outside a secure context; the value stays selectable on screen.
-        }
-      }}
-    >
-      {copied ? (
-        <IconCheck size={13} stroke={1.5} className="text-primary" />
-      ) : (
-        <IconCopy size={13} stroke={1.5} />
-      )}
-    </Button>
-  );
-}
-
-function Snippet({ value }: { value: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-md border border-border bg-background p-2.5">
-      <code className="min-w-0 flex-1 overflow-x-auto font-mono text-xs whitespace-pre text-muted-foreground">
-        {value}
-      </code>
-      <Copyable value={value} />
-    </div>
-  );
-}
-
-function Step({
-  index,
-  title,
-  description,
-  children,
-}: {
-  index: number;
-  title: string;
-  description: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
-      <div className="flex gap-2.5">
-        <span className="flex size-5 shrink-0 items-center justify-center rounded border border-border text-[11px] text-subtle">
-          {index}
-        </span>
-        <div>
-          <div className="text-sm text-foreground">{title}</div>
-          <p className="mt-0.5 text-xs leading-relaxed text-subtle">
-            {description}
-          </p>
-        </div>
-      </div>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
 
 const SKILLS_STEP = <Snippet value="npx skills add supabase/agent-skills" />;
 
@@ -176,8 +111,8 @@ function DirectPanel({ info }: { info: ConnectInfo }) {
   const selected = options.find((o) => o.id === method)!;
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+    <div className="h-full flex flex-col gap-6">
+      <div className="px-5 grid gap-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
         <div className="text-sm text-foreground">Connection Method</div>
         <div className="overflow-hidden rounded-md border border-border">
           {options.map((option, index) => (
@@ -211,7 +146,7 @@ function DirectPanel({ info }: { info: ConnectInfo }) {
         </div>
       </div>
 
-      <div className="border-t border-border pt-6">
+      <div className="px-5 border-t border-border pt-6 flex-1 bg-secondary pb-5">
         <h3 className="mb-4 text-base text-foreground">Follow these steps</h3>
 
         <div className="mb-4 flex items-start gap-2.5 rounded-md border border-border bg-card p-3">
@@ -331,7 +266,7 @@ function ServerPanel({ projectRef }: { projectRef: string }) {
   }, [projectRef]);
 
   return (
-    <div className="space-y-6">
+    <div className="h-full flex flex-col gap-6 bg-secondary px-5 mt-5 pt-6">
       <h3 className="text-base text-foreground">Follow these steps</h3>
 
       <Step
@@ -420,8 +355,8 @@ function McpPanel({ projectRef }: { projectRef: string }) {
       : `# Add this HTTP MCP server to your client:\n${url}`;
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+    <div className="h-full flex flex-col gap-6">
+      <div className="grid px-5 gap-3 sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
         <div className="text-sm text-foreground">Client</div>
         <div className="space-y-3">
           <Select value={client} onValueChange={setClient}>
@@ -446,7 +381,7 @@ function McpPanel({ projectRef }: { projectRef: string }) {
         </div>
       </div>
 
-      <div className="space-y-6 border-t border-border pt-6">
+      <div className="space-y-6 px-5 pb-5 border-t border-border pt-6 bg-secondary flex-1">
         <h3 className="text-base text-foreground">Follow these steps</h3>
 
         <Step
@@ -477,84 +412,114 @@ function McpPanel({ projectRef }: { projectRef: string }) {
   );
 }
 
-function ComingSoon({ what }: { what: string }) {
-  return (
-    <div className="rounded-md border border-dashed border-border p-8 text-center">
-      <p className="text-sm text-muted-foreground">
-        {what} setup is not built yet.
-      </p>
-      <p className="mt-1 text-xs text-subtle">
-        Unlike the other tabs this one is documentation rather than your
-        project&apos;s own connection details, so it is queued behind them.
-      </p>
-    </div>
-  );
-}
-
 export function ConnectSheet({
   info,
+  method: initial = "direct",
   children,
 }: {
   info: ConnectInfo;
+  /** Which tab the sheet opens on — the Overview tile that was clicked. */
+  method?: Method;
   children: ReactNode;
 }) {
-  const [method, setMethod] = useState<Method>("direct");
+  const [method, setMethod] = useState<Method>(initial);
+
+  /**
+   * Panels are mounted on first visit and then only hidden, never unmounted. Swapping them with a
+   * conditional threw away everything they had fetched, so every return trip to Server or Framework
+   * cost another Management API call and reset the user's selections. Tabs never opened stay
+   * unmounted, so opening the sheet still fetches nothing on its own.
+   */
+  const [visited, setVisited] = useState<Set<Method>>(() => new Set<Method>([initial]));
+
+  function show(next: Method) {
+    setMethod(next);
+    setVisited((seen) => (seen.has(next) ? seen : new Set(seen).add(next)));
+  }
+
+  function panelFor(id: Method) {
+    switch (id) {
+      case "direct":
+        return <DirectPanel info={info} />;
+      case "server":
+        return <ServerPanel projectRef={info.projectRef} />;
+      case "mcp":
+        return <McpPanel projectRef={info.projectRef} />;
+      case "framework":
+        return <FrameworkPanel projectRef={info.projectRef} />;
+      case "orm":
+        return (
+          <OrmPanel
+            transactionPooler={info.transactionPooler}
+            sessionPooler={info.sessionPooler}
+          />
+        );
+    }
+  }
 
   return (
     <Sheet>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent
         side="right"
-        className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl!"
+        className="w-full gap-0 overflow-y-auto p-0 sm:max-w-4xl! flex flex-col"
       >
-        <SheetHeader className="border-b border-border p-5">
+        <SheetHeader className="p-5!">
           <SheetTitle>Connect to your project</SheetTitle>
           <SheetDescription>
             Choose how you want to use Supabase
           </SheetDescription>
         </SheetHeader>
 
-        <div className="grid grid-cols-2 border-b border-border sm:grid-cols-5">
-          {METHODS.map(({ id, icon: Icon, title, subtitle }, index) => (
-            <button
-              key={id}
-              onClick={() => setMethod(id)}
-              className={cn(
-                "flex flex-col items-center gap-1 px-3 py-4 text-center transition-colors",
-                index > 0 && "border-l border-border",
-                method === id ? "bg-muted/60" : "hover:bg-muted/30",
-              )}
-            >
-              <Icon
-                size={17}
-                stroke={1.5}
-                className={
-                  method === id ? "text-foreground" : "text-muted-foreground"
-                }
-              />
-              <span
+        <div className="w-full bg-border h-px mb-5 shrink-0" />
+
+        <div className="w-full px-5">
+          <div className="grid overflow-hidden grid-cols-2 border border-border sm:grid-cols-5 rounded-md">
+            {METHODS.map(({ id, icon: Icon, title, subtitle }, index) => (
+              <button
+                key={id}
+                onClick={() => show(id)}
                 className={cn(
-                  "text-xs",
-                  method === id ? "text-foreground" : "text-muted-foreground",
+                  "flex flex-col items-center gap-1 px-3 py-4 text-center transition-colors",
+                  index > 0 && "border-l border-border",
+                  method === id ? "bg-muted/60" : "hover:bg-muted/30",
                 )}
               >
-                {title}
-              </span>
-              <span className="text-[11px] leading-tight text-subtle">
-                {subtitle}
-              </span>
-            </button>
-          ))}
+                <Icon
+                  size={17}
+                  stroke={1.5}
+                  className={
+                    method === id ? "text-foreground" : "text-muted-foreground"
+                  }
+                />
+                <span
+                  className={cn(
+                    "text-xs",
+                    method === id ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {title}
+                </span>
+                <span className="text-[11px] leading-tight text-subtle">
+                  {subtitle}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="p-5">
-          {method === "direct" ? <DirectPanel info={info} /> : null}
-          {method === "server" ? (
-            <ServerPanel projectRef={info.projectRef} />
-          ) : null}
-          {method === "mcp" ? <McpPanel projectRef={info.projectRef} /> : null}
-          {method === "framework" ? <ComingSoon what="Framework" /> : null}
-          {method === "orm" ? <ComingSoon what="ORM" /> : null}
+        {method !== "server" && (
+          <div className="w-full bg-border h-px my-5 shrink-0" />
+        )}
+
+        <div className="flex-1">
+          {METHODS.filter(({ id }) => visited.has(id)).map(({ id }) => (
+            // `contents` keeps the wrapper out of the layout, so the active panel sits in the flex
+            // column exactly as it did when it was rendered directly.
+            <div key={id} className={method === id ? "contents" : "hidden"}>
+              {panelFor(id)}
+            </div>
+          ))}
         </div>
       </SheetContent>
     </Sheet>
