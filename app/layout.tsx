@@ -11,9 +11,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// Dark-only: the palette lives in :root, and the `dark` class is here so `dark:` variants inside
+// shadcn components resolve against it.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" className={`dark ${inter.variable} ${mono.variable}`}>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

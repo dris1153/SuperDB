@@ -1,53 +1,191 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-/* Palette and type come from DESIGN.md. Density does not: this is an admin tool, so it uses the
-   Supabase dashboard's compact rhythm (6px radius, 8-16px gaps) rather than the landing page's
-   pill buttons and 64px section gaps. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * shadcn components are written against these shorthand variants — `data-open:`, `data-active:` and
+ * friends — but Radix emits `data-state="open"` and `data-orientation="horizontal"` instead. Without
+ * the mapping, Tailwind reads `data-open:` as the literal attribute `[data-open]`, matches nothing,
+ * and silently drops the rule.
+ *
+ * That is 27 `data-open` + 25 `data-closed` (every dialog, popover, select and menu animation),
+ * 11 `data-active` (the active tab styling) and the tabs orientation. Normally supplied by the
+ * `shadcn/tailwind.css` import that shadcn init writes but the package does not ship.
+ */
+@custom-variant data-open (&[data-state="open"]);
+@custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+
+/*
+ * Palette and type come from DESIGN.md, mapped onto shadcn's token names.
+ * Density does not: this is an admin tool, so it uses the Supabase dashboard's compact rhythm
+ * (6px radius, 8-16px gaps) rather than the landing page's pill buttons and 64px section gaps.
+ *
+ * The app is dark-only, so the dark palette lives in :root and <html> carries the `dark` class so
+ * that any `dark:` variant inside a shadcn component still resolves.
+ */
+:root {
+  --radius: 6px;
+
+  --background: #121212; /* Obsidian */
+  --foreground: #fafafa; /* Snow */
+
+  --card: #171717;
+  --card-foreground: #fafafa;
+  --popover: #1c1c1c;
+  --popover-foreground: #fafafa;
+
+  --primary: #3ecf8e; /* Phosphor Green */
+  /* DESIGN.md specifies #fafafa here, but white on #3ecf8e is ~1.7:1 contrast and unreadable.
+     The canvas colour reads at ~10:1. Do not "correct" this back to Snow. */
+  --primary-foreground: #121212;
+
+  --secondary: #242424; /* Ash */
+  --secondary-foreground: #fafafa;
+  --muted: #242424;
+  --muted-foreground: #b4b4b4; /* Silver Mist */
+  --accent: #242424;
+  --accent-foreground: #fafafa;
+
+  --destructive: #f56565;
+  --destructive-foreground: #fafafa;
+
+  --border: #2e2e2e; /* Charcoal */
+  --input: #393939; /* Slate */
+  --ring: #3ecf8e;
+
+  --sidebar: #171717;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #3ecf8e;
+  --sidebar-primary-foreground: #121212;
+  --sidebar-accent: #242424;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #2e2e2e;
+  --sidebar-ring: #3ecf8e;
+}
+
+/*
+ * Turns the variables above into Tailwind utilities (bg-card, border-border, bg-primary, …).
+ * `shadcn init` writes `@import "shadcn/tailwind.css"` for this, but that package ships no CSS, so
+ * the import resolves to nothing and every one of these utilities silently fails to exist —
+ * borders fall back to currentColor and backgrounds vanish. Declared here instead.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
 @theme {
-  --color-canvas: #121212;
-  --color-panel: #171717;
-  --color-elevated: #1c1c1c;
-  --color-ash: #242424;
-  --color-line: #2e2e2e;
-  --color-line-strong: #393939;
-  --color-graphite: #4d4d4d;
+  /* DESIGN.md has three text tones, shadcn slots two. Smoke is the most-used tone here and has
+     nowhere to go, so it keeps a token of its own. */
+  --color-subtle: #898989; /* Smoke — captions, metadata, helper text */
+  --color-brand-text: #00c573; /* Mint Pulse — link and inline accent */
+  --color-brand-border: #1f4b37; /* Forest Depth — pressed border on green */
+  --color-warn: #f5a623; /* transitional project states */
 
-  --color-fg: #fafafa;
-  --color-fg-muted: #b4b4b4;
-  --color-fg-subtle: #898989;
-
-  --color-brand: #3ecf8e;
-  --color-brand-text: #00c573;
-  --color-brand-border: #1f4b37;
-  --color-brand-deep: #006239;
-
-  --color-warn: #f5a623;
-  --color-danger: #f56565;
+  /* Toasts take their whole surface from the severity, not just their icon. The error trio was
+     sampled from Supabase's own toast; the success background is the same relationship applied to
+     the brand green, whose border and icon already exist above as brand-border and primary. */
+  --color-toast-error-bg: #1d1412;
+  --color-toast-error-border: #7f2315;
+  --color-toast-error-icon: #f16a50;
+  --color-toast-success-bg: #121e17;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  /* DESIGN.md compliance, enforced at the token level so components added later inherit it:
+     "don't add box-shadows" and "the type system tops out at 500". The utilities still compile —
+     they just emit nothing, and 500. Focus rings are NOT covered here; `ring-3` is a static utility
+     with no theme variable, so those are stripped in components/ui/*.tsx by hand. */
+  --shadow-2xs: none;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-xl: none;
+  --shadow-2xl: none;
+
+  /*
+   * Deliberate deviation from DESIGN.md, which says not to shadow "cards, popovers, or modals".
+   * That document was extracted from the supabase.com landing page, which contains no dropdowns,
+   * selects or modals at all — the rule was observed on cards and extrapolated to floating surfaces
+   * that were never in the sample. A menu that overlaps the page needs a depth cue that a 1px border
+   * cannot give; the real Supabase dashboard shadows its dropdowns too.
+   *
+   * Scoped by size rather than by class: md and lg are used only by select, dropdown-menu and
+   * popover. Cards, and anything added later, stay flat because sm and xs remain none.
+   *
+   * Values are much darker than Tailwind's defaults — rgb(0 0 0 / 0.1) is invisible over #121212.
+   */
+  --shadow-md:
+    0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg:
+    0 10px 24px -4px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.4);
+  --font-weight-semibold: 500;
+  --font-weight-bold: 500;
 }
 
 @layer base {
+  /* Tailwind v4 defaults border-color to currentColor, and shadcn components use bare `border-b` /
+     `border-t` utilities (Table, Dialog, AlertDialog). Without this they render in the text colour,
+     i.e. white. Normally supplied by the `shadcn/tailwind.css` import that ships no CSS. */
+  * {
+    border-color: var(--border);
+  }
+
   html {
     color-scheme: dark;
   }
 
   body {
-    background: var(--color-canvas);
-    color: var(--color-fg);
+    background: var(--background);
+    color: var(--foreground);
     font-family: var(--font-sans);
     /* Signature uniform negative tracking from DESIGN.md. */
     letter-spacing: -0.007em;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* DESIGN.md caps emphasis at weight 500 — no bold anywhere in this system. */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-weight: 500;
   }
 
@@ -64,7 +202,29 @@
   }
 
   ::selection {
-    background: var(--color-brand-deep);
-    color: var(--color-fg);
+    background: #006239; /* Midnight Emerald */
+    color: var(--foreground);
   }
+}
+
+/* Arrow buttons drive the usage carousel; the bar itself would only crowd the cards. Scrolling by
+   trackpad or keyboard still works — this hides the indicator, not the behaviour. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+[data-rich-colors="true"][data-sonner-toast] {
+  align-items: start !important;
+  gap: 12px !important;
+}
+
+[data-sonner-toast][data-styled="true"] [data-title] {
+  font-weight: 400 !important;
+}
+
+[data-sonner-toast][data-styled="true"] [data-icon] {
+  margin-top: 6px;
 }

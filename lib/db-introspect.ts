@@ -36,10 +36,14 @@ where c.relkind in ('r', 'p')
 order by pg_catalog.pg_total_relation_size(c.oid) desc
 limit 200;`;
 
+// backend_type filters out the background workers — checkpointer, walwriter, autovacuum launcher and
+// friends — which pg_stat_activity also lists. Counting them inflates the number by roughly eight and
+// does not match what anyone means by "connections".
 const OVERVIEW_SQL = `
 select
   pg_catalog.pg_database_size(pg_catalog.current_database())::bigint as db_bytes,
-  (select count(*) from pg_catalog.pg_stat_activity)::int as connections,
+  (select count(*) from pg_catalog.pg_stat_activity
+    where backend_type = 'client backend')::int as connections,
   (select setting::int from pg_catalog.pg_settings where name = 'max_connections') as max_connections;`;
 
 export const listTables = (token: string, ref: string) => readOnlyQuery<TableRow>(token, ref, TABLES_SQL);
