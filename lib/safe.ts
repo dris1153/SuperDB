@@ -1,4 +1,4 @@
-import { MgmtError } from "./mgmt-api";
+import { MgmtError } from "./mgmt-api.ts";
 
 /** Runs a Management API call that is allowed to fail (paused projects, missing scopes). */
 export async function safe<T>(fn: () => Promise<T>): Promise<T | null> {
@@ -45,6 +45,24 @@ function describe(error: MgmtError): string {
   const scope = /missing required scopes \(([^)]+)\)/i.exec(message);
   if (scope) {
     return `The OAuth grant is missing the ${scope[1]} scope. Re-authorize the connection to add it.`;
+  }
+
+  if (error.status === 429) {
+    return "Supabase is rate limiting this token — the figures return once the minute rolls over.";
+  }
+  // Supabase explains write failures in the response body — "…reached their maximum limits…" and
+  // the like. A generic status line would throw away the only part the user can act on. Parsed
+  // rather than pattern-matched: the text routinely contains quotes and commas of its own.
+  const brace = message.indexOf("{");
+  if (brace !== -1) {
+    try {
+      const body = JSON.parse(message.slice(brace)) as { message?: unknown };
+      // Trimmed here rather than upstream: a length limit belongs on the sentence someone reads,
+      // never on the JSON still waiting to be parsed.
+      if (typeof body.message === "string" && body.message) return body.message.slice(0, 400);
+    } catch {
+      // Not JSON after all; the status line below still says something true.
+    }
   }
 
   if (error.status === 401) return "Not authorized for this project.";

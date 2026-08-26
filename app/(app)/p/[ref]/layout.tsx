@@ -17,7 +17,10 @@ export default async function ProjectLayout({
   return (
     <div className="flex min-h-screen">
       <ProjectNav projectRef={ref} name={found.project.name} />
-      <div className="min-w-0 flex-1">{children}</div>
+      {/* The usage carousel measures this to work out how far it may bleed sideways. */}
+      <div data-content-area className="min-w-0 flex-1">
+        {children}
+      </div>
     </div>
   );
 }

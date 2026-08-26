@@ -117,6 +117,14 @@
   --color-brand-border: #1f4b37; /* Forest Depth — pressed border on green */
   --color-warn: #f5a623; /* transitional project states */
 
+  /* Toasts take their whole surface from the severity, not just their icon. The error trio was
+     sampled from Supabase's own toast; the success background is the same relationship applied to
+     the brand green, whose border and icon already exist above as brand-border and primary. */
+  --color-toast-error-bg: #1d1412;
+  --color-toast-error-border: #7f2315;
+  --color-toast-error-icon: #f16a50;
+  --color-toast-success-bg: #121e17;
+
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 
@@ -143,8 +151,10 @@
    *
    * Values are much darker than Tailwind's defaults — rgb(0 0 0 / 0.1) is invisible over #121212.
    */
-  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 6px -2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 10px 24px -4px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.4);
+  --shadow-md:
+    0 4px 12px -2px rgb(0 0 0 / 0.5), 0 2px 6px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg:
+    0 10px 24px -4px rgb(0 0 0 / 0.6), 0 4px 8px -4px rgb(0 0 0 / 0.4);
   --font-weight-semibold: 500;
   --font-weight-bold: 500;
 }
@@ -170,7 +180,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-weight: 500;
   }
 
@@ -190,4 +205,26 @@
     background: #006239; /* Midnight Emerald */
     color: var(--foreground);
   }
+}
+
+/* Arrow buttons drive the usage carousel; the bar itself would only crowd the cards. Scrolling by
+   trackpad or keyboard still works — this hides the indicator, not the behaviour. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+[data-rich-colors="true"][data-sonner-toast] {
+  align-items: start !important;
+  gap: 12px !important;
+}
+
+[data-sonner-toast][data-styled="true"] [data-title] {
+  font-weight: 400 !important;
+}
+
+[data-sonner-toast][data-styled="true"] [data-icon] {
+  margin-top: 6px;
 }
