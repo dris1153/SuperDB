@@ -3,7 +3,7 @@ import { readOnlyQuery } from "./mgmt-api";
 
 // Supabase plumbing schemas — noise in an inventory view. `auth` and `storage` stay: their row
 // counts are the most useful numbers on the page.
-const HIDDEN = [
+export const HIDDEN = [
   "pg_catalog", "information_schema", "pg_toast", "extensions", "graphql", "graphql_public",
   "net", "pgsodium", "pgsodium_masks", "vault", "cron", "pgbouncer", "realtime", "_realtime",
   "supabase_functions", "supabase_migrations",

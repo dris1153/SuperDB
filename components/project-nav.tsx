@@ -28,7 +28,7 @@ const SECTIONS: { items: { slug: string; label: string; icon: typeof IconHome; r
   {
     items: [
       { slug: "", label: "Project Overview", icon: IconHome, ready: true },
-      { slug: "tables", label: "Table Editor", icon: IconTable },
+      { slug: "tables", label: "Table Editor", icon: IconTable, ready: true },
       { slug: "sql", label: "SQL Editor", icon: IconCode },
     ],
   },

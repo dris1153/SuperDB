@@ -228,3 +228,24 @@
 [data-sonner-toast][data-styled="true"] [data-icon] {
   margin-top: 6px;
 }
+
+/* react-data-grid ships its own palette through --rdg-* custom properties, declared inside
+   `@layer rdg.Root`. Unlayered rules beat layered ones regardless of specificity, so this plain
+   block wins without !important. Only the variables are touched — never the vendored stylesheet. */
+.superdb-grid {
+  --rdg-color: var(--foreground);
+  --rdg-background-color: var(--background);
+  --rdg-header-background-color: var(--card);
+  --rdg-header-draggable-background-color: var(--muted);
+  --rdg-row-hover-background-color: var(--muted);
+  --rdg-row-selected-background-color: var(--muted);
+  --rdg-row-selected-hover-background-color: var(--accent);
+  --rdg-border-color: var(--border);
+  --rdg-summary-border-color: var(--border);
+  --rdg-selection-color: var(--primary);
+  --rdg-checkbox-focus-color: var(--primary);
+  --rdg-font-size: 0.8125rem;
+  /* The default is a fixed 350px; the grid has to fill whatever the page gives it. */
+  block-size: 100%;
+  border: none;
+}

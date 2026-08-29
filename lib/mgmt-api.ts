@@ -158,3 +158,16 @@ export type PoolerConfig = {
 
 export const getPoolerConfig = (t: string, ref: string) =>
   call<PoolerConfig[]>(t, `/v1/projects/${ref}/config/database/pooler`);
+
+/**
+ * Which schemas PostgREST actually exposes. The Table Editor marks those tables as reachable through
+ * the API; guessing "public" would be wrong on any project that changed the setting.
+ *
+ * The endpoint also returns `jwt_secret`. Only the schema list is returned here so that no caller can
+ * hand the whole response to a client component by accident — the same hazard `ApiKey.api_key`
+ * carries above.
+ */
+export async function getExposedSchemas(t: string, ref: string): Promise<string[]> {
+  const config = await call<{ db_schema: string }>(t, `/v1/projects/${ref}/postgrest`);
+  return config.db_schema.split(",").map((s) => s.trim());
+}
