@@ -1,6 +1,7 @@
 import type { Policy, TableEntry } from "@/lib/table-editor";
 import type { RowCount, RowRecord } from "@/lib/table-rows";
-import type { ColumnInfo, Filter, SortKey } from "@/lib/table-view";
+import type { ColumnInfo, SortKey } from "@/lib/table-view";
+import type { Filter } from "@/lib/table-filter";
 import { Empty } from "@/components/ui/empty-state";
 import { Definition } from "./definition";
 import { TableFooter } from "./footer";
@@ -15,10 +16,13 @@ export function TableWorkspace({
   projectRef,
   schema,
   entry,
+  schemas,
   columns,
   rows,
   sort,
   filters,
+  search,
+  urlQuery,
   policies,
   total,
   page,
@@ -29,10 +33,13 @@ export function TableWorkspace({
   projectRef: string;
   schema: string;
   entry: TableEntry;
+  schemas: string[];
   columns: ColumnInfo[];
   rows: RowRecord[] | null;
   sort: SortKey[];
   filters: Filter[];
+  search: string;
+  urlQuery: { sort?: string; filter?: string[]; search?: string };
   policies: Policy[];
   total: RowCount | null;
   page: number;
@@ -45,12 +52,18 @@ export function TableWorkspace({
     return (
       <>
         <Toolbar
+          projectRef={projectRef}
+          schema={schema}
           table={entry.name}
           rls={entry.rls}
           policies={policies}
           columns={columns}
           filters={filters}
           sort={sort}
+          search={search}
+          urlQuery={urlQuery}
+          page={page}
+          size={size}
         />
         <Definition
           ddl={definition?.ddl ?? null}
@@ -72,12 +85,18 @@ export function TableWorkspace({
   return (
     <>
       <Toolbar
+        projectRef={projectRef}
+        schema={schema}
         table={entry.name}
         rls={entry.rls}
         policies={policies}
         columns={columns}
         filters={filters}
         sort={sort}
+        search={search}
+        urlQuery={urlQuery}
+        page={page}
+        size={size}
       />
 
       {!rows ? (
@@ -93,6 +112,7 @@ export function TableWorkspace({
               projectRef={projectRef}
               schema={schema}
               table={entry.name}
+              schemas={schemas}
               columns={columns}
               rows={rows}
               sort={sort}

@@ -4,13 +4,25 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { IconPlus, IconRefresh } from "@tabler/icons-react";
 import type { Policy } from "@/lib/table-editor";
-import type { ColumnInfo, Filter, SortKey } from "@/lib/table-view";
+import type { ColumnInfo, SortKey } from "@/lib/table-view";
+import type { Filter } from "@/lib/table-filter";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { FilterBuilder } from "./filter-builder";
 import { RlsPanel } from "./rls-panel";
 import { SortBuilder } from "./sort-builder";
+import { SearchBox } from "./search-box";
+import { ExportMenu } from "./export-menu";
+import { useDensity } from "./density";
+import type { Density } from "./column-prefs";
 
 /**
  * The controls above the grid.
@@ -25,26 +37,59 @@ export function Toolbar({
   table,
   rls,
   policies,
+  projectRef,
+  schema,
   columns,
   filters,
   sort,
+  search,
+  urlQuery,
+  page,
+  size,
 }: {
+  projectRef: string;
+  schema: string;
   table: string;
   rls: boolean;
   policies: Policy[];
   columns: ColumnInfo[];
   filters: Filter[];
   sort: SortKey[];
+  search: string;
+  urlQuery: { sort?: string; filter?: string[]; search?: string };
+  page: number;
+  size: number;
 }) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
+  const { density, setDensity } = useDensity();
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+      <SearchBox search={search} />
       <FilterBuilder columns={columns} filters={filters} />
       <SortBuilder columns={columns} sort={sort} />
 
       <div className="ml-auto flex items-center gap-2">
+        <Select value={density} onValueChange={(v) => setDensity(v as Density)}>
+          <SelectTrigger size="sm" className="h-7 w-28 text-xs" aria-label="Row density">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="normal">Normal</SelectItem>
+            <SelectItem value="compact">Compact</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <ExportMenu
+          projectRef={projectRef}
+          schema={schema}
+          table={table}
+          urlQuery={urlQuery}
+          page={page}
+          size={size}
+        />
+
         <RlsPanel table={table} rls={rls} policies={policies} />
 
         <button

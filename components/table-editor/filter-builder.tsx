@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { IconFilter, IconPlus, IconX } from "@tabler/icons-react";
+import type { ColumnInfo } from "@/lib/table-view";
 import {
   FILTER_OPS,
   opLabel,
   opTakesValue,
   serialiseFilter,
-  type ColumnInfo,
   type Filter,
   type FilterOp,
-} from "@/lib/table-view";
+} from "@/lib/table-filter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

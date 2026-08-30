@@ -70,7 +70,10 @@ export const describeTable = (token: string, ref: string, schema: string, table:
             pg_catalog.pg_get_expr(d.adbin, d.adrelid) as default_expr,
             pk.pos as pk_pos,
             (pk.pos is not null) as is_pk,
-            fk.target as fk_target
+            fk.fk_schema,
+            fk.fk_table,
+            fk.fk_column,
+            fk.fk_pairs
      from pg_catalog.pg_attribute a
      join pg_catalog.pg_class c on c.oid = a.attrelid
      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
@@ -81,12 +84,34 @@ export const describeTable = (token: string, ref: string, schema: string, table:
        from pg_catalog.pg_constraint k
        where k.conrelid = c.oid and k.contype = 'p' and a.attnum = any(k.conkey) limit 1
      ) pk on true
+     -- A composite foreign key pairs positionally: conkey[i] references confkey[i]. array_position
+     -- finds this column's own counterpart; matching by name or by ordinal would be wrong.
+     --
+     -- fk_pairs carries every column of the constraint, because navigating to the referenced row
+     -- needs all of them — filtering on one column of a two-column key returns a row set, not a row.
+     --
+     -- A column can belong to more than one foreign key. Ordering by key width then oid keeps the
+     -- answer stable across executions and prefers the simplest constraint; an unordered limit would
+     -- let the header label and the jump target disagree between two renders of the same page.
      left join lateral (
-       select (tn.nspname || '.' || tc.relname)::text as target
+       select tn.nspname::text as fk_schema,
+              tc.relname::text as fk_table,
+              fa.attname::text as fk_column,
+              (select jsonb_agg(jsonb_build_object('local', la.attname, 'remote', ra.attname)
+                                order by u.ord)
+               from unnest(k.conkey, k.confkey) with ordinality as u(lnum, rnum, ord)
+               join pg_catalog.pg_attribute la on la.attrelid = k.conrelid and la.attnum = u.lnum
+               join pg_catalog.pg_attribute ra on ra.attrelid = k.confrelid and ra.attnum = u.rnum
+              ) as fk_pairs
        from pg_catalog.pg_constraint k
        join pg_catalog.pg_class tc on tc.oid = k.confrelid
        join pg_catalog.pg_namespace tn on tn.oid = tc.relnamespace
-       where k.conrelid = c.oid and k.contype = 'f' and a.attnum = any(k.conkey) limit 1
+       join pg_catalog.pg_attribute fa
+         on fa.attrelid = k.confrelid
+        and fa.attnum = k.confkey[array_position(k.conkey, a.attnum)]
+       where k.conrelid = c.oid and k.contype = 'f' and a.attnum = any(k.conkey)
+       order by pg_catalog.array_length(k.conkey, 1), k.oid
+       limit 1
      ) fk on true
      where n.nspname = ${quoteLiteral(schema)} and c.relname = ${quoteLiteral(table)}
        and a.attnum > 0 and not a.attisdropped

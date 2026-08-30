@@ -1,6 +1,6 @@
 // Explicit .ts extension, unlike the rest of lib/: this module is imported directly by a node:test
 // file, and Node's resolver has no bundler to fall back on. Do not "tidy" it away.
-import { quoteIdent, quoteLiteral } from "./sql-ident.ts";
+import { quoteIdent } from "./sql-ident.ts";
 
 /**
  * The Table Editor's pure half: column shape, page size, sort order, and the ORDER BY it builds.
@@ -9,6 +9,8 @@ import { quoteIdent, quoteLiteral } from "./sql-ident.ts";
  * components and need these as values, not just types. Same split, and the same reason, as
  * `project-status.ts`. Keeping `orderClause` here also makes it unit-testable without reaching the
  * Management API.
+ *
+ * Which *rows* are asked for lives in `table-filter.ts`.
  */
 
 export type SortKey = { column: string; dir: "asc" | "desc" };
@@ -25,8 +27,32 @@ export interface ColumnInfo {
   is_pk: boolean;
   /** 1-based position within the primary key, in `conkey` order — not attnum order. Null when not a PK. */
   pk_pos: number | null;
-  fk_target: string | null;
+  /** The referenced column, when this one is a foreign key. All three are null together. */
+  fk_schema: string | null;
+  fk_table: string | null;
+  fk_column: string | null;
+  /** Every column pair of the constraint, in key order. Composite keys need all of them. */
+  fk_pairs: { local: string; remote: string }[] | null;
 }
+
+/**
+ * A foreign key is only navigable when the target and the full pair list came back. A partial answer
+ * would build half a link, and a composite key filtered on one column lands on a row set.
+ */
+export const fkTarget = (c: ColumnInfo) =>
+  c.fk_schema && c.fk_table && c.fk_column && c.fk_pairs && c.fk_pairs.length > 0
+    ? { schema: c.fk_schema, table: c.fk_table, column: c.fk_column, pairs: c.fk_pairs }
+    : null;
+
+/**
+ * Wide values are cut to this many characters in SQL, with `…` appended by Postgres. Shared so the
+ * renderer can recognise a truncated value rather than guessing from the last character.
+ */
+export const MAX_CELL_CHARS = 512;
+
+/** A value the database shortened, rather than one that happens to end in an ellipsis. */
+export const isTruncated = (value: unknown) =>
+  typeof value === "string" && value.length === MAX_CELL_CHARS + 1 && value.endsWith("…");
 
 export const PAGE_SIZES = [100, 500] as const;
 export const DEFAULT_PAGE_SIZE = 100;
@@ -48,99 +74,6 @@ export function parseSort(value: string | null | undefined): SortKey[] {
 
 export const serialiseSort = (keys: SortKey[]) =>
   keys.map((k) => `${k.column}.${k.dir}`).join(",");
-
-/** SQL for each operator. `null` marks the two that take no value. */
-const OPS = {
-  eq: "=",
-  neq: "<>",
-  gt: ">",
-  lt: "<",
-  gte: ">=",
-  lte: "<=",
-  like: "like",
-  ilike: "ilike",
-  in: "in",
-  isnull: null,
-  notnull: null,
-} as const;
-
-export type FilterOp = keyof typeof OPS;
-export type Filter = { column: string; op: FilterOp; value: string };
-
-export const FILTER_OPS = Object.keys(OPS) as FilterOp[];
-export const opTakesValue = (op: FilterOp) => OPS[op] !== null;
-
-const OP_LABELS: Record<FilterOp, string> = {
-  eq: "equals",
-  neq: "not equals",
-  gt: "greater than",
-  lt: "less than",
-  gte: "greater or equal",
-  lte: "less or equal",
-  like: "like",
-  ilike: "ilike (case-insensitive)",
-  in: "in (comma separated)",
-  isnull: "is null",
-  notnull: "is not null",
-};
-export const opLabel = (op: FilterOp) => OP_LABELS[op];
-
-/**
- * `column.op.value`. The column is found by locating the first `.<op>.` marker rather than splitting
- * on dots, because both column names and values may contain them. A column whose name literally
- * contains something like `.eq.` cannot be filtered — it fails closed, dropping the filter rather
- * than guessing a split.
- */
-export function parseFilters(values: string[]): Filter[] {
-  const out: Filter[] = [];
-  for (const raw of values) {
-    for (const op of FILTER_OPS) {
-      const marker = `.${op}.`;
-      const at = raw.indexOf(marker);
-      if (at <= 0) continue;
-      out.push({ column: raw.slice(0, at), op, value: raw.slice(at + marker.length) });
-      break;
-    }
-  }
-  return out;
-}
-
-export const serialiseFilter = (f: Filter) =>
-  `${f.column}.${f.op}.${opTakesValue(f.op) ? f.value : ""}`;
-
-/**
- * Builds the WHERE clause.
- *
- * The literal is left untyped so Postgres coerces it to the column's own type: `"id" > '5'` compares
- * as an integer. Casting the column to text instead — which is the obvious way to get one quoting
- * rule for every type — would make '9' > '10' true. Only `like`/`ilike` cast, because pattern
- * matching genuinely needs text.
- */
-export function whereClause(columns: ColumnInfo[], filters: Filter[]): string {
-  const known = new Set(columns.map((c) => c.name));
-  const parts: string[] = [];
-
-  for (const f of filters) {
-    if (!known.has(f.column)) continue;
-    const ident = quoteIdent(f.column);
-
-    if (f.op === "isnull") parts.push(`${ident} is null`);
-    else if (f.op === "notnull") parts.push(`${ident} is not null`);
-    else if (f.op === "in") {
-      const items = f.value
-        .split(",")
-        .map((s) => s.trim())
-        .filter((s) => s !== "");
-      if (items.length > 0) parts.push(`${ident} in (${items.map(quoteLiteral).join(", ")})`);
-    } else if (f.op === "like" || f.op === "ilike") {
-      parts.push(`${ident}::text ${OPS[f.op]} ${quoteLiteral(f.value)}`);
-    } else {
-      parts.push(`${ident} ${OPS[f.op]} ${quoteLiteral(f.value)}`);
-    }
-  }
-
-  return parts.length > 0 ? ` where ${parts.join(" and ")}` : "";
-}
 
 /**
  * LIMIT/OFFSET without ORDER BY is not stable: Postgres may hand back the same row on two pages and

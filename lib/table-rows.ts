@@ -1,8 +1,10 @@
 import "server-only";
 import { readOnlyQuery } from "./mgmt-api";
 import { clampInt, quoteIdent, quoteLiteral, quoteQualified } from "./sql-ident";
-import type { ColumnInfo, Filter, SortKey } from "./table-view";
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, orderClause, whereClause } from "./table-view";
+import type { ColumnInfo, SortKey } from "./table-view";
+import type { Filter } from "./table-filter";
+import { DEFAULT_PAGE_SIZE, MAX_CELL_CHARS, MAX_PAGE_SIZE, orderClause } from "./table-view";
+import { whereClause } from "./table-filter";
 import type { TableKind } from "./table-editor";
 
 /**
@@ -19,7 +21,6 @@ export type RowRecord = Record<string, unknown>;
  * rendering one, and the grid virtualises the DOM so it would look fine right up until it did not.
  */
 const WIDE_TYPES = new Set(["text", "varchar", "bpchar", "citext", "json", "jsonb", "xml", "bytea"]);
-const MAX_CELL_CHARS = 512;
 
 /** Exact counts are O(n); past this many estimated rows the footer shows an approximation instead. */
 const EXACT_COUNT_CEILING = 50_000;
@@ -57,15 +58,21 @@ export function selectRows(
     columns: ColumnInfo[];
     sort: SortKey[];
     filters: Filter[];
+    search?: string;
     limit: number;
     offset: number;
+    /** Off only for export, which must not hand over silently shortened values. */
+    truncate?: boolean;
+    max?: number;
   },
 ) {
-  const limit = clampInt(opts.limit, 1, MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE);
+  const limit = clampInt(opts.limit, 1, opts.max ?? MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE);
   const offset = clampInt(opts.offset, 0, Number.MAX_SAFE_INTEGER, 0);
+  const list = opts.truncate === false ? "*" : selectList(opts.columns);
   const sql =
-    `select ${selectList(opts.columns)} from ${quoteQualified(schema, table)}` +
-    `${whereClause(opts.columns, opts.filters)}${orderClause(opts.columns, opts.sort)}` +
+    `select ${list} from ${quoteQualified(schema, table)}` +
+    `${whereClause(opts.columns, opts.filters, opts.search)}` +
+    `${orderClause(opts.columns, opts.sort)}` +
     ` limit ${limit} offset ${offset};`;
   return readOnlyQuery<RowRecord>(token, ref, sql);
 }
@@ -109,14 +116,18 @@ export async function rowCount(
   ref: string,
   schema: string,
   table: string,
-  kind: TableKind,
-  estimate: number,
-  columns: ColumnInfo[] = [],
-  filters: Filter[] = [],
+  opts: {
+    kind: TableKind;
+    estimate: number;
+    columns?: ColumnInfo[];
+    filters?: Filter[];
+    search?: string;
+  },
 ): Promise<RowCount> {
+  const { kind, estimate, columns = [], filters = [], search = "" } = opts;
   const est = Number(estimate);
   if (kind !== "r") return { n: null, exact: false };
-  const where = whereClause(columns, filters);
+  const where = whereClause(columns, filters, search);
   // A filtered count cannot be estimated — reltuples describes the whole table. Above the ceiling
   // there is no cheap answer at all, so "unknown" beats scanning a large table on every render.
   if (est >= EXACT_COUNT_CEILING) return where === "" ? { n: est, exact: false } : { n: null, exact: false };

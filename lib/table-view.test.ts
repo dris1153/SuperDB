@@ -1,13 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  orderClause,
-  parseFilters,
-  parseSort,
-  serialiseFilter,
-  serialiseSort,
-  whereClause,
-} from "./table-view.ts";
+import { fkTarget, orderClause, parseSort, serialiseSort } from "./table-view.ts";
 import type { ColumnInfo } from "./table-view.ts";
 
 test("parses a single sort key", () => {
@@ -64,7 +57,10 @@ const mockColumn = (name: string, pkPos: number | null = null, short_type = "int
   default_expr: null,
   is_pk: pkPos != null,
   pk_pos: pkPos,
-  fk_target: null,
+  fk_schema: null,
+  fk_table: null,
+  fk_column: null,
+  fk_pairs: null,
 });
 
 test("orderClause: empty column list returns empty string", () => {
@@ -142,78 +138,37 @@ test("orderClause: quotes dotted column names safely", () => {
   assert.equal(orderClause(cols, []), ' order by "schema.table" asc');
 });
 
-// --- filters ---
-const cols3 = [mockColumn("id", 1), mockColumn("name", null, "text"), mockColumn("age")];
-
-test("parseFilters reads column, operator and value", () => {
-  assert.deepEqual(parseFilters(["name.eq.bob"]), [{ column: "name", op: "eq", value: "bob" }]);
+// --- foreign key target ---
+const fkCol = (name: string, s: string | null, t: string | null, c: string | null): ColumnInfo => ({
+  ...mockColumn(name),
+  fk_schema: s,
+  fk_table: t,
+  fk_column: c,
+  fk_pairs: c ? [{ local: name, remote: c }] : null,
 });
 
-test("parseFilters keeps dots inside the value", () => {
-  assert.deepEqual(parseFilters(["name.eq.a.b.c"]), [{ column: "name", op: "eq", value: "a.b.c" }]);
+test("fkTarget returns the target and the full pair list", () => {
+  assert.deepEqual(fkTarget(fkCol("user_id", "auth", "users", "id")), {
+    schema: "auth",
+    table: "users",
+    column: "id",
+    pairs: [{ local: "user_id", remote: "id" }],
+  });
 });
 
-test("parseFilters handles the valueless operators", () => {
-  assert.deepEqual(parseFilters(["name.isnull."]), [{ column: "name", op: "isnull", value: "" }]);
+test("fkTarget refuses a target with no pairs — a composite key needs every column", () => {
+  // Filtering the referenced table on one column of a two-column key returns a row set, not a row.
+  assert.equal(fkTarget({ ...fkCol("a", "public", "t", "id"), fk_pairs: null }), null);
+  assert.equal(fkTarget({ ...fkCol("a", "public", "t", "id"), fk_pairs: [] }), null);
 });
 
-test("parseFilters drops entries with no recognisable operator", () => {
-  assert.deepEqual(parseFilters(["name.wat.x", "", "nonsense"]), []);
+test("fkTarget is null for a column with no foreign key", () => {
+  assert.equal(fkTarget(mockColumn("name")), null);
 });
 
-test("whereClause leaves the literal untyped so Postgres casts to the column type", () => {
-  // Casting the column to text instead would make '9' > '10' true.
-  assert.equal(whereClause(cols3, [{ column: "age", op: "gt", value: "9" }]), ` where "age" > '9'`);
+test("fkTarget refuses a partial target rather than building a half link", () => {
+  assert.equal(fkTarget(fkCol("a", "auth", "users", null)), null);
+  assert.equal(fkTarget(fkCol("b", "auth", null, "id")), null);
+  assert.equal(fkTarget(fkCol("c", null, "users", "id")), null);
 });
 
-test("whereClause casts to text only for pattern matching", () => {
-  assert.equal(
-    whereClause(cols3, [{ column: "name", op: "ilike", value: "%bo%" }]),
-    ` where "name"::text ilike '%bo%'`,
-  );
-});
-
-test("whereClause emits no literal for the valueless operators", () => {
-  assert.equal(whereClause(cols3, [{ column: "name", op: "isnull", value: "" }]), ` where "name" is null`);
-  assert.equal(
-    whereClause(cols3, [{ column: "name", op: "notnull", value: "" }]),
-    ` where "name" is not null`,
-  );
-});
-
-test("whereClause quotes every item of an IN list", () => {
-  assert.equal(
-    whereClause(cols3, [{ column: "name", op: "in", value: "a, b ,c" }]),
-    ` where "name" in ('a', 'b', 'c')`,
-  );
-});
-
-test("whereClause drops an IN with nothing in it rather than emitting in ()", () => {
-  assert.equal(whereClause(cols3, [{ column: "name", op: "in", value: " , " }]), "");
-});
-
-test("whereClause ignores a column that is not in the table", () => {
-  assert.equal(whereClause(cols3, [{ column: "ghost", op: "eq", value: "x" }]), "");
-});
-
-test("whereClause keeps an injection attempt inside one literal", () => {
-  assert.equal(
-    whereClause(cols3, [{ column: "name", op: "eq", value: "x' or '1'='1" }]),
-    ` where "name" = 'x'' or ''1''=''1'`,
-  );
-});
-
-test("whereClause joins several filters with and", () => {
-  assert.equal(
-    whereClause(cols3, [
-      { column: "age", op: "gte", value: "18" },
-      { column: "name", op: "neq", value: "bob" },
-    ]),
-    ` where "age" >= '18' and "name" <> 'bob'`,
-  );
-});
-
-test("filters round-trip through serialise and parse", () => {
-  const f = { column: "name", op: "like" as const, value: "a.b%" };
-  assert.deepEqual(parseFilters([serialiseFilter(f)]), [f]);
-});
