@@ -192,3 +192,9 @@ is a lie rather than a roadmap, the same call `components/project-nav.tsx` makes
 | Tab state desyncs from URL | URL owns the active table; storage owns only the list. One direction of truth each |
 | Toolbar grows past 200 lines | Sort and filter builders are already separate files |
 | `config/postgrest` may 403 on some tokens | `safe()` — drop the icon, never block the page |
+
+## Unrecorded omission, found later
+
+Step 7 above specified a **column header dropdown** (sort, freeze, copy name). It was not built — the
+grid only sorts on header click — and the omission was not recorded at the time. Paid back by
+`plans/260830-0045-table-editor-polish` phase A1.
