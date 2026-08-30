@@ -171,3 +171,17 @@ export async function getExposedSchemas(t: string, ref: string): Promise<string[
   const config = await call<{ db_schema: string }>(t, `/v1/projects/${ref}/postgrest`);
   return config.db_schema.split(",").map((s) => s.trim());
 }
+
+/**
+ * SQL that may write. Runs as `postgres` — full DDL rights, and RLS is bypassed — so nothing should
+ * reach here without a preview the user confirmed.
+ *
+ * The endpoint reports no affected-row count of its own: without `RETURNING` a successful UPDATE
+ * answers `[]`, indistinguishable from one that matched nothing. Every statement built for this must
+ * end in `RETURNING`, and the caller counts what comes back.
+ */
+export const writeQuery = <T = Record<string, unknown>>(t: string, ref: string, query: string) =>
+  call<T[]>(t, `/v1/projects/${ref}/database/query`, {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  });

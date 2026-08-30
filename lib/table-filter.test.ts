@@ -12,6 +12,7 @@ const mockColumn = (name: string, short_type = "int"): ColumnInfo => ({
   nullable: false,
   default_expr: null,
   is_pk: false,
+  generated: false,
   pk_pos: null,
   fk_schema: null,
   fk_table: null,

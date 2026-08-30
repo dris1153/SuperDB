@@ -86,7 +86,8 @@ create table if not exists public.connection_events (
                                              -- most worth keeping
   owner         text,                        -- organization name at the time of the event
   kind          text,
-  event         text not null check (event in ('connected', 'refreshed', 'refresh_failed', 'disconnected')),
+  event         text not null check (event in ('connected', 'refreshed', 'refresh_failed',
+                                             'disconnected', 'wrote')),
   detail        text,
   ip            text,
   created_at    timestamptz not null default now()
@@ -161,6 +162,14 @@ create policy "own connection secrets" on public.connection_secrets
   with check (user_id = auth.uid());
 
 revoke all on public.connection_secrets from anon;
+
+-- Converge an existing table: 'wrote' records a change made to a user's own database through the
+-- table editor. The constraint is unnamed in the CREATE above, so Postgres called it this.
+alter table public.connection_events
+  drop constraint if exists connection_events_event_check;
+alter table public.connection_events
+  add constraint connection_events_event_check
+  check (event in ('connected', 'refreshed', 'refresh_failed', 'disconnected', 'wrote'));
 
 -- Converge an existing table: provider_email is gone (every method now has exactly one email) and
 -- google was never a Supabase sign-in option to begin with.

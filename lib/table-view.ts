@@ -25,6 +25,11 @@ export interface ColumnInfo {
   nullable: boolean;
   default_expr: string | null;
   is_pk: boolean;
+  /**
+   * Postgres refuses a supplied value for these: a stored generated column, or an identity column
+   * declared ALWAYS. Identity BY DEFAULT is not included — a value for it is accepted.
+   */
+  generated: boolean;
   /** 1-based position within the primary key, in `conkey` order — not attnum order. Null when not a PK. */
   pk_pos: number | null;
   /** The referenced column, when this one is a foreign key. All three are null together. */
@@ -50,9 +55,19 @@ export const fkTarget = (c: ColumnInfo) =>
  */
 export const MAX_CELL_CHARS = 512;
 
-/** A value the database shortened, rather than one that happens to end in an ellipsis. */
+/**
+ * A value the database shortened, rather than one that happens to end in an ellipsis.
+ *
+ * Counted in **code points**, because that is what `left()` counted. `String.length` counts UTF-16
+ * units, so one emoji in the first 512 characters puts the cut value at 513 code points but 514
+ * units — the test fails, the cell becomes editable, and the shortened value is written back over
+ * the real one. Measured: a 512-character prefix of `repeat('🙂', 300) || repeat('a', 400)` arrives
+ * with `.length === 813`.
+ *
+ * `endsWith` first so the spread only runs on candidates.
+ */
 export const isTruncated = (value: unknown) =>
-  typeof value === "string" && value.length === MAX_CELL_CHARS + 1 && value.endsWith("…");
+  typeof value === "string" && value.endsWith("…") && [...value].length === MAX_CELL_CHARS + 1;
 
 export const PAGE_SIZES = [100, 500] as const;
 export const DEFAULT_PAGE_SIZE = 100;
@@ -98,3 +113,13 @@ export function orderClause(columns: ColumnInfo[], sort: SortKey[]): string {
   }
   return parts.length > 0 ? ` order by ${parts.join(", ")}` : "";
 }
+
+/**
+ * Schemas the platform itself depends on. A write here is confirmed a second time — not blocked,
+ * because repairing one broken `auth.users` row is a legitimate thing to need.
+ *
+ * Lives in this module rather than beside the write code because the confirmation dialog is a client
+ * component and needs it as a value.
+ */
+const GUARDED = new Set(["auth", "storage"]);
+export const isGuardedSchema = (schema: string) => GUARDED.has(schema);

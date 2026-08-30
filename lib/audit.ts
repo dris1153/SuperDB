@@ -2,7 +2,13 @@ import "server-only";
 import { headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ConnectionEvent = "connected" | "refreshed" | "refresh_failed" | "disconnected";
+export type ConnectionEvent =
+  | "connected"
+  | "refreshed"
+  | "refresh_failed"
+  | "disconnected"
+  /** A write against a user's own database, recorded with its real affected-row count. */
+  | "wrote";
 
 /** Proxy-supplied, so spoofable — good enough to correlate events, not to identify anyone. */
 async function clientIp(): Promise<string | null> {

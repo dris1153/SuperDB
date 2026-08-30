@@ -1,7 +1,36 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fkTarget, orderClause, parseSort, serialiseSort } from "./table-view.ts";
+import {
+  MAX_CELL_CHARS,
+  fkTarget,
+  isTruncated,
+  orderClause,
+  parseSort,
+  serialiseSort,
+} from "./table-view.ts";
 import type { ColumnInfo } from "./table-view.ts";
+
+// --- truncation ---
+
+test("recognises a value the database shortened", () => {
+  assert.equal(isTruncated("a".repeat(MAX_CELL_CHARS) + "…"), true);
+});
+
+test("recognises one shortened to 512 characters of which some are astral", () => {
+  // `left()` counts code points; `String.length` counts UTF-16 units. Measured against a live
+  // database: this exact prefix arrives with `.length === 813`, so a length test in units misses it
+  // and the shortened value becomes editable — and writable back over the real one.
+  const cut = "🙂".repeat(256) + "a".repeat(MAX_CELL_CHARS - 256);
+  assert.equal([...cut].length, MAX_CELL_CHARS);
+  assert.notEqual(cut.length, MAX_CELL_CHARS);
+  assert.equal(isTruncated(cut + "…"), true);
+});
+
+test("a value that merely ends in an ellipsis is not truncated", () => {
+  assert.equal(isTruncated("short…"), false);
+  assert.equal(isTruncated("a".repeat(MAX_CELL_CHARS + 1)), false);
+  assert.equal(isTruncated(null), false);
+});
 
 test("parses a single sort key", () => {
   assert.deepEqual(parseSort("id.asc"), [{ column: "id", dir: "asc" }]);
@@ -56,6 +85,7 @@ const mockColumn = (name: string, pkPos: number | null = null, short_type = "int
   nullable: false,
   default_expr: null,
   is_pk: pkPos != null,
+  generated: false,
   pk_pos: pkPos,
   fk_schema: null,
   fk_table: null,

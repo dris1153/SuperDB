@@ -62,12 +62,19 @@ export const describeTable = (token: string, ref: string, schema: string, table:
   readOnlyQuery<ColumnInfo>(
     token,
     ref,
-    `select a.attnum::int as ordinal,
+    // `format_type` drops the schema from a type name that is in the *calling* session's
+    // search_path. This query runs as supabase_read_only_user; the result is fed back to the write
+    // endpoint, which runs as postgres and may resolve a bare name differently — or to a different
+    // type of the same name. Emptying search_path makes format_type always fully qualify.
+    // Multi-statement is accepted and returns only the last result set, measured.
+    `set local search_path = '';
+     select a.attnum::int as ordinal,
             a.attname::text as name,
             ty.typname::text as short_type,
             pg_catalog.format_type(a.atttypid, a.atttypmod) as data_type,
             not a.attnotnull as nullable,
             pg_catalog.pg_get_expr(d.adbin, d.adrelid) as default_expr,
+            (a.attgenerated <> '' or a.attidentity = 'a') as generated,
             pk.pos as pk_pos,
             (pk.pos is not null) as is_pk,
             fk.fk_schema,
@@ -116,6 +123,41 @@ export const describeTable = (token: string, ref: string, schema: string, table:
      where n.nspname = ${quoteLiteral(schema)} and c.relname = ${quoteLiteral(table)}
        and a.attnum > 0 and not a.attisdropped
      order by a.attnum;`,
+  );
+
+export type IncomingRef = {
+  schema: string;
+  table: string;
+  constraint: string;
+  on_delete: string;
+};
+
+/**
+ * Foreign keys pointing *at* this table, and what they do when a referenced row goes.
+ *
+ * Neither the preview count nor `RETURNING` can see past the target table: a delete that cascades
+ * into a dozen others reports one row, twice. This is what lets the confirmation say which other
+ * tables are about to be touched — naming them is enough to change a decision, an exact count is not
+ * needed.
+ */
+export const incomingRefs = (token: string, ref: string, schema: string, table: string) =>
+  readOnlyQuery<IncomingRef>(
+    token,
+    ref,
+    `select n.nspname::text as schema,
+            c.relname::text as table,
+            k.conname::text as constraint,
+            case k.confdeltype
+              when 'c' then 'cascade' when 'n' then 'set null' when 'd' then 'set default'
+              when 'r' then 'restrict' else 'no action' end as on_delete
+     from pg_catalog.pg_constraint k
+     join pg_catalog.pg_class c on c.oid = k.conrelid
+     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+     join pg_catalog.pg_class tc on tc.oid = k.confrelid
+     join pg_catalog.pg_namespace tn on tn.oid = tc.relnamespace
+     where k.contype = 'f'
+       and tn.nspname = ${quoteLiteral(schema)} and tc.relname = ${quoteLiteral(table)}
+     order by n.nspname, c.relname;`,
   );
 
 export type Policy = {
