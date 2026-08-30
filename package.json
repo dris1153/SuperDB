@@ -6,7 +6,7 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "genkey": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"",
     "test": "node --conditions=react-server --test lib/**/*.test.ts"
@@ -37,6 +37,8 @@
     "@types/node": "^22.15.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3",
     "shadcn": "^4.19.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.0"
