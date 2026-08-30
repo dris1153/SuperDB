@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import type { Column } from "react-data-grid";
+import { SelectColumn, type Column } from "react-data-grid";
 import { IconArrowsMaximize } from "@tabler/icons-react";
 import type { RowRecord } from "@/lib/table-rows";
-import { fkTarget, serialiseSort, type ColumnInfo } from "@/lib/table-view";
+import { fkTarget, isTruncated, serialiseSort, type ColumnInfo } from "@/lib/table-view";
+import { CellEditor, isEditableColumn } from "./cell-editor";
 import { CellValue, FkJump, HeaderCell } from "./cells";
 import { ColumnMenu } from "./column-menu";
 import type { ColumnPrefs } from "./column-prefs";
@@ -24,6 +25,7 @@ export function useGridColumns({
   save,
   jump,
   onExpand,
+  editable,
 }: {
   visible: ColumnInfo[];
   prefs: ColumnPrefs;
@@ -34,6 +36,8 @@ export function useGridColumns({
   save: (next: ColumnPrefs) => void;
   jump: (target: NonNullable<ReturnType<typeof fkTarget>>, row: RowRecord) => void;
   onExpand: (row: RowRecord) => void;
+  /** False for a view or a keyless table: no tick column, and nothing to edit in place. */
+  editable: boolean;
 }) {
   return useMemo<Column<RowRecord>[]>(() => {
     // Stored order first, in its own sequence; anything it does not mention keeps catalog order
@@ -47,6 +51,7 @@ export function useGridColumns({
     const body = ordered.map((column): Column<RowRecord> => {
       const target = fkTarget(column);
       const reachable = target ? schemas.includes(target.schema) : false;
+      const writable = editable && isEditableColumn(column);
 
       return {
         key: column.name,
@@ -84,8 +89,23 @@ export function useGridColumns({
             }
           />
         ),
+        // Editing a value the grid shortened would write the shortened one back, so those cells are
+        // not editable in place; the expand button opens the row, where the full value is fetched.
+        ...(writable
+          ? {
+              renderEditCell: (props) => <CellEditor {...props} info={column} />,
+              editable: (row: RowRecord) => !isTruncated(row[column.name]),
+            }
+          : null),
         renderCell: ({ row, tabIndex }) => (
-          <div className="flex h-full items-center gap-1.5 overflow-hidden">
+          <div
+            className="flex h-full items-center gap-1.5 overflow-hidden"
+            title={
+              writable && isTruncated(row[column.name])
+                ? "Shortened for display — open the row to edit the whole value"
+                : undefined
+            }
+          >
             <span className="truncate">
               <CellValue value={row[column.name]} type={column.short_type} />
             </span>
@@ -104,6 +124,7 @@ export function useGridColumns({
     });
 
     return [
+      ...(editable ? [{ ...SelectColumn, frozen: true }] : []),
       {
         key: "__expand",
         name: "",
@@ -128,5 +149,5 @@ export function useGridColumns({
       },
       ...body,
     ];
-  }, [visible, prefs, frozen, schemas, set, save, jump, onExpand]);
+  }, [visible, prefs, frozen, schemas, set, save, jump, onExpand, editable]);
 }

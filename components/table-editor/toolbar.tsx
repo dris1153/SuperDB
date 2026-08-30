@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { IconPlus, IconRefresh } from "@tabler/icons-react";
 import type { Policy } from "@/lib/table-editor";
 import type { ColumnInfo, SortKey } from "@/lib/table-view";
@@ -19,10 +19,11 @@ import { cn } from "@/lib/utils";
 import { FilterBuilder } from "./filter-builder";
 import { RlsPanel } from "./rls-panel";
 import { SortBuilder } from "./sort-builder";
+import { InsertSheet } from "./insert-sheet";
 import { SearchBox } from "./search-box";
 import { ExportMenu } from "./export-menu";
-import { useDensity } from "./density";
-import type { Density } from "./column-prefs";
+import { useDensity, type Density } from "./column-prefs";
+
 
 /**
  * The controls above the grid.
@@ -46,6 +47,9 @@ export function Toolbar({
   urlQuery,
   page,
   size,
+  projectName,
+  editable,
+  isView,
 }: {
   projectRef: string;
   schema: string;
@@ -59,10 +63,14 @@ export function Toolbar({
   urlQuery: { sort?: string; filter?: string[]; search?: string };
   page: number;
   size: number;
+  projectName: string;
+  editable: boolean;
+  isView: boolean;
 }) {
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
   const { density, setDensity } = useDensity();
+  const [inserting, setInserting] = useState(false);
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
@@ -108,14 +116,37 @@ export function Toolbar({
           <TooltipTrigger asChild>
             {/* A disabled button swallows pointer events, so the tooltip needs a live wrapper. */}
             <span className="inline-flex">
-              <Button size="sm" disabled className="h-7 gap-1 text-xs">
+              <Button
+                size="sm"
+                disabled={!editable}
+                onClick={() => setInserting(true)}
+                className="h-7 gap-1 text-xs"
+              >
                 <IconPlus size={13} stroke={1.5} /> Insert
               </Button>
             </span>
           </TooltipTrigger>
-          <TooltipContent>This editor is read-only. Writing is not built yet.</TooltipContent>
+          {/* Two different reasons, two different messages — "not editable" alone tells nobody what
+              to do about it. */}
+          {editable ? null : (
+            <TooltipContent>
+              {isView
+                ? "A view has no rows of its own to insert into."
+                : "This table has no primary key, so a row cannot be addressed after it is written."}
+            </TooltipContent>
+          )}
         </Tooltip>
       </div>
+
+      <InsertSheet
+        open={inserting}
+        onOpenChange={setInserting}
+        projectRef={projectRef}
+        projectName={projectName}
+        schema={schema}
+        table={table}
+        columns={columns}
+      />
     </div>
   );
 }

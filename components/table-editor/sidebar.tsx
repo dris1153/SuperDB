@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconSearch } from "@tabler/icons-react";
 import type { TableEntry } from "@/lib/table-editor";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { readCollapsed, writeCollapsed } from "./column-prefs";
+import { useSidebarCollapsed } from "./column-prefs";
 import { TableList } from "./table-list";
 import { useTableUrl } from "./url";
 
@@ -35,18 +35,7 @@ export function TablesSidebar({
 }) {
   const { set } = useTableUrl();
   const [query, setQuery] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
-
-  // Storage is browser-only, so the server renders expanded and the stored choice arrives after.
-  useEffect(() => {
-    setCollapsed(readCollapsed());
-  }, []);
-
-  const toggle = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    writeCollapsed(next);
-  };
+  const [collapsed, setCollapsed] = useSidebarCollapsed();
 
   return (
     <aside
@@ -59,7 +48,7 @@ export function TablesSidebar({
         <div className="mb-3 flex items-center gap-2">
           {collapsed ? null : <h1 className="truncate text-sm">Table Editor</h1>}
           <button
-            onClick={toggle}
+            onClick={() => setCollapsed(!collapsed)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             className="ml-auto rounded p-1 text-subtle hover:bg-muted hover:text-foreground"

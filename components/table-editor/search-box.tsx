@@ -14,11 +14,16 @@ import { useTableUrl } from "./url";
 export function SearchBox({ search }: { search: string }) {
   const { set, pending } = useTableUrl();
   const [draft, setDraft] = useState(search);
+  const [seen, setSeen] = useState(search);
 
-  // The URL is the truth — a jump to another table, or the back button, must reset the box.
-  useEffect(() => {
+  // The URL is the truth — a jump to another table, or the back button, must reset the box. React's
+  // documented way to adjust state when a prop changes is to do it during render, not in an effect:
+  // an effect would render once with the stale draft first. Keying the component on `search` would
+  // also work but would drop focus every time the URL moved.
+  if (search !== seen) {
+    setSeen(search);
     setDraft(search);
-  }, [search]);
+  }
 
   const submit = (value: string) => set({ q: value === "" ? null : value, page: "1" });
 

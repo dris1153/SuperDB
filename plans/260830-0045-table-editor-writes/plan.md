@@ -18,8 +18,8 @@ Design, probe findings and the safety model:
 
 | # | Phase | Status | Delivers |
 |---|---|---|---|
-| B1 | [Write layer](phase-01-write-layer.md) | pending | Safe SQL construction, affected counts, audit — no UI |
-| B2 | [Row editing](phase-02-row-editing.md) | pending | Insert, inline edit, delete, behind preview + confirm |
+| B1 | [Write layer](phase-01-write-layer.md) | **completed** 2026-08-30 | Safe SQL construction, affected counts, audit — no UI |
+| B2 | [Row editing](phase-02-row-editing.md) | **completed** 2026-08-30 | Insert, inline edit, delete, behind preview + confirm |
 | B3 | [Schema changes](phase-03-schema-changes.md) | pending | New table, add/alter/drop column, RLS toggle |
 | B4 | [CSV import](phase-04-csv-import.md) | pending | Bulk insert from a file |
 
@@ -57,6 +57,26 @@ writing to the wrong one is a risk the single-project dashboard does not have.
 5. **Record** in `connection_events` — the existing append-only, RLS-scoped audit table.
 
 **There is no undo.** The audit trail records what happened; it does not reverse it. The UI says so.
+
+## Linting now works
+
+Set up on 2026-08-30, before this plan starts, because the code here writes to a user's database as
+`postgres` with RLS bypassed — running with no linter at all was acceptable while the editor only
+read.
+
+`next lint` was removed in Next 16 and ESLint had never actually been installed; the script only
+looked like it worked. Now `eslint` + `eslint-config-next/core-web-vitals`, flat config, with
+`react-hooks/exhaustive-deps` promoted to error — the rule that would have caught the stale closure
+found in the polish plan's review.
+
+Two things to know before touching dependencies here:
+
+- **ESLint must stay on 9.x.** `eslint-config-next@16.3.3` declares peer `eslint: ">=9.0.0"` but
+  depends on `eslint-plugin-react@^7.37.0`, whose latest release supports only up to `^9.7`. Install
+  ESLint 10 and every lint run crashes in the plugin.
+- **`pnpm-workspace.yaml` carries `allowBuilds: unrs-resolver`.** Without it pnpm's pre-script
+  dependency check fails and *every* `pnpm <script>` stops working, build included. pnpm 11 no longer
+  reads the `pnpm` field in `package.json`.
 
 ## Coordination
 

@@ -14,6 +14,7 @@ import { Toolbar } from "./toolbar";
  */
 export function TableWorkspace({
   projectRef,
+  projectName,
   schema,
   entry,
   schemas,
@@ -29,8 +30,10 @@ export function TableWorkspace({
   size,
   view,
   definition,
+  editable,
 }: {
   projectRef: string;
+  projectName: string;
   schema: string;
   entry: TableEntry;
   schemas: string[];
@@ -45,6 +48,8 @@ export function TableWorkspace({
   page: number;
   size: number;
   view: "data" | "definition";
+  /** A view has no rows to address, and neither does a table without a primary key. */
+  editable: boolean;
   /** Only fetched when the definition tab is the one being looked at. */
   definition: { ddl: string; html: string | null; complete: boolean } | null;
 }) {
@@ -64,6 +69,9 @@ export function TableWorkspace({
           urlQuery={urlQuery}
           page={page}
           size={size}
+          projectName={projectName}
+          editable={editable}
+          isView={entry.kind === "v" || entry.kind === "m"}
         />
         <Definition
           ddl={definition?.ddl ?? null}
@@ -97,6 +105,9 @@ export function TableWorkspace({
         urlQuery={urlQuery}
         page={page}
         size={size}
+        projectName={projectName}
+        editable={editable}
+        isView={entry.kind === "v" || entry.kind === "m"}
       />
 
       {!rows ? (
@@ -110,12 +121,14 @@ export function TableWorkspace({
           <div className="relative min-h-0 flex-1">
             <TableGrid
               projectRef={projectRef}
+              projectName={projectName}
               schema={schema}
               table={entry.name}
               schemas={schemas}
               columns={columns}
               rows={rows}
               sort={sort}
+              editable={editable}
             />
             {rows.length === 0 ? (
               <p className="pointer-events-none absolute inset-x-0 top-24 text-center text-sm text-subtle">

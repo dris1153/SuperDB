@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { IconTable, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { useSession, writeSession } from "./session-store";
 import { useTableUrl } from "./url";
 
 type Tab = { schema: string; table: string };
@@ -10,35 +11,30 @@ type Tab = { schema: string; table: string };
 const key = (ref: string) => `superdb:tabs:${ref}`;
 const same = (a: Tab, b: Tab) => a.schema === b.schema && a.table === b.table;
 
+const EMPTY: Tab[] = [];
+
+function parseTabs(raw: string): Tab[] {
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return EMPTY;
+  return parsed.filter(
+    (t): t is Tab =>
+      typeof t === "object" &&
+      t !== null &&
+      typeof (t as Tab).schema === "string" &&
+      typeof (t as Tab).table === "string",
+  );
+}
+
 /**
  * Open tables, kept in sessionStorage per project.
  *
  * The list is a working-session convenience, not addressable state — the URL owns which table is
- * active, this owns which ones are open. Every storage call is guarded because private browsing and
- * blocked site data throw on access, exactly as `lib/vault-store.ts` documents.
+ * active, this owns which ones are open.
+ *
+ * Which tabs to *show* is derived during render: whatever is stored, plus the table the URL says is
+ * active. Persisting it is a separate effect that only writes to the store — no `setState`, which is
+ * what an effect is actually for.
  */
-const read = (ref: string): Tab[] => {
-  try {
-    const raw = sessionStorage.getItem(key(ref));
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (t): t is Tab =>
-        typeof t === "object" && t !== null && typeof (t as Tab).table === "string",
-    );
-  } catch {
-    return [];
-  }
-};
-
-const write = (ref: string, tabs: Tab[]) => {
-  try {
-    sessionStorage.setItem(key(ref), JSON.stringify(tabs));
-  } catch {
-    // Session-only is an acceptable degradation; losing the tab list is not worth an error.
-  }
-};
-
 export function TabBar({
   projectRef,
   schema,
@@ -49,32 +45,31 @@ export function TabBar({
   table: string | null;
 }) {
   const { set } = useTableUrl();
-  const [tabs, setTabs] = useState<Tab[]>([]);
+  const storageKey = key(projectRef);
+  const stored = useSession(storageKey, EMPTY, parseTabs);
 
-  // Storage is only readable in the browser, so the first paint is server-rendered without tabs.
-  useEffect(() => {
-    setTabs(read(projectRef));
-  }, [projectRef]);
+  const tabs = useMemo(() => {
+    if (!table) return stored;
+    const active = { schema, table };
+    return stored.some((t) => same(t, active)) ? stored : [...stored, active];
+  }, [stored, schema, table]);
 
   useEffect(() => {
-    if (!table) return;
-    setTabs((current) => {
-      const active = { schema, table };
-      if (current.some((t) => same(t, active))) return current;
-      const next = [...current, active];
-      write(projectRef, next);
-      return next;
-    });
-  }, [projectRef, schema, table]);
+    if (tabs !== stored) writeSession(storageKey, JSON.stringify(tabs));
+  }, [tabs, stored, storageKey]);
 
   const close = (tab: Tab) => {
     const index = tabs.findIndex((t) => same(t, tab));
     const next = tabs.filter((t) => !same(t, tab));
-    setTabs(next);
-    write(projectRef, next);
+    writeSession(storageKey, JSON.stringify(next));
+    // Closing the active tab has to move the URL too, or the render-time union puts it straight back.
     if (table && same(tab, { schema, table })) {
       const neighbour = next[index] ?? next[index - 1] ?? null;
-      set(neighbour ? { schema: neighbour.schema, table: neighbour.table, page: "1", sort: null } : { table: null });
+      set(
+        neighbour
+          ? { schema: neighbour.schema, table: neighbour.table, page: "1", sort: null, filter: [], q: null }
+          : { table: null },
+      );
     }
   };
 
@@ -93,7 +88,9 @@ export function TabBar({
             )}
           >
             <button
-              onClick={() => set({ schema: t.schema, table: t.table, page: "1", sort: null })}
+              onClick={() =>
+                set({ schema: t.schema, table: t.table, page: "1", sort: null, filter: [], q: null })
+              }
               className="flex items-center gap-1.5 py-2"
             >
               <IconTable size={13} stroke={1.5} className="shrink-0" />

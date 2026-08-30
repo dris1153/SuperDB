@@ -1,13 +1,92 @@
 ---
 phase: 1
 title: "Write layer"
-status: pending
+status: completed
 priority: P1
 effort: "1.5d"
 dependencies: []
+completed: 2026-08-30
 ---
 
 # Phase B1: Write layer
+
+## Deviations from this plan, as built
+
+1. **`previewAffected` counts through the same join the write uses**, not a separately built
+   predicate. The plan described it as "`select count(*) … where <the same predicate>`", which leaves
+   room for the two to drift. `buildCount` emits the identical `jsonb_to_recordset` join with the
+   identical keys, so the preview cannot describe something other than what is about to run. It still
+   goes to the **read-only** endpoint, which cannot write even if it were wrong.
+2. **`execute` refuses any statement without `RETURNING`.** The plan required the builders to emit it;
+   this makes the runner check rather than trust. A write that slipped through without it would
+   report zero rows affected and look like a no-op — the one failure this phase exists to prevent.
+3. **`isGuardedSchema` added** so B2's second confirmation for `auth` and `storage` has one place to
+   ask, rather than repeating the list per dialog.
+4. **`buildUpdate` requires the key to be exactly the primary key**, not merely non-empty. A key of
+   some other column would still emit a valid `UPDATE`, just one matching an unknown number of rows.
+
+Verified: `pnpm typecheck` clean, `pnpm lint` clean, 162/162 tests (26 new).
+
+**Verified live**, against a table created and dropped by the check:
+
+- Two rows inserted with a payload of `x'; drop table public.bookmarks; --  $$ "q" \ ümlaut 🙂`;
+  the stored value matched the payload **exactly**.
+- Types coerced by Postgres from the JSON: `integer` → number, `boolean` → boolean, `jsonb` → object,
+  and an explicit null stayed null rather than becoming the string "null".
+- `previewAffected` reported 1, then 2, then 0 across an update and a two-row delete — matching what
+  `RETURNING` counted each time.
+- `execute` refused a statement with no `RETURNING`.
+- Cleanup confirmed; `public.bookmarks` untouched throughout.
+
+## Fixed after code review
+
+The review found the escape layer sound — no path out of the literal or out of a quoted identifier —
+and located the real weakness somewhere else: **four ways the layer reported something untrue about
+what it had just done.** On a database with no undo, misreporting is as dangerous as miswriting.
+
+1. **`buildInsert` wrote NULL over column DEFAULTs.** Taking the union of keys across rows put a
+   column in the INSERT list for *every* row, and `jsonb_to_recordset` yields SQL NULL wherever a row
+   omitted it. Measured on a live table: a row omitting `made_at timestamptz default now()` stored
+   NULL. Silent data loss, reported as success. Rows must now all supply the same columns; a caller
+   with ragged rows groups them. Splitting into several statements is not an alternative — a
+   multi-statement request returns only the last result set, so `RETURNING` would under-count.
+   **A test had entrenched the old behaviour as correct**; it now asserts the refusal.
+2. **`buildUpdate` silently swallowed primary-key edits.** Key and patch share one JSON object and
+   the key must win, or the `WHERE` would search for the row's new identity. An edit to a key column
+   was therefore accepted, discarded, and reported as one row updated. Now refused, with a message
+   saying to delete and re-insert.
+3. **Values the grid truncated could be written back.** `table-rows.ts` cuts wide types at 512
+   characters for display and `isTruncated` already existed to spot it — the write path never called
+   it. `bytea` was the worst case: a cut `\x…` string is still valid input, so it would have stored
+   something well-formed and wrong. Now refused in both insert and update.
+4. **`execute` reported `affected: 0` for a response it did not understand.** `call()` returns
+   `undefined` for an empty body, and `Array.isArray(undefined)` is false — so a committed write
+   could be reported as having done nothing. It now throws: "no idea what happened" should not be
+   dressed up as a number.
+
+Also fixed:
+
+- **The RETURNING guard was a regex over the SQL text** — which embeds the JSON payload, so a row
+  value containing "returning " would have satisfied it. A guard whose verdict depends on user data
+  is not a guard. Builders now return `{ sql, returning }` and `execute` accepts only that.
+- **`buildCount` deduplicates keys.** Duplicates inflated `count(*)` over the join, so the preview
+  could promise more rows than the delete would touch.
+- **One contract for "a key".** `buildUpdate` demanded exactly the primary key while `buildDelete`
+  and `buildCount` silently discarded anything extra. All three now go through `keyRows`, which also
+  rejects an explicitly `undefined` key part — `n in k` is true for those, and `JSON.stringify` drops
+  them, so the predicate would have compared against NULL and matched nothing.
+- **`describeTable` now runs with `set local search_path = ''`.** `format_type` omits the schema for
+  a type in the *calling* session's search_path; that result was being fed to a different session,
+  under a different role, which could resolve a bare name to a different type of the same name. An
+  empty search_path makes it always qualify. Verified the query still works.
+- **The audit records failures too**, and carries the keys involved. A request can time out at the
+  HTTP layer after the server has committed; without a record nothing would know it was attempted.
+- **`countAffected` surfaces the real reason.** It stands immediately before a destructive step, so
+  "this table has no primary key" and "the API call failed" must not collapse into one sentence.
+
+Re-verified live after the fixes: a column omitted by *all* rows now takes its DEFAULT
+(`made_at is null` false for every row), ragged rows are refused before any SQL runs, and a
+primary-key edit is refused. 169/169 tests.
 
 ## Overview
 
@@ -137,12 +216,12 @@ delete it, drop the table. Same shape as the probe already run, kept out of the 
 
 ## Success Criteria
 
-- [ ] `pnpm typecheck` clean; `sql-write` tests pass alongside the existing suite
-- [ ] An `UPDATE` or `DELETE` with no key throws at build time — asserted, not assumed
-- [ ] A hostile payload written to a live throwaway table is stored as data and the table survives
-- [ ] `execute` reports the true affected count, verified against a multi-row update
-- [ ] A write appears in `connection_events` with schema, table, operation and count
-- [ ] Nothing in this phase is reachable from the UI
+- [x] `pnpm typecheck` clean, `pnpm lint` clean; 162/162 tests (26 new)
+- [x] An `UPDATE` or `DELETE` with no key throws at build time — asserted, not assumed
+- [x] A hostile payload written to a live throwaway table is stored as data; the table and its neighbours survived
+- [x] `execute` reports the true affected count — verified against a two-row delete
+- [ ] A write appears in `connection_events` — needs a signed-in session to exercise
+- [x] Nothing in this phase is reachable from the UI
 
 ## Risk Assessment
 

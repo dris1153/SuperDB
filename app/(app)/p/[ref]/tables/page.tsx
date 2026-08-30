@@ -15,7 +15,6 @@ import { TablesSidebar } from "@/components/table-editor/sidebar";
 import { TabBar } from "@/components/table-editor/tab-bar";
 import { TableWorkspace } from "@/components/table-editor/workspace";
 import { TableUrlProvider } from "@/components/table-editor/url";
-import { DensityProvider } from "@/components/table-editor/density";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +39,7 @@ export default async function TablesPage({
   const [{ ref }, query] = await Promise.all([params, searchParams]);
   const found = await resolveProject(ref);
   if (!found) notFound();
-  const { token } = found;
+  const { token, project } = found;
 
   const schemas = (await safe(() => listSchemas(token, ref))) ?? [];
   if (schemas.length === 0) {
@@ -139,52 +138,57 @@ export default async function TablesPage({
     ? { ddl: built.ddl, html: await highlight(built.ddl, "sql"), complete: built.complete }
     : null;
 
+  // Only an ordinary table with a primary key can have one of its rows addressed. A view and a
+  // keyless table each fail for their own reason, which the toolbar states rather than merging.
+  const editable =
+    entry?.kind === "r" && columns.some((c) => c.pk_pos != null);
+
   const state = { schema, table: entry?.name ?? null, page, size, sort, filters, search, view };
 
   return (
     <TableUrlProvider current={queryString(state)}>
-      <DensityProvider>
-        <div className="flex h-screen">
-          <TablesSidebar
-            schemas={schemas}
-            schema={schema}
-            tables={tables}
-            table={entry?.name ?? null}
-            exposed={exposed}
-          />
+      <div className="flex h-screen">
+        <TablesSidebar
+          schemas={schemas}
+          schema={schema}
+          tables={tables}
+          table={entry?.name ?? null}
+          exposed={exposed}
+        />
 
-          <div className="flex min-w-0 flex-1 flex-col">
-            <TabBar projectRef={ref} schema={schema} table={entry?.name ?? null} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TabBar projectRef={ref} schema={schema} table={entry?.name ?? null} />
 
-            {!entry ? (
-              <TableEmpty>
-                {missing
-                  ? `No table or view named ${query.table} in schema ${schema}.`
-                  : `No tables or views in schema ${schema}.`}
-              </TableEmpty>
-            ) : (
-              <TableWorkspace
-                projectRef={ref}
-                schema={schema}
-                entry={entry}
-                schemas={schemas}
-                columns={columns}
-                rows={rows}
-                sort={sort}
-                filters={filters}
-                search={search}
-                urlQuery={exportQuery(state)}
-                policies={policies}
-                total={total}
-                page={page}
-                size={size}
-                view={view}
-                definition={definition}
-              />
-            )}
-          </div>
+          {!entry ? (
+            <TableEmpty>
+              {missing
+                ? `No table or view named ${query.table} in schema ${schema}.`
+                : `No tables or views in schema ${schema}.`}
+            </TableEmpty>
+          ) : (
+            <TableWorkspace
+              projectRef={ref}
+              projectName={project.name}
+              schema={schema}
+              entry={entry}
+              schemas={schemas}
+              columns={columns}
+              rows={rows}
+              sort={sort}
+              filters={filters}
+              search={search}
+              urlQuery={exportQuery(state)}
+              policies={policies}
+              total={total}
+              page={page}
+              size={size}
+              view={view}
+              definition={definition}
+              editable={editable}
+            />
+          )}
         </div>
-      </DensityProvider>
+      </div>
     </TableUrlProvider>
   );
 }
