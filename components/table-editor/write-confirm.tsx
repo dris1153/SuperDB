@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import type { IncomingRef } from "@/lib/table-editor";
-import { isGuardedSchema } from "@/lib/table-view";
-import { Input } from "@/components/ui/input";
+import { GuardedSchemaField, useGuardedSchema } from "./guarded-schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,19 +59,8 @@ export function WriteConfirm({
   /** What is about to be written, when the user still has a say in it. */
   children?: React.ReactNode;
 }) {
-  const [typed, setTyped] = useState("");
-  const guarded = isGuardedSchema(schema);
+  const { guarded, typed, setTyped, ready } = useGuardedSchema(open, schema, table);
 
-  // Cleared when the dialog *opens*, not when it closes. A caller that closes it by flipping `open`
-  // — which every success path does — never goes through `onOpenChange`, so clearing there left the
-  // typed name standing and the second write to `auth` in a session had no friction at all.
-  const [wasOpen, setWasOpen] = useState(open);
-  if (open !== wasOpen) {
-    setWasOpen(open);
-    setTyped("");
-  }
-
-  const ready = !guarded || typed === table;
   // A confirmed count of zero means the rows are already gone. Confirming would run a statement that
   // matches nothing and report success, which is the dialog and the database agreeing on a lie.
   const nothingToDo = affected === 0;
@@ -146,19 +133,7 @@ export function WriteConfirm({
         </p>
 
         {guarded ? (
-          <div className="space-y-1.5">
-            <p className="text-xs text-warn">
-              {schema} is used by the platform itself. Type <span className="font-mono">{table}</span>{" "}
-              to confirm.
-            </p>
-            <Input
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              placeholder={table}
-              aria-label={`Type ${table} to confirm`}
-              className="h-8 font-mono text-xs"
-            />
-          </div>
+          <GuardedSchemaField schema={schema} table={table} typed={typed} onChange={setTyped} />
         ) : null}
 
         {error ? <p className="text-xs text-destructive">{error}</p> : null}

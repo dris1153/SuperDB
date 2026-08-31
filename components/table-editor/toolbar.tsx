@@ -31,8 +31,10 @@ import { useDensity, type Density } from "./column-prefs";
  * Two things from Supabase's own toolbar are deliberately absent rather than disabled: the role
  * switcher, which this API cannot do at all — the query role is a member of no other role — and the
  * "ask AI" affordance, which has no backend here. A permanently dead control is a lie rather than a
- * roadmap, the same call `project-nav.tsx` makes about Integrations. `Insert` is disabled instead of
- * removed because writing is a real future phase, not an impossibility.
+ * roadmap, the same call `project-nav.tsx` makes about Integrations.
+ *
+ * `Insert` is disabled rather than hidden on a view or a keyless table, because its tooltip is the
+ * only place that says *why*.
  */
 export function Toolbar({
   table,
@@ -98,7 +100,15 @@ export function Toolbar({
           size={size}
         />
 
-        <RlsPanel table={table} rls={rls} policies={policies} />
+        <RlsPanel
+          projectRef={projectRef}
+          projectName={projectName}
+          schema={schema}
+          table={table}
+          rls={rls}
+          policies={policies}
+          editable={!isView}
+        />
 
         <button
           onClick={() => startRefresh(() => router.refresh())}

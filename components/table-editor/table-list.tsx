@@ -23,10 +23,14 @@ export function TableList({
   exposed,
   query,
   collapsed,
+  projectRef,
+  projectName,
 }: {
   schema: string;
   tables: TableEntry[];
   table: string | null;
+  projectRef: string;
+  projectName: string;
   /** Whether PostgREST serves this schema. Null when unreadable — then no icon at all. */
   exposed: boolean | null;
   /** The sidebar's search box lives in the shell; its text arrives here. */
@@ -132,6 +136,8 @@ export function TableList({
                     <TableMenu
                       schema={schema}
                       entry={t}
+                      projectRef={projectRef}
+                      projectName={projectName}
                       onViewDefinition={() => set({ table: t.name, view: "definition" })}
                     />
                   </span>

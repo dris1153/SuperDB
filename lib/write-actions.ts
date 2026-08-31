@@ -1,8 +1,7 @@
 "use server";
 
-import { recordEvent } from "./audit";
 import { resolveProject } from "./inventory";
-import { createClient } from "./supabase/server";
+import { recordWrite } from "./write-audit";
 import { buildDelete, buildInsert, buildUpdate } from "./sql-statements";
 import type { Row, Statement } from "./sql-write";
 import { describeTable, incomingRefs, type IncomingRef } from "./table-editor";
@@ -10,7 +9,10 @@ import { safe } from "./safe";
 import { execute, previewAffected } from "./table-writes";
 
 /**
- * The write actions phase 2 will call. Nothing reaches them from the UI yet.
+ * The row-level write actions: insert, update, delete.
+ *
+ * DDL lives in `ddl-actions.ts` — it shares the audit helper and the authorisation check, but the
+ * construction that makes values safe here does not apply to identifiers and type names.
  *
  * Authorisation rides on `resolveProject`, which only returns a token for a connection the signed-in
  * user owns — the same check every other project-scoped action makes. Schema, table and column names
@@ -22,32 +24,6 @@ import { execute, previewAffected } from "./table-writes";
  */
 
 export type WriteResult = { ok: true; affected: number } | { ok: false; reason: string };
-
-/**
- * Every attempt lands in `connection_events` — including the ones that failed.
- *
- * A write that errored still matters: a request can time out at the HTTP layer after the server has
- * committed, and without a record nothing in the system knows it was ever tried. The detail carries
- * the keys involved, because on an editor with no undo that trail is the only thing left to work
- * from.
- */
-async function record(entry: {
-  ref: string;
-  schema: string;
-  table: string;
-  what: string;
-  outcome: string;
-  keys?: Row[];
-}) {
-  const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  const keys = entry.keys?.length ? ` keys=${JSON.stringify(entry.keys).slice(0, 200)}` : "";
-  await recordEvent(supabase, {
-    userId: data.user?.id,
-    event: "wrote",
-    detail: `${entry.what} ${entry.schema}.${entry.table} on ${entry.ref} — ${entry.outcome}${keys}`,
-  });
-}
 
 async function run(
   ref: string,
@@ -86,7 +62,7 @@ async function run(
     }
 
     const { affected } = await execute(found.token, ref, build(columns));
-    await record({
+    await recordWrite({
       ref,
       schema,
       table,
@@ -99,7 +75,7 @@ async function run(
     // Postgres explains its own refusals better than this code could — a constraint name, a type
     // mismatch — so its message is surfaced rather than replaced.
     const reason = error instanceof Error ? error.message : "The write failed.";
-    await record({ ref, schema, table, what, keys, outcome: `failed: ${reason.slice(0, 200)}` });
+    await recordWrite({ ref, schema, table, what, keys, outcome: `failed: ${reason.slice(0, 200)}` });
     return { ok: false, reason: reason.slice(0, 400) };
   }
 }

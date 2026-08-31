@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconSearch } from "@tabler/icons-react";
+import { IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconPlus, IconSearch } from "@tabler/icons-react";
 import type { TableEntry } from "@/lib/table-editor";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { useSidebarCollapsed } from "./column-prefs";
+import { NewTableSheet } from "./new-table-sheet";
 import { TableList } from "./table-list";
 import { useTableUrl } from "./url";
 
@@ -26,16 +28,21 @@ export function TablesSidebar({
   tables,
   table,
   exposed,
+  projectRef,
+  projectName,
 }: {
   schemas: string[];
   schema: string;
   tables: TableEntry[];
   table: string | null;
   exposed: boolean | null;
+  projectRef: string;
+  projectName: string;
 }) {
   const { set } = useTableUrl();
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useSidebarCollapsed();
+  const [creating, setCreating] = useState(false);
 
   return (
     <aside
@@ -107,6 +114,29 @@ export function TablesSidebar({
         exposed={exposed}
         query={query}
         collapsed={collapsed}
+        projectRef={projectRef}
+        projectName={projectName}
+      />
+
+      {collapsed ? null : (
+        <div className="border-t border-border p-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 w-full gap-1 text-xs"
+            onClick={() => setCreating(true)}
+          >
+            <IconPlus size={13} stroke={1.5} /> New table
+          </Button>
+        </div>
+      )}
+
+      <NewTableSheet
+        open={creating}
+        onOpenChange={setCreating}
+        projectRef={projectRef}
+        projectName={projectName}
+        schema={schema}
       />
     </aside>
   );

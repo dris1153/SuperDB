@@ -154,6 +154,8 @@ export default async function TablesPage({
           tables={tables}
           table={entry?.name ?? null}
           exposed={exposed}
+          projectRef={ref}
+          projectName={project.name}
         />
 
         <div className="flex min-w-0 flex-1 flex-col">

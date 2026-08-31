@@ -6,7 +6,7 @@ import "react-data-grid/lib/styles.css";
 import type { RowRecord } from "@/lib/table-rows";
 import { fkTarget, serialiseSort, type ColumnInfo, type SortKey } from "@/lib/table-view";
 import { cn } from "@/lib/utils";
-import { CellEditDialog, useCellEdit } from "./cell-editor";
+import { useCellEdit } from "./cell-editor";
 import { useGridColumns } from "./column-model";
 import {
   ROW_HEIGHT,
@@ -17,7 +17,7 @@ import {
 } from "./column-prefs";
 import { useGridInteractions } from "./grid-interactions";
 import { GridBanner } from "./grid-banner";
-import { RowPanel } from "./row-panel";
+import { GridOverlays } from "./grid-overlays";
 import { useTableUrl } from "./url";
 
 export function TableGrid({
@@ -45,6 +45,7 @@ export function TableGrid({
 }) {
   const { set, pending } = useTableUrl();
   const [expanded, setExpanded] = useState<RowRecord | null>(null);
+  const [editingColumn, setEditingColumn] = useState<ColumnInfo | null>(null);
   const [selected, setSelected] = useState((): ReadonlySet<string> => new Set());
   const { editing, clearEdit, onRowsChange } = useCellEdit(rows, columns);
   const [prefs, writePrefs] = useColumnPrefs(projectRef, schema, table);
@@ -104,6 +105,7 @@ export function TableGrid({
     save,
     jump,
     onExpand: setExpanded,
+    onEditColumn: setEditingColumn,
     editable,
   });
 
@@ -175,24 +177,19 @@ export function TableGrid({
           aria-label="Table rows"
         />
       </div>
-      <RowPanel
+      <GridOverlays
         projectRef={projectRef}
         projectName={projectName}
         schema={schema}
         table={table}
         columns={columns}
-        row={expanded}
         editable={editable}
-        onClose={() => setExpanded(null)}
-      />
-      <CellEditDialog
-        projectRef={projectRef}
-        projectName={projectName}
-        schema={schema}
-        table={table}
-        columns={columns}
-        pending={editing}
-        onClose={clearEdit}
+        expandedRow={expanded}
+        onCloseRow={() => setExpanded(null)}
+        editingColumn={editingColumn}
+        onCloseColumn={() => setEditingColumn(null)}
+        pendingCell={editing}
+        onCloseCell={clearEdit}
       />
     </div>
   );

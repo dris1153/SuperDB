@@ -4,6 +4,7 @@ import {
   IconChevronDown,
   IconCopy,
   IconEyeOff,
+  IconPencil,
   IconPinned,
   IconPinnedOff,
   IconRestore,
@@ -22,8 +23,8 @@ import {
 /**
  * The per-column menu from Supabase's editor, minus everything that would write.
  *
- * Edit and Delete are omitted rather than disabled: this is a read-only editor, and a menu row that
- * can never be enabled is noise. `components/ui/dropdown-menu.tsx` has been vendored and unused since
+ * Edit column is omitted rather than disabled on a view or a keyless table: a menu row that can never
+ * be enabled is noise. `components/ui/dropdown-menu.tsx` has been vendored and unused since
  * the shadcn migration — this is its first consumer.
  */
 export function ColumnMenu({
@@ -35,6 +36,7 @@ export function ColumnMenu({
   onToggleFrozen,
   onHide,
   onReset,
+  onEdit,
 }: {
   column: ColumnInfo;
   frozen: boolean;
@@ -46,6 +48,8 @@ export function ColumnMenu({
   onToggleFrozen: () => void;
   onHide: () => void;
   onReset: () => void;
+  /** Absent on a view or a keyless table, where the schema cannot be changed from here. */
+  onEdit?: () => void;
 }) {
   /**
    * react-data-grid puts its sort handler on the header cell itself and fires it on click and on
@@ -86,6 +90,15 @@ export function ColumnMenu({
         <DropdownMenuItem onSelect={onHide} disabled={!canHide}>
           <IconEyeOff size={14} stroke={1.5} /> Hide column
         </DropdownMenuItem>
+        {onEdit ? (
+          <>
+            <DropdownMenuSeparator />
+            {/* Drop lives inside the edit sheet, next to the row count that says what it costs. */}
+            <DropdownMenuItem onSelect={onEdit}>
+              <IconPencil size={14} stroke={1.5} /> Edit column
+            </DropdownMenuItem>
+          </>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => navigator.clipboard?.writeText(column.name).catch(() => {})}>
           <IconCopy size={14} stroke={1.5} /> Copy name

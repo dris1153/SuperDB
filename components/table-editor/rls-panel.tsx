@@ -11,15 +11,25 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { RlsToggle } from "./rls-toggle";
 
 export function RlsPanel({
+  projectRef,
+  projectName,
+  schema,
   table,
   rls,
   policies,
+  editable,
 }: {
+  projectRef: string;
+  projectName: string;
+  schema: string;
   table: string;
   rls: boolean;
   policies: Policy[];
+  /** A view has no RLS of its own to toggle. */
+  editable: boolean;
 }) {
   return (
     <Sheet>
@@ -45,6 +55,17 @@ export function RlsPanel({
         </SheetHeader>
 
         <div className="space-y-4 px-4 pb-6">
+          {editable ? (
+            <RlsToggle
+              projectRef={projectRef}
+              projectName={projectName}
+              schema={schema}
+              table={table}
+              rls={rls}
+              policyCount={policies.length}
+            />
+          ) : null}
+
           {/* Without this the count above implies a filtering that is not happening. */}
           <p className="rounded-md border border-warn/40 px-3 py-2 text-xs text-warn">
             The rows shown in this editor are <strong>not</strong> filtered by these policies. Queries

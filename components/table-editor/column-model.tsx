@@ -25,6 +25,7 @@ export function useGridColumns({
   save,
   jump,
   onExpand,
+  onEditColumn,
   editable,
 }: {
   visible: ColumnInfo[];
@@ -36,6 +37,8 @@ export function useGridColumns({
   save: (next: ColumnPrefs) => void;
   jump: (target: NonNullable<ReturnType<typeof fkTarget>>, row: RowRecord) => void;
   onExpand: (row: RowRecord) => void;
+  /** Opens the schema editor for one column. Absent when the table cannot be changed. */
+  onEditColumn: (column: ColumnInfo) => void;
   /** False for a view or a keyless table: no tick column, and nothing to edit in place. */
   editable: boolean;
 }) {
@@ -85,6 +88,7 @@ export function useGridColumns({
                 }
                 onHide={() => save({ ...prefs, hidden: [...prefs.hidden, column.name] })}
                 onReset={() => save({ hidden: [], frozen: [], order: [], widths: [] })}
+                onEdit={editable ? () => onEditColumn(column) : undefined}
               />
             }
           />
@@ -149,5 +153,5 @@ export function useGridColumns({
       },
       ...body,
     ];
-  }, [visible, prefs, frozen, schemas, set, save, jump, onExpand, editable]);
+  }, [visible, prefs, frozen, schemas, set, save, jump, onExpand, onEditColumn, editable]);
 }
