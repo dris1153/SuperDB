@@ -1,6 +1,6 @@
 ---
 title: "Table Editor writes (group B)"
-status: pending
+status: completed
 created: 2026-08-30
 blockedBy: []
 blocks: []
@@ -21,7 +21,7 @@ Design, probe findings and the safety model:
 | B1 | [Write layer](phase-01-write-layer.md) | **completed** 2026-08-30 | Safe SQL construction, affected counts, audit — no UI |
 | B2 | [Row editing](phase-02-row-editing.md) | **completed** 2026-08-30 | Insert, inline edit, delete, behind preview + confirm |
 | B3 | [Schema changes](phase-03-schema-changes.md) | **completed** 2026-08-31 | New table, add/alter/drop column, RLS toggle |
-| B4 | [CSV import](phase-04-csv-import.md) | pending | Bulk insert from a file |
+| B4 | [CSV import](phase-04-csv-import.md) | **completed** 2026-08-31 | Bulk insert from a file |
 
 B1 ships no user-visible feature and is still the most important phase. Everything after it is UI
 over a layer that is either safe or is not.

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { IconPlus, IconRefresh } from "@tabler/icons-react";
+import { IconPlus, IconRefresh, IconUpload } from "@tabler/icons-react";
 import type { Policy } from "@/lib/table-editor";
 import type { ColumnInfo, SortKey } from "@/lib/table-view";
 import type { Filter } from "@/lib/table-filter";
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { FilterBuilder } from "./filter-builder";
 import { RlsPanel } from "./rls-panel";
 import { SortBuilder } from "./sort-builder";
+import { ImportSheet } from "./import-sheet";
 import { InsertSheet } from "./insert-sheet";
 import { SearchBox } from "./search-box";
 import { ExportMenu } from "./export-menu";
@@ -34,7 +35,8 @@ import { useDensity, type Density } from "./column-prefs";
  * roadmap, the same call `project-nav.tsx` makes about Integrations.
  *
  * `Insert` is disabled rather than hidden on a view or a keyless table, because its tooltip is the
- * only place that says *why*.
+ * only place that says *why*. `Import` is hidden there instead: it has no tooltip to carry, and two
+ * controls repeating the same explanation is noise.
  */
 export function Toolbar({
   table,
@@ -73,6 +75,7 @@ export function Toolbar({
   const [refreshing, startRefresh] = useTransition();
   const { density, setDensity } = useDensity();
   const [inserting, setInserting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
@@ -99,6 +102,18 @@ export function Toolbar({
           page={page}
           size={size}
         />
+
+        {/* Next to Export, because an import is what an export is for. */}
+        {editable ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+            onClick={() => setImporting(true)}
+          >
+            <IconUpload size={13} stroke={1.5} /> Import
+          </Button>
+        ) : null}
 
         <RlsPanel
           projectRef={projectRef}
@@ -147,6 +162,16 @@ export function Toolbar({
           )}
         </Tooltip>
       </div>
+
+      <ImportSheet
+        open={importing}
+        onOpenChange={setImporting}
+        projectRef={projectRef}
+        projectName={projectName}
+        schema={schema}
+        table={table}
+        columns={columns}
+      />
 
       <InsertSheet
         open={inserting}
