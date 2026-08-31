@@ -18,6 +18,7 @@ import { FrameworkPanel } from "./connect-framework-panel";
 import { OrmPanel } from "./connect-orm-panel";
 import { Copyable, Snippet, Step } from "./connect-primitives";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import {
   Sheet,
   SheetContent,
@@ -369,15 +370,18 @@ function McpPanel({ projectRef }: { projectRef: string }) {
             </SelectContent>
           </Select>
 
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
+          {/* Beside the label rather than inside it: the checkbox is a button, which a wrapping
+              label would forward its own click to on top of the button's — toggling twice. */}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="connect-read-only"
               checked={readOnly}
-              onChange={(e) => setReadOnly(e.target.checked)}
-              className="accent-primary"
+              onCheckedChange={(v) => setReadOnly(v === true)}
             />
-            Read-only — only allow read operations on your database.
-          </label>
+            <label htmlFor="connect-read-only" className="text-sm text-muted-foreground">
+              Read-only — only allow read operations on your database.
+            </label>
+          </div>
         </div>
       </div>
 

@@ -189,10 +189,11 @@
     font-weight: 500;
   }
 
-  /* Tailwind v4 Preflight drops the native pointer cursor on buttons. */
+  /* Tailwind v4 Preflight drops the native pointer cursor on buttons. A checkbox is a button too, so
+     it is already covered; the label beside it is what needs naming. */
   button:not(:disabled),
   [role="button"]:not(:disabled),
-  label:has(> input[type="checkbox"]),
+  [role="checkbox"]:not([data-disabled]) + label,
   select:not(:disabled),
   summary {
     cursor: pointer;
@@ -243,7 +244,6 @@
   --rdg-border-color: var(--border);
   --rdg-summary-border-color: var(--border);
   --rdg-selection-color: var(--primary);
-  --rdg-checkbox-focus-color: var(--primary);
   --rdg-font-size: 0.8125rem;
   /* The default is a fixed 350px; the grid has to fill whatever the page gives it. */
   block-size: 100%;

@@ -17,6 +17,7 @@ import {
 } from "./column-prefs";
 import { useGridInteractions } from "./grid-interactions";
 import { GridBanner } from "./grid-banner";
+import { GRID_RENDERERS } from "./grid-checkbox";
 import { GridOverlays } from "./grid-overlays";
 import { useTableUrl } from "./url";
 
@@ -174,6 +175,7 @@ export function TableGrid({
           onColumnsReorder={onColumnsReorder}
           columnWidths={columnWidths}
           onColumnWidthsChange={onColumnWidthsChange}
+          renderers={GRID_RENDERERS}
           aria-label="Table rows"
         />
       </div>

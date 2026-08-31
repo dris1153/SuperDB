@@ -6,6 +6,7 @@ import { saveConnectionSecret, type ConnectionSecret } from "@/lib/vault-actions
 import { useVault } from "./vault-provider";
 import { VaultGate } from "./vault-gate";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
@@ -181,10 +182,16 @@ function CredentialsForm({
       ) : null}
 
       {shape.supabasePassword || shape.emailPassword ? (
-        <label className="flex items-center gap-2 text-xs text-subtle">
-          <input type="checkbox" checked={reveal} onChange={(e) => setReveal(e.target.checked)} />
-          Show passwords
-        </label>
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="reveal-passwords"
+            checked={reveal}
+            onCheckedChange={(v) => setReveal(v === true)}
+          />
+          <label htmlFor="reveal-passwords" className="text-xs text-subtle">
+            Show passwords
+          </label>
+        </div>
       ) : (
         <p className="text-xs text-subtle">
           Nothing to store for {shape.label} beyond the address — that account lives wherever you manage it.
