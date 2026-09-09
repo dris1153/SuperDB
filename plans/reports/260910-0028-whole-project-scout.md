@@ -49,6 +49,10 @@ Browser ─┬─ proxy.ts (Next 16 middleware) ── getUser() + aal2 MFA gate
 `"use client"` in `app/`. No `error.tsx` / `loading.tsx` / `not-found.tsx` anywhere — failures are
 handled as *data* (`lib/safe.ts::attempt()` returns `{ok,data} | {ok:false,reason}`).
 
+> Superseded for `loading.tsx` only: three were added on 2026-09-10 by
+> [260910-0042-navigation-latency](../260910-0042-navigation-latency/plan.md). The rest of this
+> snapshot stands at head `5f0f14b`.
+
 | URL | File | Notes |
 |---|---|---|
 | `/` | `app/(app)/page.tsx` | Projects board, `loadInventory()` fan-out |
@@ -297,10 +301,12 @@ directly. `plans/reports/` holds cross-plan reports.
 
 ### Documentation drift (worth fixing)
 
-- **`README.md` is stale on three counts**: it claims "around 7,400 lines" (now 19,414), lists
-  **Table Editor under "Not built yet"** when three plans shipped it, and says "eleven of thirteen"
-  nav items are disabled when `project-nav.tsx` now marks three ready (Overview, Table Editor,
-  Database) and ten "soon". It also advertises `pnpm test` as "33 tests"; it is 253.
+- ~~**`README.md` is stale on three counts.**~~ **Fixed 2026-09-10.** It claimed "around 7,400 lines"
+  (19,414), listed **Table Editor under "Not built yet"** when three plans shipped it, advertised
+  `pnpm test` as "33 tests" (262), and said "eleven of thirteen" nav items are disabled.
+  That last count was wrong in a second way this report repeated: `project-nav.tsx` declares **12**
+  nav items, not 13 — a `grep '{ slug:'` also matches the type declaration on the `SECTIONS` line.
+  Three are ready (Overview, Table Editor, Database), so **nine** are disabled.
 - **`plans/260824-1218-.../plan.md`** front-matter still says `status: pending` while its phase files
   say completed. Flagged at the last scout, unchanged.
 - The credential-vault brainstorm proposes a `'google'` login method and a `provider_email` column;
@@ -327,5 +333,5 @@ directly. `plans/reports/` holds cross-plan reports.
   Supabase** and flagged Unverified in `docs/secret-rotation-runbook.md` — still untested.
 - `ENCRYPTION_KEY` remains a single point of total loss: no KMS, no rewrap script in `lib/`. Rotating
   it today destroys access to every stored token.
-- Whether the remaining ten nav slugs are still the intended roadmap, given the table editor took the
+- Whether the remaining nine nav slugs are still the intended roadmap, given the table editor took the
   codebase from 7.4k to 19.4k lines on its own.
