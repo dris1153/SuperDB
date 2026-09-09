@@ -29,18 +29,27 @@ term in the total.
 
 ## Architecture
 
-The guiding rule: **with N serial round trips to one backend, colocate compute with the data, not
-with the user.** One extra browser hop costs one round trip; a mismatched backend region costs N.
-This app has N ≈ 5–8 before first paint, so data proximity wins decisively.
+> **Corrected 2026-09-10.** The decision table below assumed every round trip goes to the Supabase
+> project's region. It does not. **There are two backends, in different places**, and the original
+> rule picked a winner without noticing it was a trade.
 
-Decision table, driven by Phase 1's recorded region:
+The project region is **`ap-southeast-2`** (AWS Sydney; Vercel's match is `syd1`). Traffic splits:
 
-| Supabase project region | Action |
-|---|---|
-| Singapore (`ap-southeast-1`) | `vercel.json` → `{"regions": ["sin1"]}` |
-| Other Asia-Pacific | pick the matching Vercel region (`hkg1`, `icn1`, `syd1`, `bom1`) |
-| US East (`us-east-1`) | **Skip this phase.** Already aligned; the win is elsewhere |
-| Europe | matching EU region (`fra1`, `lhr1`, `arn1`) |
+| Destination | Where | Round trips per `/p/[ref]/tables` |
+|---|---|---|
+| SuperDB's own Supabase project — auth, `connections`, `vault` | Sydney | ~4 |
+| `api.supabase.com` — the Management API | Cloudflare anycast (`104.18.42.230`, `172.64.145.26`, `2606:4700::`); control-plane origin elsewhere | ~5 |
+
+So moving `iad1` → `syd1` buys roughly 800 ms on the Sydney group and may give most of it back on the
+Management API group, depending on where that origin sits and how Cloudflare's backbone routes to it.
+**It could be a wash, or a regression.** Reasoning cannot settle it; only a preview deploy can.
+
+One thumb on the scale for `syd1`: the user is in Vietnam, so the browser hop drops from ~250 ms
+(`iad1`) to ~110 ms. That is one round trip, not N.
+
+The corrected rule: **with N serial round trips split across backends in different regions, there is
+no single "next to the data" — measure both placements.** The original one-backend rule only applies
+when all N share a destination.
 
 Two mechanisms exist; confirm which applies before editing. Check
 `node_modules/next/dist/docs/` per `AGENTS.md` — this Next version's conventions may differ from
@@ -63,13 +72,20 @@ round trips are already fast (a US East project), this trade does not exist and 
 
 ## Implementation Steps
 
-1. Read the region from `baseline.md`. If it is US East, mark this phase skipped and stop.
+Region is known (`ap-southeast-2`), so this is now an A/B measurement, not a lookup.
+
+1. Complete Phase 1 on the current `iad1` deployment, with the per-stage timings split into the two
+   destination groups above. That split is the whole point — a single total cannot decide this.
 2. Confirm the region config mechanism against `node_modules/next/dist/docs/`.
-3. Add `vercel.json` with the matching region.
-4. Deploy to a preview.
-5. Re-run Phase 1's timing measurements on the preview. Compare against `baseline.md`.
-6. Record the delta in `baseline.md`. If the improvement is negligible, revert — an unexplained
-   config file is worse than none.
+3. Add `vercel.json` → `{"regions": ["syd1"]}` and deploy to a **preview**, leaving production on
+   `iad1`.
+4. Re-run the same measurements against the preview.
+5. Compare group by group, not just the total: Sydney calls should collapse, Management API calls may
+   rise. Note the browser hop separately — it improves either way for a user in Asia-Pacific.
+6. Keep whichever wins on total time to interactive. Record both sets of numbers in `baseline.md`,
+   including the losing one, so nobody re-litigates this from intuition.
+7. If it is a wash, **revert to no `vercel.json`** and spend the effort on Phase 6 instead — an
+   unexplained config file is worse than none.
 
 ## Success Criteria
 
