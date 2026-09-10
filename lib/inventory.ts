@@ -48,12 +48,13 @@ export async function loadInventory(): Promise<Inventory> {
     }),
   );
 
-  const projects = perConnection
-    .flat()
-    .sort(
-      (a, b) =>
-        a.owner.localeCompare(b.owner) || a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name),
-    );
+  // Sorted within a connection only, never across them: connectionsWithTokens returns the user's
+  // chosen sort_order and perConnection preserves it, so the board follows the order set on the
+  // connections page. Sorting by owner here again would silently override it — this is deliberate,
+  // not a missing sort.
+  const projects = perConnection.flatMap((group) =>
+    group.sort((a, b) => a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name)),
+  );
 
   return { projects, connections: connections.map(({ token, ...c }) => c), errors };
 }
