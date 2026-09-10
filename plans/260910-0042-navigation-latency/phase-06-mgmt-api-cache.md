@@ -93,6 +93,11 @@ projects are the same projects.
   `node_modules/next/dist/docs/01-app/02-guides/caching-without-cache-components.md`
 - Do not touch: `lib/table-rows.ts`, `lib/table-editor.ts`, `lib/prometheus.ts`, `lib/logs-sql.ts`
 
+> **Overlaps [260910-0934-connection-ordering](../260910-0934-connection-ordering/plan.md) phase 2**,
+> which rewrites `loadInventory`'s sort in this same file. Neither blocks the other, but whichever
+> lands second resolves a conflict there. That plan is not deferred and this phase is P3, so expect
+> it to land first.
+
 ## Implementation Steps
 
 1. Read `caching-without-cache-components.md` and `unstable_cache.md` in full. Confirm the
