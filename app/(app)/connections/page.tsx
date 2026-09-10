@@ -30,6 +30,8 @@ import { DisconnectConnection } from "@/components/disconnect-connection";
 import { EditConnection } from "@/components/edit-connection";
 import { ToastFromParams } from "@/components/toast-from-params";
 import { date } from "@/lib/format";
+import { methodLabel } from "@/lib/credential-methods";
+import type { ConnectionSecret } from "@/lib/vault-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -135,7 +137,7 @@ export default async function ConnectionsPage() {
           <Table className="min-w-2xl">
             <TableHeader className="bg-card">
               <TableRow className="hover:bg-transparent">
-                {["Owner", "Kind", "Tags", "Token", "Added", ""].map((h) => (
+                {["Owner", "Kind", "Account", "Tags", "Token", "Added", ""].map((h) => (
                   <TableHead key={h} className={HEAD}>
                     {h}
                   </TableHead>
@@ -165,6 +167,9 @@ export default async function ConnectionsPage() {
                     >
                       {c.kind}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <CredentialCell secret={secretByConnection.get(c.id) ?? null} />
                   </TableCell>
                   <TableCell>
                     {c.tags.length === 0 ? (
@@ -209,6 +214,28 @@ export default async function ConnectionsPage() {
           </Table>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Method and email are plaintext in the database, so this renders without the vault being unlocked —
+ * which is the point: it answers "whose account is this" from the table, without opening a dialog.
+ */
+function CredentialCell({ secret }: { secret: ConnectionSecret | null }) {
+  const label = methodLabel(secret?.supabase_login_method);
+  if (!label && !secret?.supabase_email) return <span className="text-subtle">—</span>;
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {label ? (
+        <Badge variant="outline" className="rounded-full">
+          {label}
+        </Badge>
+      ) : null}
+      {secret?.supabase_email ? (
+        <span className="text-xs text-subtle">{secret.supabase_email}</span>
+      ) : null}
     </div>
   );
 }
