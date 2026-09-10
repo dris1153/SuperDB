@@ -26,7 +26,14 @@ create table if not exists public.connections (
 
   created_at     timestamptz not null default now(),
   synced_at      timestamptz,
-  last_error     text                         -- set when a refresh fails; drives the Reconnect state
+  last_error     text,                        -- set when a refresh fails; drives the Reconnect state
+
+  -- The user's chosen order, for the connections table and the board. Deliberately nullable rather
+  -- than `not null default 0`: a row inserted by older code between running this file and deploying
+  -- would take 0 and jump to the top of the board, the most visible wrong place. Null sorts last
+  -- instead, which is where a new connection belongs anyway. Readers order nulls last and tiebreak
+  -- on created_at, so the order stays total even with nulls or duplicates.
+  sort_order     integer
 );
 
 -- One row per account (PAT) or per organization (OAuth). coalesce needs an index, not a constraint.
@@ -65,6 +72,33 @@ alter table public.connections drop column if exists label;
 -- After the column exists, never before: on an existing database the create table above is a no-op,
 -- so indexing tags any earlier fails with "column tags does not exist".
 create index if not exists connections_tags on public.connections using gin (tags);
+
+-- Converge an existing database on sort_order, seeding it from the order rows were connected in so
+-- nothing visibly moves the first time this runs.
+alter table public.connections add column if not exists sort_order integer;
+
+-- Only rows that have none, so re-running this file never renumbers an order somebody chose.
+--
+-- The numbering continues past that user's current maximum instead of restarting at 1. WHERE is
+-- applied before the window function, so row_number() counts only the unnumbered rows — without the
+-- offset, a row added after the first run would be numbered 1 and land second, not last, which is
+-- exactly the placement the column comment above promises to avoid.
+update public.connections c
+   set sort_order = ranked.rn
+  from (
+    select n.id,
+           coalesce(
+             (select max(m.sort_order) from public.connections m where m.user_id = n.user_id),
+             0
+           ) + row_number() over (partition by n.user_id order by n.created_at) as rn
+      from public.connections n
+     where n.sort_order is null
+  ) ranked
+ where c.id = ranked.id and c.sort_order is null;
+
+-- No unique constraint on (user_id, sort_order): rewriting a whole ordering necessarily passes
+-- through states where two rows share a number, and a constraint would reject the legitimate write.
+create index if not exists connections_order on public.connections (user_id, sort_order);
 
 alter table public.connections enable row level security;
 
@@ -196,6 +230,29 @@ $$;
 
 revoke all on function public.delete_own_account() from public, anon;
 grant execute on function public.delete_own_account() to authenticated;
+
+-- Reordering. One statement, so a partial reorder cannot exist — the app already has one non-atomic
+-- update loop (rotateVault) and does not need a second.
+--
+-- security invoker, unlike delete_own_account above: the "own connections" policy already scopes
+-- this correctly, and definer would only widen what a bug here could reach. The user_id clause is
+-- belt and braces alongside that policy.
+--
+-- array_position returns null for an id that is not in the array, and `id = any(ids)` keeps those
+-- rows out of the update — so a stale list from the browser cannot blank an untouched connection.
+create or replace function public.reorder_connections(ids uuid[])
+returns void
+language sql
+security invoker
+set search_path = ''
+as $$
+  update public.connections c
+     set sort_order = array_position(ids, c.id)
+   where c.user_id = auth.uid() and c.id = any(ids);
+$$;
+
+revoke all on function public.reorder_connections(uuid[]) from public, anon;
+grant execute on function public.reorder_connections(uuid[]) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Upgrading from the single-user schema: run this only after reconnecting your
