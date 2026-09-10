@@ -9,6 +9,7 @@ import {
   listTags,
   modeEnabled,
   removeConnection,
+  reorderConnections,
   updateConnection,
 } from "@/lib/connections";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +74,15 @@ export default async function ConnectionsPage() {
     await removeConnection(id);
     revalidatePath("/");
     redirect(`/connections?disconnected=${encodeURIComponent(owner)}`);
+  }
+
+  async function reorder(ids: string[]) {
+    "use server";
+    await reorderConnections(ids);
+    // Both, because both render the order — "/" through loadInventory. Revalidating only this page
+    // would leave the board stale, which is the bug shape saveConnectionSecret already had.
+    revalidatePath("/");
+    revalidatePath("/connections");
   }
 
   return (
