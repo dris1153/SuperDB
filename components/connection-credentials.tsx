@@ -65,6 +65,7 @@ function CredentialsForm({
   const [reveal, setReveal] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [decryptFailed, setDecryptFailed] = useState(false);
 
   // Decryption happens here, never on the server — it never held the plaintext to begin with.
   useEffect(() => {
@@ -73,9 +74,17 @@ function CredentialsForm({
       if (!key || !secret?.vault_blob) return;
       try {
         const decrypted = await decryptJson<Passwords>(key, secret.vault_blob);
-        if (!cancelled) setPasswords(decrypted);
+        if (!cancelled) {
+          setPasswords(decrypted);
+          setDecryptFailed(false);
+        }
       } catch {
-        if (!cancelled) setStatus("Stored credentials could not be decrypted with this vault key.");
+        // Blocks save() below. An unreadable blob and no stored password look identical in this
+        // form, and saving from that state would replace the real one with null, irreversibly.
+        if (!cancelled) {
+          setDecryptFailed(true);
+          setStatus("Stored credentials could not be decrypted with this vault key.");
+        }
       }
     })();
     return () => {
@@ -86,7 +95,7 @@ function CredentialsForm({
   const shape = METHODS.find((m) => m.value === method)!;
 
   async function save() {
-    if (!key) return;
+    if (!key || decryptFailed) return;
     setBusy(true);
     setStatus(null);
     try {
@@ -207,7 +216,15 @@ function CredentialsForm({
 
       {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
 
-      <Button onClick={save} disabled={busy}>
+      {decryptFailed ? (
+        <p className="text-xs text-destructive">
+          Saving is disabled. A password is stored for this connection but cannot be read with the
+          current vault key, and saving would replace it with nothing — there is no undo. Unlock with
+          the master password it was encrypted under to edit it.
+        </p>
+      ) : null}
+
+      <Button onClick={save} disabled={busy || decryptFailed}>
         {busy ? "Saving…" : "Save credentials"}
       </Button>
     </div>
