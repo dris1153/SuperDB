@@ -28,6 +28,12 @@ Design, the alternatives weighed, and the recommendation the user overrode:
 SQL — before any drag UI exists, and they pull in no new dependency. Phase 4 is the only phase that
 adds one.
 
+> **Run `supabase/schema.sql` before deploying the Phase 2 code.** Phase 2 orders by a column Phase 1
+> creates; against a table without it, `connectionsWithTokens` throws, and that function gates every
+> project page and every write, DDL and connect action through `resolveProject`. With no `error.tsx`
+> in the repo, each becomes a 500. Details and the sequence are in
+> [phase-01](phase-01-schema.md#deploy-order--not-optional).
+
 ## Settled decisions
 
 Do not re-open these during implementation:

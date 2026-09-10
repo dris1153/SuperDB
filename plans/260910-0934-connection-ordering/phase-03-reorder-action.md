@@ -80,10 +80,12 @@ interpolation — and a malformed uuid is rejected by Postgres before the update
 1. Add `reorderConnections` to `lib/connections.ts` with a header comment saying why it is an RPC.
 2. Add the `reorder` server action to the connections page.
 3. `pnpm typecheck`, `pnpm lint`, `pnpm test`.
-4. Test before any UI exists: call the action from a temporary button, or call the RPC directly in the
-   SQL editor with a shuffled array, then reload both screens.
-5. Test the negative case: sign in as a second account, call the RPC with the first account's ids,
-   confirm nothing moves.
+4. Test before any UI exists: call the action from a temporary button, or call the RPC in the SQL
+   editor **under `set local role authenticated` with a `request.jwt.claims` sub** — see phase 1 step
+   8. As `postgres`, `auth.uid()` is NULL, the function matches no rows, and the test passes without
+   proving anything.
+5. Test the negative case the same way: impersonate a second account and pass the first account's
+   ids. Confirm nothing moves. Run it as `postgres` and it "passes" for the wrong reason.
 
 ## Success Criteria
 

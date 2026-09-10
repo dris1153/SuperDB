@@ -100,7 +100,19 @@ rows out — so a stale client list cannot null out an untouched connection's or
 6. Run the whole file against a populated database. Run it **twice** — the second run must change
    nothing.
 7. Confirm ordering by hand: `select display_name, sort_order from connections order by sort_order`.
-8. Call the function directly in the SQL editor with a shuffled id array and confirm the result.
+8. Call the function with a shuffled id array — **but not as `postgres`.** The SQL editor runs as a
+   superuser where `auth.uid()` is NULL, so `user_id = auth.uid()` matches nothing and the function
+   returns success having changed nothing. Both the positive and the negative test would pass while
+   proving nothing. Impersonate first:
+
+   ```sql
+   begin;
+   set local role authenticated;
+   set local request.jwt.claims = '{"sub":"<your user uuid>"}';
+   select public.reorder_connections(array[...]::uuid[]);
+   select display_name, sort_order from public.connections order by sort_order;
+   commit;
+   ```
 
 ## Success Criteria
 
@@ -111,10 +123,30 @@ rows out — so a stale client list cannot null out an untouched connection's or
 - [ ] `reorder_connections` with a partial id list leaves the omitted rows' `sort_order` intact.
 - [ ] The null/not-null decision is recorded in the file as a comment explaining which and why.
 
+## Deploy order — not optional
+
+**Run this file before deploying the Phase 2 code.** Not after, not together.
+
+Phase 2 makes both connection readers `.order("sort_order")`. Against a table without the column,
+PostgREST returns error 42703 and `connectionsWithTokens` throws. That function feeds `resolveProject`,
+which gates every project page and every DDL, write, table and connect action — and there is no
+`error.tsx` anywhere, so each one becomes a 500. Account deletion goes through it too.
+
+Nothing enforces the order automatically: there is no `supabase/migrations/`, and the README tells the
+operator to paste this file into the SQL editor by hand.
+
+Sequence: run the file → confirm `select sort_order from public.connections limit 1` works → exercise
+the app once → then deploy. Leave a gap after pasting; PostgREST reloads its schema cache on a DDL
+event trigger, and a request in the first seconds can still see the old schema.
+
 ## Risk Assessment
 
-**Backfill renumbering a chosen order on re-run.** The whole point of the `sort_order is null` guard.
-Test it by setting a custom order, re-running the file, and confirming the order survives.
+**Backfill renumbering a chosen order on re-run.** The `sort_order is null` guard is not enough on its
+own: `WHERE` is applied before the window function, so `row_number()` restarts at 1 over the
+unnumbered rows and a later addition would land second rather than last. The backfill offsets from
+each user's current maximum for that reason. Test it by setting a custom order, adding a row with a
+null `sort_order`, re-running the file, and confirming the chosen order survives and the new row is
+last.
 
 **A row created between backfill and code deploy.** Lands with a null `sort_order` (or 0 under the
 not-null option) and sorts unpredictably. This is what the open question above is really about.
