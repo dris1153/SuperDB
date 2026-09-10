@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { IconLock, IconSearch } from "@tabler/icons-react";
 import type { InventoryProject } from "@/lib/inventory";
+import { PROJECT_SORTS, sortProjects, type ProjectSort } from "@/lib/project-sort";
 import { ProjectStatus } from "./status";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
@@ -19,12 +20,13 @@ export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
   const [owner, setOwner] = useState(ALL);
   const [status, setStatus] = useState(ALL);
   const [tag, setTag] = useState(ALL);
+  const [sort, setSort] = useState<ProjectSort>("connection");
 
   const owners = useMemo(() => [...new Set(projects.map((p) => p.owner))].sort(), [projects]);
   const statuses = useMemo(() => [...new Set(projects.map((p) => p.status))].sort(), [projects]);
   const tags = useMemo(() => [...new Set(projects.flatMap((p) => p.tags))].sort(), [projects]);
 
-  const rows = useMemo(() => {
+  const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return projects.filter((p) => {
       if (owner !== ALL && p.owner !== owner) return false;
@@ -36,6 +38,10 @@ export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
       );
     });
   }, [projects, q, owner, status, tag]);
+
+  // Separate from the filter memo so changing the sort does not re-run the filter, and so sorting
+  // applies to what is on screen rather than to everything.
+  const rows = useMemo(() => sortProjects(filtered, sort), [filtered, sort]);
 
   return (
     <div className="space-y-4">
@@ -88,6 +94,20 @@ export function ProjectsBoard({ projects }: { projects: InventoryProject[] }) {
             </SelectContent>
           </Select>
         ) : null}
+
+        {/* Last, because it changes the order rather than what is in it. */}
+        <Select value={sort} onValueChange={(v) => setSort(v as ProjectSort)}>
+          <SelectTrigger className="w-44" aria-label="Sort projects">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PROJECT_SORTS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {rows.length === 0 ? (
