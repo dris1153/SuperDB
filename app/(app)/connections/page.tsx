@@ -2,7 +2,12 @@ import { Suspense } from "react";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { IconAlertTriangle, IconPlugConnected } from "@tabler/icons-react";
+import {
+  IconAlertTriangle,
+  IconChevronDown,
+  IconChevronUp,
+  IconPlugConnected,
+} from "@tabler/icons-react";
 import {
   addPatConnection,
   listConnections,
@@ -33,20 +38,55 @@ import { ToastFromParams } from "@/components/toast-from-params";
 import { date } from "@/lib/format";
 import { methodLabel } from "@/lib/credential-methods";
 import type { ConnectionSecret } from "@/lib/vault-actions";
+import {
+  accountSortKey,
+  nextConnectionSort,
+  parseConnectionSort,
+  serialiseConnectionSort,
+  sortConnections,
+  type ConnectionSort,
+  type SortColumn,
+} from "@/lib/connection-sort";
+import { SortableConnections, type ConnectionRow } from "@/components/sortable-connections";
 
 export const dynamic = "force-dynamic";
 
 const HEAD = "text-xs font-normal text-subtle";
 
-export default async function ConnectionsPage() {
-  const [connections, availableTags, secrets] = await Promise.all([
+/** Header text, so the "sorted by" line names the column the way the header does. */
+const SORT_LABELS: Record<SortColumn, string> = {
+  owner: "Owner",
+  kind: "Kind",
+  account: "Account",
+  added: "Added",
+};
+
+export default async function ConnectionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>;
+}) {
+  const [connections, availableTags, secrets, query] = await Promise.all([
     listConnections(),
     listTags(),
     listConnectionSecrets(),
+    searchParams,
   ]);
   const secretByConnection = new Map(secrets.map((s) => [s.connection_id, s]));
   const oauth = modeEnabled("oauth");
   const pat = modeEnabled("pat");
+
+  // listConnections already returns the user's manual order; a sort here temporarily overrides it.
+  const sort = parseConnectionSort(query.sort);
+  const ordered = sortConnections(connections, sort, (c) => {
+    const secret = secretByConnection.get(c.id);
+    return {
+      owner: c.display_name,
+      kind: c.kind,
+      account: accountSortKey(methodLabel(secret?.supabase_login_method), secret?.supabase_email),
+      added: c.created_at,
+    };
+  });
 
   async function connectToken(token: string, tags: string[]) {
     "use server";
@@ -84,6 +124,72 @@ export default async function ConnectionsPage() {
     revalidatePath("/");
     revalidatePath("/connections");
   }
+
+  // Cells stay server-rendered — EditConnection and DisconnectConnection keep receiving their server
+  // actions as props. The client component only wraps each set in a row it can move.
+  const rows: ConnectionRow[] = ordered.map((c) => ({
+    id: c.id,
+    label: c.display_name,
+    cells: (
+      <>
+        <TableCell className="text-foreground">
+          {c.display_name}
+          {c.last_error ? (
+            <div className="mt-1 flex items-center gap-1 text-xs text-warn">
+              <IconAlertTriangle size={13} stroke={1.5} />
+              Reconnect required
+            </div>
+          ) : null}
+        </TableCell>
+        <TableCell>
+          <Badge
+            variant="outline"
+            className={
+              c.kind === "oauth" ? "rounded-full border-brand-border text-primary" : "rounded-full"
+            }
+          >
+            {c.kind}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <CredentialCell secret={secretByConnection.get(c.id) ?? null} />
+        </TableCell>
+        <TableCell>
+          {c.tags.length === 0 ? (
+            <span className="text-subtle">—</span>
+          ) : (
+            <span className="flex flex-wrap gap-1">
+              {c.tags.map((tag) => (
+                <Badge key={tag} variant="outline" className="rounded-full">
+                  {tag}
+                </Badge>
+              ))}
+            </span>
+          )}
+        </TableCell>
+        <TableCell className="font-mono text-xs text-subtle">…{c.token_hint}</TableCell>
+        <TableCell className="text-subtle">{date(c.created_at)}</TableCell>
+        <TableCell>
+          <div className="flex justify-end gap-1">
+            <EditConnection
+              id={c.id}
+              displayName={c.display_name}
+              tags={c.tags}
+              availableTags={availableTags}
+              secret={secretByConnection.get(c.id) ?? null}
+              action={saveConnection}
+            />
+            <DisconnectConnection
+              id={c.id}
+              owner={c.display_name}
+              kind={c.kind}
+              action={disconnect}
+            />
+          </div>
+        </TableCell>
+      </>
+    ),
+  }));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-6">
@@ -143,88 +249,69 @@ export default async function ConnectionsPage() {
       {connections.length === 0 ? (
         <Empty>Nothing connected yet.</Empty>
       ) : (
-        <div className="rounded-lg border border-border overflow-hidden">
-          <Table className="min-w-2xl">
-            <TableHeader className="bg-card">
-              <TableRow className="hover:bg-transparent">
-                {["Owner", "Kind", "Account", "Tags", "Token", "Added", ""].map((h) => (
-                  <TableHead key={h} className={HEAD}>
-                    {h}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {connections.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="text-foreground">
-                    {c.display_name}
-                    {c.last_error ? (
-                      <div className="mt-1 flex items-center gap-1 text-xs text-warn">
-                        <IconAlertTriangle size={13} stroke={1.5} />
-                        Reconnect required
-                      </div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        c.kind === "oauth"
-                          ? "rounded-full border-brand-border text-primary"
-                          : "rounded-full"
-                      }
-                    >
-                      {c.kind}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <CredentialCell secret={secretByConnection.get(c.id) ?? null} />
-                  </TableCell>
-                  <TableCell>
-                    {c.tags.length === 0 ? (
-                      <span className="text-subtle">—</span>
-                    ) : (
-                      <span className="flex flex-wrap gap-1">
-                        {c.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="rounded-full">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-subtle">
-                    …{c.token_hint}
-                  </TableCell>
-                  <TableCell className="text-subtle">
-                    {date(c.created_at)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-1">
-                      <EditConnection
-                        id={c.id}
-                        displayName={c.display_name}
-                        tags={c.tags}
-                        availableTags={availableTags}
-                        secret={secretByConnection.get(c.id) ?? null}
-                        action={saveConnection}
-                      />
-                      <DisconnectConnection
-                        id={c.id}
-                        owner={c.display_name}
-                        kind={c.kind}
-                        action={disconnect}
-                      />
-                    </div>
-                  </TableCell>
+        <div className="space-y-2">
+          {sort ? (
+            <p className="text-xs text-subtle">
+              Sorted by {SORT_LABELS[sort.column]}. Dragging is off while a sort is applied —{" "}
+              <Link href="/connections" className="text-brand-text hover:underline">
+                clear it to reorder
+              </Link>
+              .
+            </p>
+          ) : null}
+
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table className="min-w-2xl">
+              <TableHeader className="bg-card">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className={HEAD} />
+                    <SortHead column="owner" label="Owner" sort={sort} />
+                  <SortHead column="kind" label="Kind" sort={sort} />
+                  <SortHead column="account" label="Account" sort={sort} />
+                  <TableHead className={HEAD}>Tags</TableHead>
+                  <TableHead className={HEAD}>Token</TableHead>
+                  <SortHead column="added" label="Added" sort={sort} />
+                  <TableHead className={HEAD} />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                <SortableConnections rows={rows} sorted={sort !== null} reorder={reorder} />
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+/** Cycles this column on click; the third click drops the sort and restores the manual order. */
+function SortHead({
+  column,
+  label,
+  sort,
+}: {
+  column: SortColumn;
+  label: string;
+  sort: ConnectionSort | null;
+}) {
+  const next = nextConnectionSort(sort, column);
+  const href = next ? `/connections?sort=${serialiseConnectionSort(next)}` : "/connections";
+  const direction = sort?.column === column ? sort.dir : null;
+
+  return (
+    <TableHead
+      className={HEAD}
+      aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
+    >
+      <Link href={href} className="inline-flex items-center gap-1 hover:text-foreground">
+        {label}
+        {direction === "asc" ? <IconChevronUp size={13} stroke={1.5} aria-label="ascending" /> : null}
+        {direction === "desc" ? (
+          <IconChevronDown size={13} stroke={1.5} aria-label="descending" />
+        ) : null}
+      </Link>
+    </TableHead>
   );
 }
 
