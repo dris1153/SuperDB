@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireUser } from "./supabase/server";
 
 export type VaultMeta = { salt: string; iterations: number; check_blob: string };
@@ -87,4 +88,8 @@ export async function saveConnectionSecret(input: {
     { onConflict: "connection_id" },
   );
   if (error) throw new Error(error.message);
+
+  // Without this the connections page keeps the secrets it rendered with, so reopening the dialog
+  // hands the form a stale null and it looks like nothing was saved.
+  revalidatePath("/connections");
 }
