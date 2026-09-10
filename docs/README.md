@@ -22,6 +22,16 @@ safety model has the shape it does.
 - **[Secret rotation runbook](./secret-rotation-runbook.md)** — procedures for rotating encryption
   keys. Read it before rotating anything.
 
+## Journals
+
+[`journals/`](./journals/) records mistakes worth not repeating, one file per incident, named
+`YYMMDD-slug`. Not a changelog — git already has that. A session belongs here only when something was
+believed and turned out to be false, and the way it was caught generalises.
+
+- **[Misreading branch conditions in vendor code](./journals/260910-misreading-a-branch.md)** — a
+  false reading of `@supabase/auth-js` reached six documents before any code was written, and what
+  caught it.
+
 ## Writing more of this
 
 1. Under 200 lines per file, matching the repo's rule for source.

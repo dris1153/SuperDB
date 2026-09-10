@@ -1,12 +1,14 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireUser } from "./supabase/server";
+import { METHOD_VALUES, type Method } from "./credential-methods";
 
 export type VaultMeta = { salt: string; iterations: number; check_blob: string };
 
 export type ConnectionSecret = {
   connection_id: string;
-  supabase_login_method: "email" | "github" | "chatgpt" | "sso" | null;
+  supabase_login_method: Method | null;
   supabase_email: string | null;
   vault_blob: string | null;
 };
@@ -56,35 +58,60 @@ export async function listConnectionSecrets(): Promise<ConnectionSecret[]> {
   return (data ?? []) as ConnectionSecret[];
 }
 
-const METHODS = ["email", "github", "chatgpt", "sso"] as const;
-
 /**
  * The blob is stored verbatim. The server cannot read it, cannot validate it, and must not try —
  * only the identity fields, which are deliberately plaintext, get checked here.
+ *
+ * Omitting `vaultBlob` leaves the stored one alone, which is what a save from a locked vault must do:
+ * identity is editable without the key, and there is nothing to re-encrypt. That path uses UPDATE
+ * rather than an upsert with the column left out, because whether PostgREST's ON CONFLICT clause
+ * preserves a column absent from the payload is not documented for a single-row upsert — and writing
+ * a null there would destroy the password irreversibly.
  */
 export async function saveConnectionSecret(input: {
   connectionId: string;
   supabaseLoginMethod: string | null;
   supabaseEmail: string | null;
-  vaultBlob: string | null;
+  vaultBlob?: string | null;
 }): Promise<void> {
   const { supabase, user } = await requireUser();
 
   const method = input.supabaseLoginMethod;
-  if (method && !METHODS.includes(method as (typeof METHODS)[number])) {
+  if (method && !METHOD_VALUES.includes(method as Method)) {
     throw new Error(`Unknown sign-in method: ${method}`);
   }
 
-  const { error } = await supabase.from("connection_secrets").upsert(
-    {
-      connection_id: input.connectionId,
-      user_id: user.id,
-      supabase_login_method: method,
-      supabase_email: input.supabaseEmail?.trim() || null,
-      vault_blob: input.vaultBlob,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "connection_id" },
-  );
-  if (error) throw new Error(error.message);
+  const identity = {
+    supabase_login_method: method,
+    supabase_email: input.supabaseEmail?.trim() || null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (input.vaultBlob === undefined) {
+    // .select() so the result carries the affected rows and an absent secret can be told apart from
+    // a successful update.
+    const { data, error } = await supabase
+      .from("connection_secrets")
+      .update(identity)
+      .eq("connection_id", input.connectionId)
+      .select("connection_id");
+    if (error) throw new Error(error.message);
+
+    if ((data ?? []).length === 0) {
+      const { error: insertError } = await supabase
+        .from("connection_secrets")
+        .insert({ connection_id: input.connectionId, user_id: user.id, ...identity, vault_blob: null });
+      if (insertError) throw new Error(insertError.message);
+    }
+  } else {
+    const { error } = await supabase.from("connection_secrets").upsert(
+      { connection_id: input.connectionId, user_id: user.id, ...identity, vault_blob: input.vaultBlob },
+      { onConflict: "connection_id" },
+    );
+    if (error) throw new Error(error.message);
+  }
+
+  // Without this the connections page keeps the secrets it rendered with, so reopening the dialog
+  // hands the form a stale null and it looks like nothing was saved.
+  revalidatePath("/connections");
 }

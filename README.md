@@ -20,14 +20,22 @@ single board and lets you name each account whatever you actually call it.
 filters for owner, status and tag. Each card carries its ref, the connection it came from, the
 organization and region, and whatever tags you gave it.
 
-**Per-project workspace** — a Supabase-style sidebar with Overview and Database built. The other
-eleven nav items are visible and marked "soon", so the shape of the thing is honest rather than
-hidden.
+**Per-project workspace** — a Supabase-style sidebar with Overview, Table Editor and Database built.
+The other nine nav items are visible and marked "soon", so the shape of the thing is honest rather
+than hidden.
 
 ![Project Overview: status, compute, branch, migration and backup tiles beside a Primary Database card showing disk, RAM, connections and size, above the Get connected grid and service usage charts](docs/images/overview.png)
 
 Disk and RAM appear here because this project is reached through an access token. Over OAuth those
 two cards explain themselves instead — see [Connecting an account](#connecting-an-account).
+
+**Table editor** — browse, filter, sort and edit rows of any table in any connected project, plus
+basic schema changes. It writes as `postgres` with row-level security bypassed, against a database
+with no undo, so every write is previewed, confirmed against a re-checked row count, and recorded in
+the audit log. `auth` and `storage` make you type the table name first.
+[`docs/table-editor.md`](docs/table-editor.md) explains why the safety model has the shape it does,
+and [`docs/table-editor-measurements.md`](docs/table-editor-measurements.md) records what was
+measured against a live project rather than assumed.
 
 **Connect sheet** — the same right-hand sheet Supabase shows. Framework covers ten frameworks with
 their real quickstart files, the shadcn toggle where Supabase publishes a registry item, and a Copy
@@ -217,7 +225,7 @@ call them; the organization name is only the default.
 
 ```bash
 pnpm dev          # next dev on :3000
-pnpm test         # node:test, 33 tests — crypto, vault, tags, paths, prometheus
+pnpm test         # node:test, 262 tests — crypto, vault, SQL building, CSV, table views, parsing
 pnpm typecheck    # tsc --noEmit
 pnpm build
 ```
@@ -245,15 +253,15 @@ to the OAuth app's redirect URIs.
 
 Next.js 16 (App Router, server components, `proxy.ts`) · React 19 · Supabase Auth + Postgres ·
 Tailwind v4 · shadcn/ui on Radix · Tabler Icons · Shiki for syntax highlighting. No ORM and no
-data-fetching library — around 7,400 lines across `app/`, `lib/` and `components/`.
+data-fetching library — around 19,400 lines across `app/`, `lib/` and `components/`.
 
 Theme follows `DESIGN.md` for palette and typography, but uses the Supabase *dashboard's* density
 (6px radius, compact tables) rather than the landing page's pill buttons and 64px section gaps.
 
 ## Not built yet
 
-Eleven of the thirteen project nav items — Table Editor, SQL Editor, Auth, Storage, Edge Functions,
-Realtime, Advisors, Observability, Logs, Project Settings — are visible and disabled. Also: six mobile
+Nine of the twelve project nav items — SQL Editor, Auth, Storage, Edge Functions, Realtime,
+Advisors, Observability, Logs, Project Settings — are visible and disabled. Also: six mobile
 and non-JS frameworks listed in the Connect sheet as "soon" (Flask, Expo, Flutter, Ionic, Swift,
 Android Kotlin), master-password rotation from the UI (the server action exists),
 moving `ENCRYPTION_KEY` into a KMS, pause / restore / restart actions, and background sync with
