@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Read path"
-status: pending
+status: in-progress
 priority: P1
 effort: "1h"
 dependencies: [1]
@@ -79,13 +79,13 @@ Both revalidate `/` only. `/connections` does not render project order.
 
 ## Success Criteria
 
-- [ ] With rows present, the board renders in `sort_order`.
-- [ ] With no rows, the board is byte-identical to today's output.
-- [ ] A ref with no row sorts last.
-- [ ] Projects with no row keep connection order among themselves.
-- [ ] A deliberately broken order query leaves the board working in connection order.
-- [ ] `reorderProjects` refuses a malformed ref and an oversized array.
-- [ ] `pnpm test` still 285/285.
+- [ ] **Needs the app.** With rows present, the board renders in `sort_order`.
+- [ ] **Needs the app.** With no rows, the board is byte-identical to today's output.
+- [x] A ref with no row sorts last. Tested: `project-sort.test.ts`.
+- [x] Projects with no row keep connection order among themselves. Tested.
+- [ ] **Needs the app.** A deliberately broken order query leaves the board working in connection order.
+- [x] `reorderProjects` refuses a malformed ref and an oversized array. Tested via `isValidProjectOrder`.
+- [x] `pnpm test` green — 291/291, six of them new here.
 
 ## Risk Assessment
 

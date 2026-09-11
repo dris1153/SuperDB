@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Card restructure and grid drag"
-status: pending
+status: in-progress
 priority: P1
 effort: "5h"
 dependencies: [2, 3]
@@ -106,18 +106,19 @@ Confirm that reading once the UI is on screen.
 
 ## Success Criteria
 
-- [ ] Drag a card, reload — the order persisted.
-- [ ] The first drag saves every project, verified in the table, not just the one moved.
-- [ ] A project created upstream since the last reorder appears last.
-- [ ] Reordering is possible with the keyboard alone.
-- [ ] Reordering works on a touch device, through the buttons.
-- [ ] Drag and buttons are hidden whenever the board is filtered, searched or sorted, and the reason
+- [ ] **Needs the app.** Drag a card, reload — the order persisted.
+- [ ] **Needs the app.** The first drag saves every project, verified in the table, not just the one moved.
+- [ ] **Needs the app.** A project created upstream since the last reorder appears last.
+- [ ] **Needs the app.** Reordering is possible with the keyboard alone.
+- [ ] **Needs a device.** Reordering works on a touch device, through the buttons.
+- [ ] **Needs the app.** Drag and buttons are hidden whenever the board is filtered, searched or sorted, and the reason
       is on screen.
-- [ ] Reset returns the board to connection order.
-- [ ] A failed write does not leave the optimistic order on screen.
-- [ ] **No `<button>` inside an `<a>`** — check the rendered DOM, not the JSX.
-- [ ] Clicking a card still opens the project; hover and focus still read correctly.
-- [ ] `pnpm test` still 285/285.
+- [ ] **Needs the app.** Reset returns the board to connection order.
+- [ ] **Needs the app.** A failed write does not leave the optimistic order on screen.
+- [x] **No `<button>` inside an `<a>`** — the component tree resolves statically: Card renders a div,
+      so the controls are a sibling of the anchor, and nothing inside the Link is interactive.
+- [ ] **Needs the app.** Clicking a card still opens the project; hover and focus still read correctly.
+- [x] `pnpm test` green — 291/291.
 
 ## Risk Assessment
 

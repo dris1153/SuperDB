@@ -4,6 +4,7 @@ import { connectionsWithTokens, type Connection, type ConnectionKind } from "./c
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
 import { projectOrder } from "./project-order";
 import { isProjectRef } from "./project-ref";
+import { bySavedOrder } from "./project-sort";
 
 export type InventoryProject = Project & {
   connectionId: string;
@@ -62,12 +63,9 @@ export async function loadInventory(): Promise<Inventory> {
     group.sort((a, b) => a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name)),
   );
 
-  // A project the user has placed by hand wins. Anything unplaced sorts after everything placed —
-  // MAX_SAFE_INTEGER rather than 0, because a project created upstream since the last reorder
-  // appearing at the top of the board is the most visible possible wrong answer. sort() is stable,
-  // so those keep the connection grouping above among themselves; no further tiebreak is needed.
-  const placed = (p: InventoryProject) => order.get(p.ref) ?? Number.MAX_SAFE_INTEGER;
-  const projects = grouped.sort((a, b) => placed(a) - placed(b));
+  // A project the user has placed by hand wins; see bySavedOrder for why unplaced ones go last.
+  // sort() is stable, so those keep the connection grouping above among themselves.
+  const projects = grouped.sort(bySavedOrder(order));
 
   return {
     projects,

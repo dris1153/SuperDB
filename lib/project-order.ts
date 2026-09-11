@@ -1,6 +1,6 @@
 import "server-only";
 import { requireUser } from "./supabase/server";
-import { isProjectRef } from "./project-ref";
+import { isValidProjectOrder } from "./project-sort";
 
 /**
  * The board's saved project order.
@@ -12,6 +12,7 @@ import { isProjectRef } from "./project-ref";
 
 /** Far above any plausible number of projects across every connected account; a bound, not a limit. */
 const MAX_PROJECTS = 1000;
+
 
 /**
  * Ref to position.
@@ -42,10 +43,7 @@ export async function projectOrder(): Promise<Map<string, number>> {
  * and a malformed ref would sit in the table forever because nothing upstream will ever match it.
  */
 export async function reorderProjects(refs: string[]): Promise<void> {
-  if (!Array.isArray(refs) || refs.length > MAX_PROJECTS) throw new Error("Invalid project order");
-  if (!refs.every((ref) => typeof ref === "string" && isProjectRef(ref))) {
-    throw new Error("Invalid project order");
-  }
+  if (!isValidProjectOrder(refs, MAX_PROJECTS)) throw new Error("Invalid project order");
 
   // Deduped rather than rejected: a repeat is normal, not hostile. GET /v1/projects is not scoped to
   // one organization and connections_identity includes `kind`, so an account connected by both PAT

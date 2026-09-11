@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PROJECT_SORTS, sortProjects } from "./project-sort.ts";
+import {
+  bySavedOrder,
+  isValidProjectOrder,
+  PROJECT_SORTS,
+  sortProjects,
+} from "./project-sort.ts";
 import type { Project } from "./mgmt-api.ts";
 
 type Row = { name: string; status: Project["status"]; region: string; created_at: string };
@@ -100,4 +105,55 @@ test("every option has a label and the default is connection order", () => {
   assert.equal(PROJECT_SORTS[0].value, "manual");
   assert.equal(PROJECT_SORTS.length, 5);
   for (const option of PROJECT_SORTS) assert.ok(option.label.length > 0, option.value);
+});
+
+const REF_A = "aaaaaaaaaaaaaaaaaaaa";
+const REF_B = "bbbbbbbbbbbbbbbbbbbb";
+const REF_C = "cccccccccccccccccccc";
+const refsOf = (list: { ref: string }[]) => list.map((r) => r.ref);
+const tiles = (...refs: string[]) => refs.map((ref) => ({ ref }));
+
+test("saved order follows the stored positions", () => {
+  const order = new Map([
+    [REF_A, 2],
+    [REF_B, 1],
+  ]);
+  assert.deepEqual(refsOf(tiles(REF_A, REF_B).sort(bySavedOrder(order))), [REF_B, REF_A]);
+});
+
+test("a project with no saved position sorts last, never first", () => {
+  const order = new Map([[REF_B, 1]]);
+  // Unplaced first in the input, and unplaced second: it ends up behind the placed one either way.
+  assert.deepEqual(refsOf(tiles(REF_A, REF_B).sort(bySavedOrder(order))), [REF_B, REF_A]);
+  assert.deepEqual(refsOf(tiles(REF_B, REF_A).sort(bySavedOrder(order))), [REF_B, REF_A]);
+});
+
+test("unplaced projects keep the order they arrived in, so connection grouping survives", () => {
+  const before = tiles(REF_C, REF_A, REF_B);
+  assert.deepEqual(refsOf([...before].sort(bySavedOrder(new Map()))), refsOf(before));
+});
+
+test("the unplaced sentinel cannot collide with a real position or lose precision", () => {
+  // Positions are 1-based from `with ordinality`, so the gap to the sentinel is always exact.
+  const compare = bySavedOrder(new Map([[REF_A, 1]]));
+  const diff = compare({ ref: REF_B }, { ref: REF_A });
+  assert.equal(diff, Number.MAX_SAFE_INTEGER - 1);
+  assert.ok(Number.isSafeInteger(diff), "difference stays exactly representable");
+  assert.ok(diff > 0, "unplaced sorts after placed");
+});
+
+test("a project order is valid only when every entry is a real ref", () => {
+  assert.ok(isValidProjectOrder([REF_A, REF_B], 10));
+  assert.ok(isValidProjectOrder([], 10), "an empty order is valid");
+  assert.equal(isValidProjectOrder([REF_A, "not-a-ref"], 10), false);
+  assert.equal(isValidProjectOrder([REF_A.toUpperCase()], 10), false, "refs are lowercase");
+  assert.equal(isValidProjectOrder([REF_A.slice(1)], 10), false, "refs are exactly 20 characters");
+  assert.equal(isValidProjectOrder([123], 10), false);
+  assert.equal(isValidProjectOrder("not an array", 10), false);
+  assert.equal(isValidProjectOrder(null, 10), false);
+});
+
+test("a project order is refused once it exceeds the cap", () => {
+  assert.ok(isValidProjectOrder(Array(10).fill(REF_A), 10));
+  assert.equal(isValidProjectOrder(Array(11).fill(REF_A), 10), false);
 });

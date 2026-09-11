@@ -1,4 +1,5 @@
 import type { Project } from "./mgmt-api";
+import { isProjectRef } from "./project-ref.ts";
 
 /**
  * Sorting for the board's project cards.
@@ -85,4 +86,32 @@ export function sortProjects<T extends Sortable>(rows: T[], sort: ProjectSort): 
         return b.created_at.localeCompare(a.created_at);
     }
   });
+}
+
+/**
+ * Orders projects by a saved position, leaving anything unplaced after everything placed.
+ *
+ * MAX_SAFE_INTEGER rather than 0: a project created upstream since the last reorder appearing at the
+ * top of the board is the most visible possible wrong answer. Positions are 1-based, so they never
+ * reach the sentinel and the difference stays exactly representable.
+ *
+ * Returns a comparator rather than sorting, so the caller keeps its own stable sort — unplaced
+ * projects then hold whatever order they arrived in, which is the connection grouping.
+ */
+export function bySavedOrder<T extends { ref: string }>(order: Map<string, number>) {
+  const placed = (p: T) => order.get(p.ref) ?? Number.MAX_SAFE_INTEGER;
+  return (a: T, b: T) => placed(a) - placed(b);
+}
+
+/**
+ * Whether an array is safe to send as a project order. Separate from the action that throws on it, so
+ * the rule can be tested without a database — the action itself cannot be imported by node:test,
+ * because its Supabase imports resolve only through the bundler.
+ */
+export function isValidProjectOrder(refs: unknown, max: number): refs is string[] {
+  return (
+    Array.isArray(refs) &&
+    refs.length <= max &&
+    refs.every((ref) => typeof ref === "string" && isProjectRef(ref))
+  );
 }

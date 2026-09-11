@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Shared order hook"
-status: pending
+status: in-progress
 priority: P1
 effort: "2h"
 dependencies: []
@@ -90,14 +90,14 @@ of two real defects. Moving the code without them would discard the reason.
 
 ## Success Criteria
 
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm build` clean; `pnpm test` still 285/285.
-- [ ] Dragging a connection still reorders and persists.
-- [ ] The up/down buttons still work and are still disabled at the ends.
-- [ ] **Rapid clicking still does not swallow a move** — the defect the pending gate fixes.
-- [ ] A failed write still does not leave the optimistic order on screen.
-- [ ] Drag is still disabled while a column sort is active.
-- [ ] The sync-gate and rollback comments moved with the code.
-- [ ] `sortable-connections.tsx` got shorter, not longer.
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm build` clean; `pnpm test` 291/291.
+- [ ] **Needs the app.** Dragging a connection still reorders and persists.
+- [ ] **Needs the app.** The up/down buttons still work and are still disabled at the ends.
+- [ ] **Needs the app. Rapid clicking still does not swallow a move** — the defect the pending gate fixes.
+- [ ] **Needs the app.** A failed write still does not leave the optimistic order on screen.
+- [ ] **Needs the app.** Drag is still disabled while a column sort is active.
+- [x] The sync-gate and rollback comments moved with the code — confirmed by diff, character for character.
+- [x] `sortable-connections.tsx` got shorter, not longer — 255 to 213 lines.
 
 ## Risk Assessment
 

@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Schema and RPC"
-status: pending
+status: in-progress
 priority: P1
 effort: "2h"
 dependencies: []
@@ -109,12 +109,14 @@ rollback;
 
 ## Success Criteria
 
-- [ ] `supabase/schema.sql` run twice in a row is a no-op the second time.
-- [ ] Under impersonation, `reorder_projects` inserts the array in order.
-- [ ] Calling it again with a different order updates rather than duplicating.
-- [ ] A second user's refs cannot be written or read — verified by impersonating two accounts.
-- [ ] The clear path removes only the caller's rows.
-- [ ] No backfill was added.
+- [x] `supabase/schema.sql` run twice in a row is a no-op the second time. Run four times against the
+      live database. **The `reorder_projects` body changed afterwards (duplicate refs) — one more run
+      is needed.**
+- [ ] **Needs a database.** Under impersonation, `reorder_projects` inserts the array in order.
+- [ ] **Needs a database.** Calling it again with a different order updates rather than duplicating.
+- [ ] **Needs a database.** A second user's refs cannot be written or read — verified by impersonating two accounts.
+- [ ] **Needs a database.** The clear path removes only the caller's rows.
+- [x] No backfill was added.
 
 ## Risk Assessment
 
