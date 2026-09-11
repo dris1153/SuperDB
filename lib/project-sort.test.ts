@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ALL,
   bySavedOrder,
+  dedupeRefs,
+  isReorderable,
   isValidProjectOrder,
   PROJECT_SORTS,
   sortProjects,
@@ -156,4 +159,29 @@ test("a project order is valid only when every entry is a real ref", () => {
 test("a project order is refused once it exceeds the cap", () => {
   assert.ok(isValidProjectOrder(Array(10).fill(REF_A), 10));
   assert.equal(isValidProjectOrder(Array(11).fill(REF_A), 10), false);
+});
+
+test("repeats collapse to the first position of each ref", () => {
+  // One account connected by both PAT and OAuth lists its projects twice. Sending that array made
+  // reorder_projects abort with "cannot affect row a second time" — every drag dead for that user.
+  assert.deepEqual(dedupeRefs([REF_A, REF_B, REF_A]), [REF_A, REF_B]);
+  assert.deepEqual(dedupeRefs([REF_A, REF_A, REF_A]), [REF_A]);
+  assert.deepEqual(dedupeRefs([REF_C, REF_B, REF_A]), [REF_C, REF_B, REF_A], "order preserved");
+  assert.deepEqual(dedupeRefs([]), []);
+});
+
+test("reordering is allowed only with every control at its default", () => {
+  const clean = { sort: "manual" as const, search: "", owner: ALL, status: ALL, tag: ALL };
+  assert.ok(isReorderable(clean));
+
+  assert.equal(isReorderable({ ...clean, sort: "name" }), false, "a column sort reorders the view");
+  assert.equal(isReorderable({ ...clean, search: "prod" }), false);
+  assert.equal(isReorderable({ ...clean, owner: "someone" }), false);
+  assert.equal(isReorderable({ ...clean, status: "INACTIVE" }), false);
+  assert.equal(isReorderable({ ...clean, tag: "live" }), false);
+});
+
+test("whitespace-only search does not block reordering, matching the filter that ignores it", () => {
+  const clean = { sort: "manual" as const, search: "   ", owner: ALL, status: ALL, tag: ALL };
+  assert.ok(isReorderable(clean), "the filter trims too, so the two must agree");
 });

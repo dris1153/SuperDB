@@ -115,3 +115,38 @@ export function isValidProjectOrder(refs: unknown, max: number): refs is string[
     refs.every((ref) => typeof ref === "string" && isProjectRef(ref))
   );
 }
+
+/**
+ * Collapses repeats, keeping the first position of each ref.
+ *
+ * The same ref legitimately arrives twice: GET /v1/projects is not scoped to an organization, and
+ * connections_identity includes `kind`, so one account connected by both PAT and OAuth puts its
+ * projects on the board twice. Sending that array to reorder_projects made two source rows arbitrate
+ * to one key, which raises "ON CONFLICT DO UPDATE command cannot affect row a second time" and aborts
+ * the statement — every drag failing, permanently, for anyone in that situation.
+ */
+export const dedupeRefs = (refs: string[]) => [...new Set(refs)];
+
+/** Radix Select reserves the empty string for "no value", so the unfiltered option needs a sentinel. */
+export const ALL = "__all__";
+
+/**
+ * Whether the board is showing everything, in the saved order — the only state in which a drop has a
+ * position it could mean. Anywhere else the cards on screen are a subset, in some other order, and a
+ * write would renumber only what is visible and interleave it with everything left behind.
+ */
+export function isReorderable(view: {
+  sort: ProjectSort;
+  search: string;
+  owner: string;
+  status: string;
+  tag: string;
+}): boolean {
+  return (
+    view.sort === "manual" &&
+    view.search.trim() === "" &&
+    view.owner === ALL &&
+    view.status === ALL &&
+    view.tag === ALL
+  );
+}

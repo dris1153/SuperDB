@@ -111,7 +111,8 @@ Confirm that reading once the UI is on screen.
 - [ ] **Needs the app.** A project created upstream since the last reorder appears last.
 - [ ] **Needs the app.** Reordering is possible with the keyboard alone.
 - [ ] **Needs a device.** Reordering works on a touch device, through the buttons.
-- [ ] **Needs the app.** Drag and buttons are hidden whenever the board is filtered, searched or sorted, and the reason
+- [x] Drag and buttons are hidden whenever the board is filtered, searched or sorted — the gate is
+      `isReorderable`, tested against every control. That the reason
       is on screen.
 - [ ] **Needs the app.** Reset returns the board to connection order.
 - [ ] **Needs the app.** A failed write does not leave the optimistic order on screen.

@@ -4,7 +4,13 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { IconLock, IconSearch } from "@tabler/icons-react";
 import type { InventoryProject } from "@/lib/inventory";
-import { PROJECT_SORTS, sortProjects, type ProjectSort } from "@/lib/project-sort";
+import {
+  ALL,
+  isReorderable,
+  PROJECT_SORTS,
+  sortProjects,
+  type ProjectSort,
+} from "@/lib/project-sort";
 import { SortableProjects } from "./sortable-projects";
 import { ProjectStatus } from "./status";
 import { Badge } from "./ui/badge";
@@ -13,8 +19,6 @@ import { Empty } from "./ui/empty-state";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
-// Radix Select reserves the empty string for "no value", so the unfiltered option needs a sentinel.
-const ALL = "__all__";
 
 export function ProjectsBoard({
   projects,
@@ -64,8 +68,7 @@ export function ProjectsBoard({
   // Every control at its default. Only then does a drop have a position it could mean. Load-bearing,
   // not cosmetic: a write from a filtered view would renumber only the visible subset and interleave
   // it with everything left at its old position.
-  const clean =
-    sort === "manual" && q.trim() === "" && owner === ALL && status === ALL && activeTag === ALL;
+  const clean = isReorderable({ sort, search: q, owner, status, tag: activeTag });
 
 
   return (
