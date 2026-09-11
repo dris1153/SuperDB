@@ -57,7 +57,11 @@ function oauthColumns(tokens: OAuthTokens) {
 
 export async function listConnections(): Promise<Connection[]> {
   const { supabase } = await requireUser();
-  const { data, error } = await supabase.from("connections").select(SAFE_COLUMNS).order("created_at");
+  const { data, error } = await supabase
+    .from("connections")
+    .select(SAFE_COLUMNS)
+    .order("sort_order", { nullsFirst: false })
+    .order("created_at");
   if (error) throw new Error(error.message);
   return (data ?? []) as Connection[];
 }
@@ -117,6 +121,9 @@ export async function connectionsWithTokens(): Promise<(Connection & { token: st
   const { data, error } = await supabase
     .from("connections")
     .select(`${SAFE_COLUMNS}, dek_wrapped, secret_cipher, expires_at`)
+    // nulls last and created_at as tiebreak, so the order stays total even for a row the backfill
+    // missed or two that briefly share a number after a reorder.
+    .order("sort_order", { nullsFirst: false })
     .order("created_at");
   if (error) throw new Error(error.message);
 
@@ -195,6 +202,35 @@ export async function addOAuthConnection(tokens: OAuthTokens) {
 }
 
 /**
+ * Where a newly connected account goes: last. Reads the current maximum rather than counting rows,
+ * because a deleted connection leaves a gap and a count would collide with an existing number.
+ *
+ * Returns null when rows exist but none is numbered yet — no integer sorts after a null under
+ * `nulls last`, so the honest answer is to join the unnumbered group, where created_at still puts
+ * this one at the end.
+ *
+ * The error is checked rather than swallowed: falling back to a default here would silently place a
+ * new connection first, which is the one position a user notices and did not ask for.
+ */
+async function nextSortOrder(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("connections")
+    .select("sort_order")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+
+  if (!data) return 1;
+  const max = data.sort_order as number | null;
+  return max === null ? null : max + 1;
+}
+
+/**
  * Select-then-write: the unique index guards integrity, and this avoids upserting onto an expression.
  *
  * display_name and tags are set on insert only. They belong to the user, and folding them into the
@@ -237,6 +273,10 @@ async function write({
         kind,
         display_name: org.name,
         tags: normaliseTags(tags),
+        // Insert-only, like display_name and tags: re-authorizing must never move a connection the
+        // user has placed. A concurrent connect can pick the same number; nothing enforces
+        // uniqueness and the created_at tiebreak keeps the order total until one is re-dragged.
+        sort_order: await nextSortOrder(supabase, user.id),
       });
   if (error) throw new Error(error.message);
 
@@ -246,6 +286,36 @@ async function write({
     kind,
     event: "connected",
   });
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Far above any plausible number of connected accounts; a bound, not a product decision. */
+const MAX_REORDER = 500;
+
+/**
+ * Writes a whole ordering in one statement, through public.reorder_connections.
+ *
+ * An RPC rather than a loop of updates on purpose: rotateVault already loops independent writes with
+ * no transaction, and a failure partway through it leaves an inconsistent vault. One statement means
+ * a partial reorder cannot exist rather than merely being unlikely.
+ *
+ * The client's order is taken as given — it is a user preference with nothing to validate against,
+ * and RLS bounds the write to the caller's own rows.
+ */
+export async function reorderConnections(ids: string[]): Promise<void> {
+  // A server action's arguments are client input; the string[] type is erased at runtime. RLS bounds
+  // what a hostile array can reach, but a malformed uuid would surface as a raw Postgres error and
+  // an unbounded one makes array_position scan per row, so both are refused here instead.
+  if (!Array.isArray(ids) || ids.length > MAX_REORDER) {
+    throw new Error("Invalid connection order");
+  }
+  if (!ids.every((id) => typeof id === "string" && UUID.test(id))) {
+    throw new Error("Invalid connection order");
+  }
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("reorder_connections", { ids });
+  if (error) throw new Error(error.message);
 }
 
 /** The only path that may change display_name or tags after the first connect. */

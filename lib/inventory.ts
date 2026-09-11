@@ -2,6 +2,9 @@ import "server-only";
 import { cache } from "react";
 import { connectionsWithTokens, type Connection, type ConnectionKind } from "./connections";
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
+import { projectOrder } from "./project-order";
+import { isProjectRef } from "./project-ref";
+import { bySavedOrder } from "./project-sort";
 
 export type InventoryProject = Project & {
   connectionId: string;
@@ -16,11 +19,15 @@ export type Inventory = {
   projects: InventoryProject[];
   connections: Connection[];
   errors: { owner: string; message: string }[];
+  /** Whether the user has dragged anything yet. The board cannot tell from the order alone. */
+  ordered: boolean;
 };
 
 /** Fans out across every connection. One broken token degrades its own row, not the page. */
 export async function loadInventory(): Promise<Inventory> {
-  const connections = await connectionsWithTokens();
+  // Alongside the tokens rather than after them: the order is a small keyed read against this app's
+  // own database, so pairing it here costs no wall-clock time.
+  const [connections, order] = await Promise.all([connectionsWithTokens(), projectOrder()]);
   const errors: Inventory["errors"] = [];
 
   const perConnection = await Promise.all(
@@ -48,18 +55,28 @@ export async function loadInventory(): Promise<Inventory> {
     }),
   );
 
-  const projects = perConnection
-    .flat()
-    .sort(
-      (a, b) =>
-        a.owner.localeCompare(b.owner) || a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name),
-    );
+  // Sorted within a connection only, never across them: connectionsWithTokens returns the user's
+  // chosen sort_order and perConnection preserves it, so the board follows the order set on the
+  // connections page. Sorting by owner here again would silently override it — this is deliberate,
+  // not a missing sort.
+  const grouped = perConnection.flatMap((group) =>
+    group.sort((a, b) => a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name)),
+  );
 
-  return { projects, connections: connections.map(({ token, ...c }) => c), errors };
+  // A project the user has placed by hand wins; see bySavedOrder for why unplaced ones go last.
+  // sort() is stable, so those keep the connection grouping above among themselves.
+  const projects = grouped.sort(bySavedOrder(order));
+
+  return {
+    projects,
+    connections: connections.map(({ token, ...c }) => c),
+    errors,
+    ordered: order.size > 0,
+  };
 }
 
-/** Project refs are 20 lowercase letters — validate before it reaches a URL we build. */
-export const isProjectRef = (ref: string) => /^[a-z]{20}$/.test(ref);
+/** Re-exported so existing callers keep working; the definition lives in a leaf to avoid a cycle. */
+export { isProjectRef };
 
 /**
  * Finds which connection owns a ref by asking all of them at once.

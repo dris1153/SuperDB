@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { loadInventory } from "@/lib/inventory";
+import { reorderProjects, resetProjectOrder } from "@/lib/project-order";
 import { ProjectsBoard } from "@/components/projects-board";
 import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty-state";
@@ -9,7 +11,21 @@ import { Stat } from "@/components/ui/stat";
 export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage() {
-  const { projects, connections, errors } = await loadInventory();
+  const { projects, connections, errors, ordered } = await loadInventory();
+
+  async function reorder(refs: string[]) {
+    "use server";
+    await reorderProjects(refs);
+    // Only this page renders the project order.
+    revalidatePath("/");
+  }
+
+  async function reset() {
+    "use server";
+    await resetProjectOrder();
+    revalidatePath("/");
+  }
+
   const active = projects.filter((p) => p.status === "ACTIVE_HEALTHY").length;
   const idle = projects.filter((p) => p.status === "INACTIVE").length;
 
@@ -51,7 +67,7 @@ export default async function ProjectsPage() {
             </Card>
           ) : null}
 
-          <ProjectsBoard projects={projects} />
+          <ProjectsBoard projects={projects} ordered={ordered} reorder={reorder} reset={reset} />
         </>
       )}
     </div>
