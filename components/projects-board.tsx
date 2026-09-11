@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { IconLock, IconSearch } from "@tabler/icons-react";
 import type { InventoryProject } from "@/lib/inventory";
@@ -32,31 +32,41 @@ export function ProjectsBoard({
   const [status, setStatus] = useState(ALL);
   const [tag, setTag] = useState(ALL);
   const [sort, setSort] = useState<ProjectSort>("manual");
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetting, startReset] = useTransition();
 
   const owners = useMemo(() => [...new Set(projects.map((p) => p.owner))].sort(), [projects]);
   const statuses = useMemo(() => [...new Set(projects.map((p) => p.status))].sort(), [projects]);
   const tags = useMemo(() => [...new Set(projects.flatMap((p) => p.tags))].sort(), [projects]);
+
+  // The tag Select unmounts once no connection carries a tag, and a selection left behind would
+  // filter the board to nothing with no control on screen to clear it. Derived rather than reset, so
+  // the choice comes back if the tag does — and so nothing writes state during a render.
+  const activeTag = tags.includes(tag) ? tag : ALL;
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return projects.filter((p) => {
       if (owner !== ALL && p.owner !== owner) return false;
       if (status !== ALL && p.status !== status) return false;
-      if (tag !== ALL && !p.tags.includes(tag)) return false;
+      if (activeTag !== ALL && !p.tags.includes(activeTag)) return false;
       if (!needle) return true;
       return [p.name, p.ref, p.orgName, p.region, p.owner, ...p.tags].some((v) =>
         v?.toLowerCase().includes(needle),
       );
     });
-  }, [projects, q, owner, status, tag]);
+  }, [projects, q, owner, status, activeTag]);
 
   // Separate from the filter memo so changing the sort does not re-run the filter, and so sorting
   // applies to what is on screen rather than to everything.
   const rows = useMemo(() => sortProjects(filtered, sort), [filtered, sort]);
 
-  // Every control at its default. Only then does a drop have a position it could mean.
+  // Every control at its default. Only then does a drop have a position it could mean. Load-bearing,
+  // not cosmetic: a write from a filtered view would renumber only the visible subset and interleave
+  // it with everything left at its old position.
   const clean =
-    sort === "manual" && q.trim() === "" && owner === ALL && status === ALL && tag === ALL;
+    sort === "manual" && q.trim() === "" && owner === ALL && status === ALL && activeTag === ALL;
+
 
   return (
     <div className="space-y-4">
@@ -97,7 +107,7 @@ export function ProjectsBoard({
 
         {/* Tags live on the connection, so this narrows to whole organizations, not single projects. */}
         {tags.length > 0 ? (
-          <Select value={tag} onValueChange={setTag}>
+          <Select value={activeTag} onValueChange={setTag}>
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -137,19 +147,39 @@ export function ProjectsBoard({
       {/* Only when there is something to undo: the board cannot tell a saved order from the
           connection order it falls back to, so the server says. */}
       {clean && ordered ? (
-        <button
-          type="button"
-          onClick={() => reset()}
-          className="text-xs text-subtle hover:text-foreground"
-        >
-          Reset to connection order
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={resetting}
+            onClick={() =>
+              startReset(async () => {
+                setResetError(null);
+                try {
+                  await reset();
+                } catch (e) {
+                  // Unawaited, this failed in silence: no error boundary catches a rejected promise
+                  // from an event handler, so the button simply stopped working with no explanation.
+                  setResetError(e instanceof Error ? e.message : "Could not reset the order");
+                }
+              })
+            }
+            className="text-xs text-subtle hover:text-foreground disabled:opacity-50"
+          >
+            {resetting ? "Resetting…" : "Reset to connection order"}
+          </button>
+          {resetError ? (
+            <span className="text-xs text-destructive" role="alert">
+              {resetError}
+            </span>
+          ) : null}
+        </div>
       ) : null}
 
       {rows.length === 0 ? (
         <Empty>No project matches these filters.</Empty>
       ) : (
         <SortableProjects
+          key={String(clean)}
           tiles={rows.map((p) => ({
             id: p.ref,
             label: p.name,

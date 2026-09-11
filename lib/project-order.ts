@@ -1,6 +1,6 @@
 import "server-only";
 import { requireUser } from "./supabase/server";
-import { isProjectRef } from "./inventory";
+import { isProjectRef } from "./project-ref";
 
 /**
  * The board's saved project order.
@@ -47,8 +47,14 @@ export async function reorderProjects(refs: string[]): Promise<void> {
     throw new Error("Invalid project order");
   }
 
+  // Deduped rather than rejected: a repeat is normal, not hostile. GET /v1/projects is not scoped to
+  // one organization and connections_identity includes `kind`, so an account connected by both PAT
+  // and OAuth shows its projects twice on the board. The function guards this too — this keeps the
+  // wire clean and the intent visible at the call site.
+  const unique = [...new Set(refs)];
+
   const { supabase } = await requireUser();
-  const { error } = await supabase.rpc("reorder_projects", { refs });
+  const { error } = await supabase.rpc("reorder_projects", { refs: unique });
   if (error) throw new Error(error.message);
 }
 

@@ -300,8 +300,14 @@ security invoker
 set search_path = ''
 as $$
   insert into public.project_order (user_id, project_ref, sort_order)
-  select auth.uid(), r.ref, r.ord
+  -- distinct on, because the same ref can legitimately arrive twice: GET /v1/projects is not scoped
+  -- to one organization, and connections_identity includes `kind`, so one account connected by both
+  -- PAT and OAuth puts its projects on the board twice. Two source rows arbitrating to one key raises
+  -- "ON CONFLICT DO UPDATE command cannot affect row a second time" and aborts the whole statement,
+  -- so without this every drag fails for that user. Keeps the earliest position of each ref.
+  select distinct on (r.ref) auth.uid(), r.ref, r.ord
     from unnest(refs) with ordinality as r(ref, ord)
+   order by r.ref, r.ord
   on conflict (user_id, project_ref) do update
     set sort_order = excluded.sort_order, updated_at = now();
 $$;

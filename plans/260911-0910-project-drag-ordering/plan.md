@@ -30,14 +30,16 @@ worth landing on its own so a regression there is not tangled up with new behavi
 
 ## Run the SQL before deploying anything
 
-`supabase/schema.sql` **has never been run**. The `connections.sort_order` column and
-`reorder_connections` from the previous plan are still only in the file, and phase 1 adds more to the
-same file. One run now applies both.
+**Applied 2026-09-11.** `supabase/schema.sql` has been run against the live database, covering both
+this plan's objects and `connections.sort_order` from the previous one.
 
-Deploying code that reads either before the SQL has run takes out far more than the board:
-`connectionsWithTokens` feeds `resolveProject`, which gates every project page and every write, DDL
-and connect action, and the repo has no `error.tsx`. Sequence: run the SQL, confirm the columns
-exist, exercise the app, then deploy.
+The rule still holds for any future change to that file: run it before deploying code that reads the
+new objects. `connectionsWithTokens` feeds `resolveProject`, which gates every project page and every
+write, DDL and connect action, and the repo has no `error.tsx` — so a missing column is a 500 across
+the app, not a degraded board.
+
+**The `reorder_projects` body changed after that run** (duplicate refs; see phase 1), so the file
+needs re-running once more before dragging works.
 
 ## Settled decisions
 

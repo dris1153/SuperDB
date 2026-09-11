@@ -3,6 +3,7 @@ import { cache } from "react";
 import { connectionsWithTokens, type Connection, type ConnectionKind } from "./connections";
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
 import { projectOrder } from "./project-order";
+import { isProjectRef } from "./project-ref";
 
 export type InventoryProject = Project & {
   connectionId: string;
@@ -76,8 +77,8 @@ export async function loadInventory(): Promise<Inventory> {
   };
 }
 
-/** Project refs are 20 lowercase letters — validate before it reaches a URL we build. */
-export const isProjectRef = (ref: string) => /^[a-z]{20}$/.test(ref);
+/** Re-exported so existing callers keep working; the definition lives in a leaf to avoid a cycle. */
+export { isProjectRef };
 
 /**
  * Finds which connection owns a ref by asking all of them at once.
