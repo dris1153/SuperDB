@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { connectionsWithTokens, type Connection, type ConnectionKind } from "./connections";
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
+import { projectOrder } from "./project-order";
 
 export type InventoryProject = Project & {
   connectionId: string;
@@ -20,7 +21,9 @@ export type Inventory = {
 
 /** Fans out across every connection. One broken token degrades its own row, not the page. */
 export async function loadInventory(): Promise<Inventory> {
-  const connections = await connectionsWithTokens();
+  // Alongside the tokens rather than after them: the order is a small keyed read against this app's
+  // own database, so pairing it here costs no wall-clock time.
+  const [connections, order] = await Promise.all([connectionsWithTokens(), projectOrder()]);
   const errors: Inventory["errors"] = [];
 
   const perConnection = await Promise.all(
@@ -52,9 +55,16 @@ export async function loadInventory(): Promise<Inventory> {
   // chosen sort_order and perConnection preserves it, so the board follows the order set on the
   // connections page. Sorting by owner here again would silently override it — this is deliberate,
   // not a missing sort.
-  const projects = perConnection.flatMap((group) =>
+  const grouped = perConnection.flatMap((group) =>
     group.sort((a, b) => a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name)),
   );
+
+  // A project the user has placed by hand wins. Anything unplaced sorts after everything placed —
+  // MAX_SAFE_INTEGER rather than 0, because a project created upstream since the last reorder
+  // appearing at the top of the board is the most visible possible wrong answer. sort() is stable,
+  // so those keep the connection grouping above among themselves; no further tiebreak is needed.
+  const placed = (p: InventoryProject) => order.get(p.ref) ?? Number.MAX_SAFE_INTEGER;
+  const projects = grouped.sort((a, b) => placed(a) - placed(b));
 
   return { projects, connections: connections.map(({ token, ...c }) => c), errors };
 }
