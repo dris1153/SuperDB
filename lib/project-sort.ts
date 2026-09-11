@@ -11,15 +11,15 @@ import type { Project } from "./mgmt-api";
  * — see 260911-0039-project-card-sorting-brainstorm.md.
  */
 
-export type ProjectSort = "connection" | "name" | "status" | "region" | "newest";
+export type ProjectSort = "manual" | "name" | "status" | "region" | "newest";
 
 /**
- * "Connection order" is the default and names what the board already does: loadInventory returns
- * projects grouped by the user's connection order. Without an option for it there would be no way
- * back after sorting.
+ * "My order" is the default and names what the server sends: the user's dragged order where one
+ * exists, connection order underneath it. Without an option for it there would be no way back after
+ * sorting, and it is also the only mode in which dragging is allowed.
  */
 export const PROJECT_SORTS: { value: ProjectSort; label: string }[] = [
-  { value: "connection", label: "Connection order" },
+  { value: "manual", label: "My order" },
   { value: "name", label: "Name" },
   { value: "status", label: "Status" },
   { value: "region", label: "Region" },
@@ -62,14 +62,14 @@ const severity = (status: string) => SEVERITY[status as Project["status"]] ?? OT
 type Sortable = Pick<Project, "name" | "status" | "region" | "created_at">;
 
 /**
- * Returns the input untouched for "connection": it is already in that order, and copying would only
+ * Returns the input untouched for "manual": the server already sent it in that order, and copying would only
  * invite a caller to assume otherwise.
  *
  * No tiebreak is needed. Array.prototype.sort is stable and the input arrives in connection order,
  * so projects with equal keys keep it.
  */
 export function sortProjects<T extends Sortable>(rows: T[], sort: ProjectSort): T[] {
-  if (sort === "connection") return rows;
+  if (sort === "manual") return rows;
 
   return [...rows].sort((a, b) => {
     switch (sort) {

@@ -15,9 +15,9 @@ const row = (name: string, over: Partial<Row> = {}): Row => ({
 
 const names = (rows: Row[]) => rows.map((r) => r.name);
 
-test("connection order is returned untouched, not copied", () => {
+test("my order is returned untouched, not copied", () => {
   const rows = [row("c"), row("a"), row("b")];
-  const result = sortProjects(rows, "connection");
+  const result = sortProjects(rows, "manual");
   assert.equal(result, rows, "same reference — it is already the answer");
   assert.deepEqual(names(result), ["c", "a", "b"]);
 });
@@ -97,7 +97,7 @@ test("equal keys keep the order they arrived in, so connection order survives", 
 });
 
 test("every option has a label and the default is connection order", () => {
-  assert.equal(PROJECT_SORTS[0].value, "connection");
+  assert.equal(PROJECT_SORTS[0].value, "manual");
   assert.equal(PROJECT_SORTS.length, 5);
   for (const option of PROJECT_SORTS) assert.ok(option.label.length > 0, option.value);
 });

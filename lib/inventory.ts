@@ -17,6 +17,8 @@ export type Inventory = {
   projects: InventoryProject[];
   connections: Connection[];
   errors: { owner: string; message: string }[];
+  /** Whether the user has dragged anything yet. The board cannot tell from the order alone. */
+  ordered: boolean;
 };
 
 /** Fans out across every connection. One broken token degrades its own row, not the page. */
@@ -66,7 +68,12 @@ export async function loadInventory(): Promise<Inventory> {
   const placed = (p: InventoryProject) => order.get(p.ref) ?? Number.MAX_SAFE_INTEGER;
   const projects = grouped.sort((a, b) => placed(a) - placed(b));
 
-  return { projects, connections: connections.map(({ token, ...c }) => c), errors };
+  return {
+    projects,
+    connections: connections.map(({ token, ...c }) => c),
+    errors,
+    ordered: order.size > 0,
+  };
 }
 
 /** Project refs are 20 lowercase letters — validate before it reaches a URL we build. */
