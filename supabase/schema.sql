@@ -230,6 +230,34 @@ create policy "own project order" on public.project_order
 
 revoke all on public.project_order from anon;
 
+-- ---------------------------------------------------------------------------
+-- Per-project vault entries, currently the database password. Keyed by ref for the same reason as
+-- project_order: the project itself lives in Supabase, not here.
+--
+-- vault_blob is written by the browser and is opaque to this database and to the server — same scheme
+-- as connection_secrets. There is deliberately no check constraint and no column describing what is
+-- inside: nothing here can read it, and a comment claiming otherwise would be unverifiable.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.project_secrets (
+  user_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  project_ref  text not null,
+  vault_blob   text,
+  updated_at   timestamptz not null default now(),
+
+  primary key (user_id, project_ref)
+);
+
+alter table public.project_secrets enable row level security;
+
+drop policy if exists "own project secrets" on public.project_secrets;
+create policy "own project secrets" on public.project_secrets
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+revoke all on public.project_secrets from anon;
+
 -- Converge an existing table: 'wrote' records a change made to a user's own database through the
 -- table editor. The constraint is unnamed in the CREATE above, so Postgres called it this.
 alter table public.connection_events
