@@ -3,7 +3,7 @@ title: "Connection ordering: manual order plus column sort"
 status: pending
 created: 2026-09-10
 blockedBy: []
-blocks: []
+blocks: [260911-0910-project-drag-ordering]
 ---
 
 # Connection ordering
@@ -70,6 +70,12 @@ deferred, so this plan will most likely land first.
 
 `260824-1218-multi-user-auth-and-oauth-connections` phase 2 lists the same two files, but that work
 shipped long ago; its `status: pending` is known stale frontmatter, not active work.
+
+**Blocks [260911-0910-project-drag-ordering](../260911-0910-project-drag-ordering/plan.md).** Its
+phase 3 refactors `components/sortable-connections.tsx`, produced by phase 4 here. **Run this plan's
+manual checks before that refactor starts** — phase 4's code passed review and every static check,
+but its blocking end-to-end verification is still unrun, and refactoring on an unverified baseline
+makes any later bug ambiguous between the two plans.
 
 ## Success metrics
 
