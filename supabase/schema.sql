@@ -197,6 +197,39 @@ create policy "own connection secrets" on public.connection_secrets
 
 revoke all on public.connection_secrets from anon;
 
+-- ---------------------------------------------------------------------------
+-- The board's project order. Projects live in Supabase, not here — they arrive from the Management
+-- API on every load — so there is no row to add a column to and this table keys on the ref instead.
+--
+-- Deliberately empty until the first drag, which sends the whole visible order and seeds every row
+-- at once. Do not add a backfill: there is nothing to back-fill from, and the one above for
+-- connections is where an ordering bug shipped.
+--
+-- A project deleted in Supabase leaves a row here that never matches again. That is intended. A
+-- cleanup would have to treat a ref missing from one API response as gone for good, and a failed
+-- call looks exactly the same.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.project_order (
+  user_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  project_ref  text not null,
+  sort_order   integer not null,
+  updated_at   timestamptz not null default now(),
+
+  -- Composite key, so it doubles as the on conflict target below. No surrogate id earns its place.
+  primary key (user_id, project_ref)
+);
+
+alter table public.project_order enable row level security;
+
+drop policy if exists "own project order" on public.project_order;
+create policy "own project order" on public.project_order
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+revoke all on public.project_order from anon;
+
 -- Converge an existing table: 'wrote' records a change made to a user's own database through the
 -- table editor. The constraint is unnamed in the CREATE above, so Postgres called it this.
 alter table public.connection_events
@@ -253,6 +286,28 @@ $$;
 
 revoke all on function public.reorder_connections(uuid[]) from public, anon;
 grant execute on function public.reorder_connections(uuid[]) to authenticated;
+
+-- The same job for projects, except rows may not exist yet: the first drag inserts the whole board.
+-- `with ordinality` supplies each ref's position, so no index arithmetic crosses the wire, and the
+-- insert and the update are one statement rather than a read followed by a write.
+--
+-- Clearing the order is a plain delete from the app; the policy above already scopes it, so it needs
+-- no function of its own.
+create or replace function public.reorder_projects(refs text[])
+returns void
+language sql
+security invoker
+set search_path = ''
+as $$
+  insert into public.project_order (user_id, project_ref, sort_order)
+  select auth.uid(), r.ref, r.ord
+    from unnest(refs) with ordinality as r(ref, ord)
+  on conflict (user_id, project_ref) do update
+    set sort_order = excluded.sort_order, updated_at = now();
+$$;
+
+revoke all on function public.reorder_projects(text[]) from public, anon;
+grant execute on function public.reorder_projects(text[]) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Upgrading from the single-user schema: run this only after reconnecting your
