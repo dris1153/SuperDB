@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   draggable,
   dropTargetForElements,
@@ -16,6 +15,7 @@ import {
 import { reorderWithEdge } from "@atlaskit/pragmatic-drag-and-drop-hitbox/util/reorder-with-edge";
 import { IconChevronDown, IconChevronUp, IconGripVertical } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { useOptimisticOrder } from "./use-optimistic-order";
 import { TableCell, TableRow } from "./ui/table";
 
 export type ConnectionRow = { id: string; label: string; cells: ReactNode };
@@ -43,49 +43,7 @@ export function SortableConnections({
   sorted: boolean;
   reorder: (ids: string[]) => Promise<void>;
 }) {
-  const [rows, setRows] = useState(incoming);
-  const [seen, setSeen] = useState(incoming);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const router = useRouter();
-
-  // The page rebuilds this array on every render, so the identity always differs and this runs every
-  // time. Taking the server's order while a write is still in flight would undo it on screen and
-  // make the next click compute from a stale list, so it only applies once nothing is pending.
-  if (incoming !== seen) {
-    setSeen(incoming);
-    if (!pending) {
-      setRows(incoming);
-      setError(null);
-    }
-  }
-
-  function commit(next: ConnectionRow[]) {
-    if (next.every((row, i) => row.id === rows[i]?.id)) return;
-
-    setRows(next);
-    setError(null);
-    start(async () => {
-      try {
-        await reorder(next.map((row) => row.id));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Could not save the new order");
-        // Ask the server rather than restoring a snapshot: after a failed write, anything held on
-        // the client may itself be an optimistic order that was never stored.
-        router.refresh();
-      }
-    });
-  }
-
-  function move(id: string, delta: number) {
-    const from = rows.findIndex((row) => row.id === id);
-    const to = from + delta;
-    if (from < 0 || to < 0 || to >= rows.length) return;
-
-    const next = [...rows];
-    [next[from], next[to]] = [next[to], next[from]];
-    commit(next);
-  }
+  const { rows, commit, move, pending, error } = useOptimisticOrder(incoming, reorder);
 
   useEffect(() => {
     if (sorted) return;
