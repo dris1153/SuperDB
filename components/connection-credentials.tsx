@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { decryptJson, encryptJson } from "@/lib/vault-crypto";
+import { useState } from "react";
 import { saveConnectionSecret, type ConnectionSecret } from "@/lib/vault-actions";
 import { METHODS, type Method } from "@/lib/credential-methods";
-import { useVault } from "./vault-provider";
+import { useVaultSecret } from "./use-vault-secret";
 import { VaultGate } from "./vault-gate";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -35,46 +34,27 @@ export function ConnectionCredentials({
   connectionId: string;
   secret: ConnectionSecret | null;
 }) {
-  const { key } = useVault();
+  const {
+    value: passwords,
+    setValue: setPasswords,
+    decryptFailed,
+    message,
+    setMessage,
+    seal,
+  } = useVaultSecret<Passwords>(secret?.vault_blob);
+
   const [method, setMethod] = useState<Method>(secret?.supabase_login_method ?? "email");
   const [email, setEmail] = useState(secret?.supabase_email ?? "");
-  const [passwords, setPasswords] = useState<Passwords>({});
   const [reveal, setReveal] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [decryptFailed, setDecryptFailed] = useState(false);
-
-  // Decryption happens here, never on the server — it never held the plaintext to begin with.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!key || !secret?.vault_blob) return;
-      try {
-        const decrypted = await decryptJson<Passwords>(key, secret.vault_blob);
-        if (!cancelled) {
-          setPasswords(decrypted);
-          setDecryptFailed(false);
-        }
-      } catch {
-        // Blocks save() below. An unreadable blob and no stored password look identical in this
-        // form, and saving from that state would replace the real one with null, irreversibly.
-        if (!cancelled) {
-          setDecryptFailed(true);
-          setStatus("Stored credentials could not be decrypted with this vault key.");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [key, secret?.vault_blob]);
 
   const shape = METHODS.find((m) => m.value === method)!;
+  const status = message;
 
   async function save() {
     if (decryptFailed) return;
     setBusy(true);
-    setStatus(null);
+    setMessage(null);
     try {
       // Only keep what this method actually uses, so switching away does not leave a stale password
       // encrypted in the blob.
@@ -91,17 +71,11 @@ export function ConnectionCredentials({
         connectionId,
         supabaseLoginMethod: method,
         supabaseEmail: email,
-        // Locked vault: nothing to re-encrypt, so leave the stored blob untouched rather than
-        // clearing it. undefined is the signal for that; null would delete it.
-        vaultBlob: key
-          ? Object.keys(kept).length > 0
-            ? await encryptJson(key, kept)
-            : null
-          : undefined,
+        vaultBlob: await seal(kept),
       });
-      setStatus("Saved.");
+      setMessage("Saved.");
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : "Could not save");
+      setMessage(e instanceof Error ? e.message : "Could not save");
     } finally {
       setBusy(false);
     }
@@ -149,7 +123,7 @@ export function ConnectionCredentials({
                 id={`sb-pw-${connectionId}`}
                 type={reveal ? "text" : "password"}
                 value={passwords.supabase_password ?? ""}
-                onChange={(e) => setPasswords((p) => ({ ...p, supabase_password: e.target.value }))}
+                onChange={(e) => setPasswords({ ...passwords, supabase_password: e.target.value })}
                 autoComplete="off"
                 className="font-mono"
               />
@@ -165,7 +139,7 @@ export function ConnectionCredentials({
                 id={`em-pw-${connectionId}`}
                 type={reveal ? "text" : "password"}
                 value={passwords.email_password ?? ""}
-                onChange={(e) => setPasswords((p) => ({ ...p, email_password: e.target.value }))}
+                onChange={(e) => setPasswords({ ...passwords, email_password: e.target.value })}
                 autoComplete="off"
                 className="font-mono"
               />
