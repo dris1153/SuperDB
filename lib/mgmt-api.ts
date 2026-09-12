@@ -78,7 +78,17 @@ const SERVICES = ["auth", "db", "pooler", "realtime", "rest", "storage"] as cons
 export const getHealth = (t: string, ref: string) =>
   call<ServiceHealth[]>(t, `/v1/projects/${ref}/health?services=${SERVICES.join(",")}`);
 
-/** Read-only SQL. The endpoint rejects unqualified entity references, so schema-qualify everything. */
+/**
+ * Read-only SQL. Runs as `supabase_read_only_user`, which holds `rolbypassrls`, so results are not
+ * RLS-filtered.
+ *
+ * Every query this repo *builds* schema-qualifies its references, and should keep doing so: the
+ * schema is chosen by the caller, and resolving it through a search path would make the target
+ * depend on a role's configuration. But the endpoint does not require it — measured 2026-09-13 with
+ * scripts/probe-query-errors.mjs, `search_path` here is `"$user", public`, and an unqualified
+ * reference to a public table answers 201. That matters because the SQL editor sends whatever the
+ * user typed through this endpoint first.
+ */
 export const readOnlyQuery = <T = Record<string, unknown>>(t: string, ref: string, query: string) =>
   call<T[]>(t, `/v1/projects/${ref}/database/query/read-only`, {
     method: "POST",

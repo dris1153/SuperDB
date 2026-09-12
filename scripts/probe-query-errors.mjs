@@ -84,3 +84,34 @@ await probe("syntax error, read-only endpoint", "/database/query/read-only", "se
 
 // For contrast: a statement that works, to confirm the success shape.
 await probe("successful select", "/database/query/read-only", "select 1 as ok");
+
+// Whether an unqualified reference resolves on the read-only endpoint.
+//
+// This decides whether the SQL editor's run flow is usable at all. Every statement goes to the
+// read-only endpoint first, and `lib/mgmt-api.ts` records that this endpoint "rejects unqualified
+// entity references". If that is true of a plain `select * from todos` — which is how people
+// actually write SQL — then the editor reports 42P01 for a table that exists, and there is no route
+// to the write endpoint because only 25006 opens it.
+await probe("search_path, read-only endpoint", "/database/query/read-only", "show search_path");
+await probe("search_path, write endpoint", "/database/query", "show search_path");
+
+// pg_catalog is searched whatever search_path says, so this lookup works on either endpoint.
+const listing = await fetch(`${BASE}/v1/projects/${ref}/database/query/read-only`, {
+  method: "POST",
+  headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  body: JSON.stringify({
+    query: "select tablename from pg_tables where schemaname = 'public' order by tablename limit 1",
+  }),
+});
+const [first] = listing.ok ? await listing.json() : [];
+
+if (!first?.tablename) {
+  console.log("\n=== unqualified reference\nNo table in public to try. Skipped.");
+} else {
+  // Quoted, so a name needing quotes does not turn this into a syntax error and confuse the answer.
+  const name = `"${first.tablename.replaceAll('"', '""')}"`;
+  // count(*), not `select *`: the question is whether the name resolves, and no row of real data
+  // needs to be printed to answer it.
+  await probe("unqualified reference, read-only endpoint", "/database/query/read-only", `select count(*) from ${name}`);
+  await probe("qualified, read-only endpoint, for contrast", "/database/query/read-only", `select count(*) from public.${name}`);
+}

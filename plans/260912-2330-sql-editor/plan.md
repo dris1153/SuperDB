@@ -1,6 +1,6 @@
 ---
 title: "SQL Editor"
-status: pending
+status: in-progress
 created: 2026-09-12
 blockedBy: []
 blocks: []
@@ -20,7 +20,7 @@ Design, the measured API behaviour it rests on, and what cannot be matched:
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [Editor, run, results](phase-01-editor-run-results.md) | pending | ~2d | — |
+| 1 | [Editor, run, results](phase-01-editor-run-results.md) | in-progress | ~2d | — |
 | 2 | [Saved queries](phase-02-saved-queries.md) | pending | ~1d | 1 |
 | 3 | [Query tabs](phase-03-query-tabs.md) | pending | ~1d | 1, 2 |
 | 4 | [Templates and running queries](phase-04-templates-and-running.md) | pending | ~4h | 1 |

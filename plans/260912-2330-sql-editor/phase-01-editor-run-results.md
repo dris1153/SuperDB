@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Editor, run, results"
-status: pending
+status: in-progress
 priority: P1
 effort: "2d"
 dependencies: []
@@ -123,18 +123,91 @@ these are strictly more dangerous.
 
 ## Success Criteria
 
-- [ ] `parseSqlError` has tests using the three measured response bodies verbatim.
-- [ ] A test pins that success is 201 — not 200.
-- [ ] A `SELECT` renders rows with no prompt.
-- [ ] An `UPDATE` prompts once, names the project, and applies only on confirmation.
-- [ ] Cancelling the prompt leaves the database untouched.
-- [ ] A syntax error underlines the offending token.
-- [ ] A successful write says "no rows returned" rather than showing an empty grid.
-- [ ] The multi-statement rule is stated next to the results.
-- [ ] The write appears in `/settings`'s connection event log.
-- [ ] The nav slug is live; "soon" is gone.
-- [ ] The CodeMirror bundle does not appear in any other route's chunks.
-- [ ] `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` green.
+- [x] `parseSqlError` has tests using the three measured response bodies verbatim — 15 tests in
+      `lib/sql-error.test.ts`, the refusal and syntax bodies copied from the probe run unedited.
+- [x] A test pins that success is 201 — not 200: `lib/mgmt-api.test.ts`, "a query answers 201, and
+      201 is a success".
+- [ ] **Needs the app.** A `SELECT` renders rows with no prompt.
+- [ ] **Needs the app.** An `UPDATE` prompts once, names the project, and applies only on
+      confirmation.
+- [ ] **Needs the app.** Cancelling the prompt leaves the database untouched.
+- [ ] **Needs the app.** A syntax error underlines the offending token.
+- [x] A successful write says "Success. No rows returned." rather than showing an empty grid —
+      `components/sql-editor/results.tsx`.
+- [x] The multi-statement rule is stated next to the results, permanently: detecting several
+      statements would need a parser that handles strings and dollar quotes, and the rule is true of
+      every run anyway.
+- [ ] **Needs the app.** The write appears in `/settings`'s connection event log.
+- [x] The nav slug is live; "soon" is gone — `ready: true` on the `sql` slug.
+- [x] The CodeMirror bundle does not appear in any other route's chunks. Measured from
+      `.next/diagnostics/route-bundle-stats.json`: the 424KB chunk is referenced only by
+      `/p/[ref]/sql`, and not in that route's first load either — it is behind the dynamic import.
+- [x] `pnpm test` (316), `pnpm typecheck`, `pnpm lint`, `pnpm build` green.
+- [x] An unqualified `SELECT` resolves on the read-only endpoint — probed 2026-09-13, 201.
+
+One case has no route through the editor and is accepted rather than solved: a table whose SELECT
+privilege has been revoked from `supabase_read_only_user` answers 42501 on the read path, and only
+25006 opens the write endpoint. Offering "run it as postgres anyway" would turn the confirm from a
+question about a refused write into a way around a permission, which is worse than the gap.
+
+## What was built, where it differs from the plan
+
+- The run flow lives in `lib/sql-editor-actions.ts` (`"use server"`), not a `server-only` module plus
+  a wrapper. It follows `write-actions.ts` / `ddl-actions.ts`: the logic and the action are the same
+  module, and `resolveProject` is the authorisation gate.
+- `recordWrite` grew optional `schema` and `table`. An arbitrary statement has no single table to
+  name, and passing an invented one would have put fake values in the audit trail. Existing callers
+  pass both, so their `detail` strings are byte-identical.
+- `@codemirror/lint` was added to the four planned packages. `setDiagnostics` gives the underline and
+  its hover message in one call, which is less code than a hand-built decoration field — and pnpm
+  will not resolve a transitive dependency, so it has to be declared.
+- Versions installed, all current at 2026-09-12: `codemirror` 6.0.2, `@codemirror/view` 6.43.11,
+  `@codemirror/state` 6.7.4, `@codemirror/lang-sql` 6.10.0, `@codemirror/lint` 6.9.7.
+- The editor is uncontrolled — it owns the document and reports it through `onChange`. Re-creating
+  the state per keystroke would drop the selection, the undo history and the scroll position.
+- `Mod-Enter` needs `Prec.highest`: `basicSetup`'s default keymap binds it to `insertBlankLine`.
+- No pane splitter. The original has a draggable one; a fixed 45/55 split is the smaller thing that
+  works, and nothing measured says the split is wrong yet.
+
+## Review findings, and what came of them
+
+Reviewed 2026-09-13. Two High, four Medium, six Low. Fixed in this phase:
+
+- **The confirm sent whatever was in the editor, not the statement Postgres refused.** The editor
+  stays typeable during a run, so typing through the round trip sent an unvetted statement straight
+  to the write endpoint while the dialog said it had been refused by a read-only transaction. The
+  refused statement is now held in state (`confirming: string | null`) and that is what is shown and
+  what is resent.
+- **A refusal left the previous rows on screen**, so cancelling looked like the statement had run.
+  The result is cleared when the confirm opens.
+- **`LINE n` was counted against a trimmed statement and applied to an untrimmed document**, so
+  leading blank lines or indentation underlined the wrong place. The document is sent as it is;
+  `.trim()` is only a guard against running nothing.
+- **A rejected action showed nothing at all** — an expired session left the page unchanged, right
+  after the user had clicked "Run write". `runSql` is now awaited inside a try/catch that renders
+  the failure.
+- **Password literals reached the audit trail.** `connection_events` has `select` and `insert`
+  policies and nothing else, so a recorded secret cannot be deleted, and `/settings` renders
+  `detail` verbatim. This is the first path in the app that can run `alter user … password '…'`.
+  `lib/sql-redact.ts` removes the literal — tested, including the doubled-quote case — and the
+  failure message is redacted too, since a syntax error quotes the fragment it choked on.
+- **A position inside a function body is no longer underlined.** PL/pgSQL reports `LINE n` under a
+  `QUERY:` line, counting lines of the function, not of the document.
+- **`recordWrite`'s schema and table are bound together** as a pair rather than two independent
+  optionals, so a caller cannot pass one and silently lose the target from the audit line.
+- Results are memoised, and the panels dim while a run is in flight rather than only the grid.
+
+**The read-only probe does not reject unqualified references — measured, not argued.** The review's
+second High was that sending every statement to the read-only endpoint would break
+`select * from todos`, because `lib/mgmt-api.ts` claimed the endpoint "rejects unqualified entity
+references". Probed 2026-09-13: `search_path` there is `"$user", public`, and `select count(*)` on a
+public table by bare name answers 201. The comment was wrong and has been corrected in place with
+the measurement. `scripts/probe-query-errors.mjs` now carries both probes so the claim stays
+checkable.
+
+Left alone, deliberately: a result set with duplicate column names loses one (the endpoint returns
+JSON objects, so the keys collapse before this code sees them, and it returns no column metadata to
+work from).
 
 ## Risk Assessment
 
