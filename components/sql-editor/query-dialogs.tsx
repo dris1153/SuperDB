@@ -1,6 +1,7 @@
 "use client";
 
 import type { SavedQuery } from "@/lib/saved-queries";
+import type { SqlTab } from "./tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,17 +15,16 @@ import {
 import { NameDialog } from "./name-dialog";
 
 /**
- * The four questions the sidebar can ask, as one state rather than four booleans — two of them can
+ * The four questions this page can ask, as one state rather than four booleans — two of them can
  * never be open at once, and separate flags would let them be.
  *
- * `discard` carries what to open next, `null` meaning a new empty query. Without it, confirming
- * would have to guess what the user had clicked.
+ * Each carries what it is about, so confirming never has to work out what the user had clicked.
  */
 export type QueryDialog =
   | { kind: "save-as" }
   | { kind: "rename"; query: SavedQuery }
   | { kind: "delete"; query: SavedQuery }
-  | { kind: "discard"; next: SavedQuery | null };
+  | { kind: "close"; tab: SqlTab };
 
 export function QueryDialogs({
   dialog,
@@ -33,7 +33,7 @@ export function QueryDialogs({
   onClose,
   onName,
   onDelete,
-  onDiscard,
+  onCloseTab,
 }: {
   dialog: QueryDialog | null;
   busy: boolean;
@@ -42,7 +42,7 @@ export function QueryDialogs({
   /** Save under a new name, or rename the one in the dialog. */
   onName: (name: string) => void;
   onDelete: (query: SavedQuery) => void;
-  onDiscard: (next: SavedQuery | null) => void;
+  onCloseTab: (tab: SqlTab) => void;
 }) {
   const naming = dialog?.kind === "save-as" || dialog?.kind === "rename";
 
@@ -90,13 +90,12 @@ export function QueryDialogs({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={dialog?.kind === "discard"} onOpenChange={(open) => !open && onClose()}>
+      <AlertDialog open={dialog?.kind === "close"} onOpenChange={(open) => !open && onClose()}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogTitle>Close this tab?</AlertDialogTitle>
             <AlertDialogDescription>
-              The editor has changes that are not saved to any query. Opening another one replaces
-              them.
+              It holds changes that are not saved to any query. Closing discards them.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -104,10 +103,10 @@ export function QueryDialogs({
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
-                if (dialog?.kind === "discard") onDiscard(dialog.next);
+                if (dialog?.kind === "close") onCloseTab(dialog.tab);
               }}
             >
-              Discard
+              Close tab
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

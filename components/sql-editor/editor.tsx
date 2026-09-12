@@ -78,6 +78,18 @@ export default function SqlCodeEditor({
     };
   }, []);
 
+  /**
+   * The buffer arrives from `sessionStorage` through `useSyncExternalStore`, and this component is
+   * loaded on demand — so on a reload it is possible for the editor to mount before the stored text
+   * has reached it, with nothing afterwards to put it there. Filling an empty document closes that
+   * without ever touching one being typed in.
+   */
+  useEffect(() => {
+    const editor = view.current;
+    if (!editor || initialValue === "" || editor.state.doc.length > 0) return;
+    editor.dispatch({ changes: { from: 0, insert: initialValue } });
+  }, [initialValue]);
+
   useEffect(() => {
     const editor = view.current;
     if (!editor) return;
