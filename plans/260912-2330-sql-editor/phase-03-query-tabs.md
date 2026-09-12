@@ -120,7 +120,10 @@ Reviewed 2026-09-13. One Critical, two High, four Medium, seven Low — all fixe
   because a write notifies every listener. The cache is now per hook instance in a `useRef`, and the
   computation is the pure function in `lib/`.
 - **Medium: `pending` was global** while results were per tab, so a run in one tab disabled Run in
-  the others and silently swallowed their Mod-Enter. It is now the running tab's id.
+  the others and silently swallowed their Mod-Enter. It is now the running tab's id — and since the
+  page still runs one statement at a time, the other tabs' Run is disabled with "Another tab is
+  running." beside it rather than accepting a click and doing nothing. Mod-Enter has nowhere to
+  report a refusal, so the button is where that state has to be visible.
 - **Medium: a failed `sessionStorage` write was swallowed** with a comment about view preferences —
   written when this store held column widths. It now holds unsaved SQL, where dropping a write means
   an editor that rolls back to nothing on the next tab switch, or, with site data blocked, a Run

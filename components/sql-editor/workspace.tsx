@@ -87,6 +87,7 @@ export function SqlWorkspace({
 
         <EditorToolbar
           running={running}
+          elsewhere={busy && !running}
           canRun={sql.trim() !== ""}
           savePending={saved.pending}
           activeName={active?.name ?? null}

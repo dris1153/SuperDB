@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
  */
 export function EditorToolbar({
   running,
+  elsewhere,
   canRun,
   savePending,
   activeName,
@@ -21,6 +22,8 @@ export function EditorToolbar({
   onNew,
 }: {
   running: boolean;
+  /** A statement is running in another tab. One at a time, so this one's Run waits. */
+  elsewhere: boolean;
   canRun: boolean;
   savePending: boolean;
   /** The open query's name, or null for an unsaved buffer — which is what Save asks about. */
@@ -32,7 +35,9 @@ export function EditorToolbar({
 }) {
   return (
     <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-      <Button size="sm" onClick={onRun} disabled={running || !canRun}>
+      {/* Disabled rather than silently ignored while another tab runs: Mod-Enter has nowhere to
+          report a refusal, so the button is where the state has to be visible. */}
+      <Button size="sm" onClick={onRun} disabled={running || elsewhere || !canRun}>
         <IconPlayerPlayFilled size={12} stroke={1.5} />
         {running ? "Running…" : "Run"}
       </Button>
@@ -48,7 +53,11 @@ export function EditorToolbar({
       </Button>
 
       <span className="ml-auto truncate text-[11px] text-subtle">
-        {activeName ? `${activeName}${dirty ? " — unsaved changes" : ""}` : "Ctrl/Cmd + Enter"}
+        {elsewhere
+          ? "Another tab is running."
+          : activeName
+            ? `${activeName}${dirty ? " — unsaved changes" : ""}`
+            : "Ctrl/Cmd + Enter"}
       </span>
     </div>
   );
