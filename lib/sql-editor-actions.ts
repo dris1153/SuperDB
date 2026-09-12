@@ -5,6 +5,12 @@ import { MgmtError, readOnlyQuery, writeQuery } from "./mgmt-api";
 import { recordWrite } from "./write-audit";
 import { isReadOnlyRefusal, sqlErrorFromMgmt, type SqlError } from "./sql-error";
 import { redactSqlSecrets } from "./sql-redact";
+import {
+  createSavedQuery,
+  deleteSavedQuery,
+  updateSavedQuery,
+  type SavedQuery,
+} from "./saved-queries";
 
 /**
  * Running a statement from the SQL editor.
@@ -105,3 +111,53 @@ const toSqlError = (e: unknown): SqlError =>
   e instanceof MgmtError
     ? sqlErrorFromMgmt(e.message)
     : { sqlstate: null, text: e instanceof Error ? e.message : "Query failed", line: null, column: null };
+
+/**
+ * Saved queries. The work and the validation live in `saved-queries.ts`, which the server component
+ * reads through directly; these are the four things the browser may ask for.
+ *
+ * Failures come back as values, not thrown. React replaces a rejected action's message with an
+ * opaque digest in production, and these messages are the ones worth reading — "that query no longer
+ * exists, save it as a new one" is the difference between understanding a failed save and retrying
+ * it forever. Same reason `runSql` returns a `RunResult`.
+ *
+ * Success carries the whole fresh list, so the sidebar replaces its state rather than reconciling.
+ */
+export type QueryListResult =
+  | { ok: true; queries: SavedQuery[] }
+  | { ok: false; reason: string };
+
+export type QueryCreateResult =
+  | { ok: true; id: string; queries: SavedQuery[] }
+  | { ok: false; reason: string };
+
+const reason = (e: unknown) => (e instanceof Error ? e.message : "Could not save the query.");
+
+export async function saveQuery(ref: string, name: string, sql: string): Promise<QueryCreateResult> {
+  try {
+    const { id, queries } = await createSavedQuery(ref, name, sql);
+    return { ok: true, id, queries };
+  } catch (e) {
+    return { ok: false, reason: reason(e) };
+  }
+}
+
+export async function patchQuery(
+  ref: string,
+  id: string,
+  patch: { name?: string; sql?: string; favorite?: boolean },
+): Promise<QueryListResult> {
+  try {
+    return { ok: true, queries: await updateSavedQuery(ref, id, patch) };
+  } catch (e) {
+    return { ok: false, reason: reason(e) };
+  }
+}
+
+export async function removeQuery(ref: string, id: string): Promise<QueryListResult> {
+  try {
+    return { ok: true, queries: await deleteSavedQuery(ref, id) };
+  } catch (e) {
+    return { ok: false, reason: reason(e) };
+  }
+}
