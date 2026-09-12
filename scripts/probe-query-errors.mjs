@@ -46,14 +46,22 @@ async function probe(label, path, query) {
   console.log("body:");
   console.log(text || "(empty)");
 
-  // Whatever the shape, say plainly whether a machine-readable code survived into it.
+  // Measured 2026-09-12: there is no `code` field, but the SQLSTATE is embedded in the message as
+  // `ERROR:  25006: …`. An earlier version of this probe only looked for a field and reported
+  // "message matching only", which was wrong and undersold what is available — the five characters
+  // after `ERROR:` are Postgres's own output, not Supabase's wording, so matching them is matching a
+  // code rather than matching English.
   try {
     const body = JSON.parse(text);
-    const code = body.code ?? body.sqlstate ?? body.error?.code ?? null;
+    if (Array.isArray(body)) {
+      console.log(`\nrows: ${body.length}`);
+      return;
+    }
+    const sqlstate = /ERROR:\s+([0-9A-Z]{5}):/.exec(body.message ?? "")?.[1] ?? null;
     console.log(`\nkeys: ${Object.keys(body).join(", ")}`);
-    console.log(code ? `code found: ${code}` : "no code/sqlstate field — message matching only");
+    console.log(sqlstate ? `sqlstate in message: ${sqlstate}` : "no sqlstate anywhere");
   } catch {
-    console.log("\nbody is not JSON — message matching only");
+    console.log("\nbody is not JSON");
   }
 }
 

@@ -61,18 +61,42 @@ exactly once.
 Cost: a write takes two round trips. Writes are rare and deliberate, so that trades well. The
 refused attempt has no side effects — a read-only transaction rolls back.
 
-### The dependency this rests on, unverified
+### Measured 2026-09-12 — the flow works
 
-The flow must recognise *read-only transaction refused* specifically, not "some error". Matching
-SQLSTATE `25006` is reliable; matching an English message string is not.
+`scripts/probe-query-errors.mjs` against a live project:
 
-**It is unknown whether the Management API surfaces the SQLSTATE or only a message.** `MgmtError`
-carries a status and a body capped at 2000 characters; what Postgres detail survives into that body
-has not been measured. Send one `update` to the read-only endpoint and read the response before
-building on this.
+```
+POST /database/query/read-only   create temporary table … → 400
+{"message":"Failed to run sql query: ERROR:  25006: cannot execute CREATE TABLE in a read-only transaction\n"}
 
-If only a message comes back, this design weakens and the fallback is the user's original choice:
-always `writeQuery`, always confirm.
+POST /database/query/read-only   selec 1 → 400
+{"message":"Failed to run sql query: ERROR:  42601: syntax error at or near \"selec\"\nLINE 1: selec 1\n        ^\n"}
+
+POST /database/query/read-only   select 1 as ok → 201
+[{"ok":1}]
+```
+
+**There is no `code` field, but the SQLSTATE is in the message** at a fixed position:
+`ERROR:  <sqlstate>: <text>`. Parse it with `/ERROR:\s+([0-9A-Z]{5}):/`.
+
+That matters more than it looks. Those five characters are **Postgres's own output format**, not
+Supabase's prose — Supabase can reword its `Failed to run sql query:` wrapper without touching them.
+So this is matching a code, not matching English, and the read-only-first flow rests on something
+stable. `25006` is `read_only_sql_transaction`; `42601` is `syntax_error`.
+
+The probe's first version reported "no code/sqlstate field — message matching only", because it only
+looked for a JSON field. That conclusion was wrong and undersold the answer; the script has been
+corrected so the next person running it is not misled.
+
+### Two unplanned findings, both worth more than the question
+
+**Errors carry a position.** The syntax error came back with `LINE 1: selec 1` and a caret under the
+offending token. Supabase's editor underlines the error in place; with this, so can ours. Parse the
+`LINE n:` and the caret column and mark it in CodeMirror. Not in the original scope — add it to
+phase 1, it is nearly free once the message is being parsed anyway.
+
+**Success is 201, not 200,** and the body is the rows array directly with no envelope. Worth pinning
+in a test: a status check written as `=== 200` would treat every successful query as a failure.
 
 ## Decisions
 
@@ -136,7 +160,7 @@ app. The section has no meaning here — omit it rather than shipping an empty b
 
 | Risk | Mitigation |
 |---|---|
-| SQLSTATE not available, breaking the read-only-first flow | Measure before building. Fallback is always-confirm |
+| Supabase reformats its error wrapper | Only the `ERROR:  <code>:` part is parsed, and that is Postgres output, not Supabase prose |
 | A destructive statement runs with no undo | The confirm names the project; the audit records it. Beyond that, this is the feature |
 | Confirm fatigue if reads get caught | The whole point of read-only-first. Verify that a plain `SELECT` never prompts |
 | CodeMirror bundle lands on a route the latency work cares about | Route-scoped, dynamically imported; measure against the baseline that still has not been captured |
@@ -156,12 +180,12 @@ app. The section has no meaning here — omit it rather than shipping an empty b
 
 ## Next steps
 
-Large enough to warrant a plan. Before phase 1 begins, send one `update` to the read-only endpoint
-and record what comes back — that single response decides the run flow.
+Large enough to warrant a plan. The measurement that blocked it is done — see above.
 
 ## Open questions
 
-- Does the Management API surface SQLSTATE, or only a message? **Blocks the run flow design.**
+- ~~Does the Management API surface SQLSTATE?~~ **Answered 2026-09-12** — in the message, at a fixed
+  position, parseable as a code. The run flow is unblocked.
 - What the Database dropdown in the screenshot selects — plausibly a read replica or branch. Low
   value here; likely omitted rather than faked.
 - Whether Chart survives contact with phases 1–4.
