@@ -92,6 +92,13 @@ export function useSqlTabs(projectRef: string) {
   };
   const write = (next: TabsState) => writeSession(tabsKey(projectRef), JSON.stringify(next));
 
+  const addTab = (sql: string) => {
+    const id = newId();
+    writeBuffer(projectRef, id, sql);
+    const now = current();
+    write({ tabs: [...now.tabs, { id, queryId: null }], activeId: id });
+  };
+
   return {
     tabs: state.tabs,
     activeId: activeTabOf(state).id,
@@ -108,12 +115,10 @@ export function useSqlTabs(projectRef: string) {
       write({ tabs: [...now.tabs, { id, queryId }], activeId: id });
     },
 
-    add: () => {
-      const id = newId();
-      writeBuffer(projectRef, id, EMPTY_BUFFER);
-      const now = current();
-      write({ tabs: [...now.tabs, { id, queryId: null }], activeId: id });
-    },
+    add: () => addTab(EMPTY_BUFFER),
+
+    /** A template or example: its own tab, so nothing in front of the user is replaced. */
+    openText: (sql: string) => addTab(sql),
 
     /** After Save as…, so the tab stops being an unsaved buffer without being reopened. */
     link: (tabId: string, queryId: string) => {

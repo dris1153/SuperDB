@@ -5,6 +5,7 @@ import { MgmtError, readOnlyQuery, writeQuery } from "./mgmt-api";
 import { recordWrite } from "./write-audit";
 import { isReadOnlyRefusal, sqlErrorFromMgmt, type SqlError } from "./sql-error";
 import { redactSqlSecrets } from "./sql-redact";
+import { RUNNING_QUERIES_SQL, type RunningQuery } from "./running-queries";
 import {
   createSavedQuery,
   deleteSavedQuery,
@@ -159,5 +160,26 @@ export async function removeQuery(ref: string, id: string): Promise<QueryListRes
     return { ok: true, queries: await deleteSavedQuery(ref, id) };
   } catch (e) {
     return { ok: false, reason: reason(e) };
+  }
+}
+
+/**
+ * What is executing against the project right now.
+ *
+ * Read-only, and there is no companion action that terminates a session: `pg_terminate_backend` is a
+ * deliberate omission, not an oversight. See `running-queries.ts`.
+ */
+export type RunningResult = { ok: true; rows: RunningQuery[] } | { ok: false; reason: string };
+
+export async function listRunningQueries(ref: string): Promise<RunningResult> {
+  try {
+    // Inside the try as well: requireUser throws on an expired session, and a rejected action
+    // reaches the client as a digest with nothing useful in it.
+    const found = await resolveProject(ref);
+    if (!found) return { ok: false, reason: "Project not found." };
+
+    return { ok: true, rows: await readOnlyQuery<RunningQuery>(found.token, ref, RUNNING_QUERIES_SQL) };
+  } catch (e) {
+    return { ok: false, reason: toSqlError(e).text };
   }
 }

@@ -6,6 +6,7 @@ import type { SavedQuery } from "@/lib/saved-queries";
 import { QueryDialogs, type QueryDialog } from "./query-dialogs";
 import { Results } from "./results";
 import { RunConfirm } from "./run-confirm";
+import { RunningQueries } from "./running-queries";
 import { SavedQueriesSidebar } from "./saved-queries-sidebar";
 import { SqlTabBar } from "./tab-bar";
 import { useRunSql } from "./use-run-sql";
@@ -39,7 +40,7 @@ export function SqlWorkspace({
   initialQueries: SavedQuery[] | null;
 }) {
   const saved = useSavedQueries(projectRef, initialQueries ?? []);
-  const { tabs, activeId, activate, open, add, link, close } = useSqlTabs(projectRef);
+  const { tabs, activeId, activate, open, openText, add, link, close } = useSqlTabs(projectRef);
   const dirtyIds = useDirtyTabs(projectRef, tabs, saved.queries);
 
   const sql = useBuffer(projectRef, activeId);
@@ -48,6 +49,7 @@ export function SqlWorkspace({
     activeId,
   );
   const [dialog, setDialog] = useState<QueryDialog | null>(null);
+  const [showRunning, setShowRunning] = useState(false);
 
   /** The tab and its results go together; nothing will ask for a closed tab's rows again. */
   const closeAll = (tab: { id: string }) => {
@@ -72,6 +74,8 @@ export function SqlWorkspace({
         onRename={(query) => setDialog({ kind: "rename", query })}
         onToggleFavorite={(query) => saved.update(query.id, { favorite: !query.favorite })}
         onDelete={(query) => setDialog({ kind: "delete", query })}
+        onUseSnippet={openText}
+        onShowRunning={() => setShowRunning(true)}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -127,6 +131,10 @@ export function SqlWorkspace({
         // write's outcome is filed under whatever tab the user happened to switch to.
         onConfirm={() => confirming && run(confirming.sql, true, confirming.tabId)}
       />
+
+      {showRunning ? (
+        <RunningQueries projectRef={projectRef} onOpenChange={setShowRunning} />
+      ) : null}
 
       <QueryDialogs
         dialog={dialog}

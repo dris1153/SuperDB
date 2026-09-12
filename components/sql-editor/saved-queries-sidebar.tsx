@@ -5,6 +5,7 @@ import { IconSearch } from "@tabler/icons-react";
 import type { SavedQuery } from "@/lib/saved-queries";
 import { Input } from "@/components/ui/input";
 import { QuerySection } from "./query-section";
+import { ReferenceSection } from "./reference-section";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,6 +29,8 @@ export function SavedQueriesSidebar({
   onRename,
   onToggleFavorite,
   onDelete,
+  onUseSnippet,
+  onShowRunning,
 }: {
   queries: SavedQuery[];
   /** The list could not be read. Saying "nothing saved yet" instead would be a claim, not a fact. */
@@ -40,6 +43,8 @@ export function SavedQueriesSidebar({
   onRename: (query: SavedQuery) => void;
   onToggleFavorite: (query: SavedQuery) => void;
   onDelete: (query: SavedQuery) => void;
+  onUseSnippet: (sql: string) => void;
+  onShowRunning: () => void;
 }) {
   const [search, setSearch] = useState("");
 
@@ -89,6 +94,8 @@ export function SavedQueriesSidebar({
       </div>
 
       {error ? <p className="border-t border-border px-3 py-2 text-xs text-destructive">{error}</p> : null}
+
+      <ReferenceSection onUse={(snippet) => onUseSnippet(snippet.sql)} onShowRunning={onShowRunning} />
     </aside>
   );
 }
