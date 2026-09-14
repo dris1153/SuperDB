@@ -242,8 +242,3 @@ function formatTimestamp(value: unknown): string {
   return `${parts.month} ${parts.day} ${parts.year} ${parts.hour}:${parts.minute}`;
 }
 
-/**
- * Draw every nth label, so they thin out instead of overlapping or being rotated into a fan. The
- * points themselves are all still drawn — this only decides which ones are named.
- */
-export const labelStride = (count: number, max: number) => Math.max(1, Math.ceil(count / Math.max(1, max)));

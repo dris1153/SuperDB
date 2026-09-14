@@ -7,11 +7,11 @@ import "react-data-grid/lib/styles.css";
 import type { RunResult, Row } from "@/lib/sql-editor-actions";
 import { cn } from "@/lib/utils";
 
-// Loaded when the tab is opened. Small — it is hand-rolled SVG, not a charting library — but this
-// route already carries CodeMirror, and nothing that is never opened should be in its first load.
+// Loaded when the tab is opened. recharts is large and this route already carries CodeMirror, so
+// nothing that is never opened belongs in its first load.
 const Chart = dynamic(() => import("./chart").then((m) => m.Chart), {
   ssr: false,
-  loading: () => <div className="h-full animate-pulse bg-muted/20" />,
+  loading: () => <div className="h-full animate-pulse bg-muted/20 motion-reduce:animate-none" />,
 });
 
 /**

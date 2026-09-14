@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   buildPoints,
   chartProblem,
@@ -19,11 +19,10 @@ import { cn } from "@/lib/utils";
 /**
  * The current result set, plotted, with its options beside it.
  *
- * Hand-rolled SVG, following `components/stacked-bars.tsx`. The alternatives were checked against
- * the registry rather than reputation, 2026-09-14: recharts 3.10.1 is 7.4MB unpacked, chart.js
- * 4.5.1 is 6.2MB, uplot 1.6.32 is 545KB. Rechecked when the design bar rose: a library would have
- * replaced about sixty lines of geometry and none of the column inference, the options panel, the
- * cumulative series or the timestamp axis — which is all of the actual work.
+ * Drawn by recharts, as every chart in the app now is. It brings the animation and the tooltip;
+ * everything that decides *what* to draw stays in `lib/chart-data.ts`, where it is tested — the
+ * column inference, the cumulative series, the timestamp axis, and the vertical scale that the
+ * plot hands recharts as an explicit domain.
  *
  * Which columns were chosen is always visible and always overridable: a chart built on the wrong
  * column looks perfectly fine and means nothing.
@@ -61,8 +60,6 @@ export function Chart({ rows }: { rows: Row[] }) {
     const built = buildPoints(visible, x, y, labelFormatter(visible, x));
     return toggles.cumulative ? { points: cumulative(built.points), skipped: built.skipped } : built;
   }, [visible, x, y, problem, toggles.cumulative]);
-
-  const [plotRef, plotWidth] = useMeasuredWidth();
 
   if (problem) {
     return (
@@ -108,20 +105,17 @@ export function Chart({ rows }: { rows: Row[] }) {
           </div>
         </div>
 
-        <div ref={plotRef} className="min-h-0 flex-1 overflow-x-auto px-3">
-          {plotWidth > 0 ? (
-            // Nothing is drawn until the container has been measured: a guessed width paints a
-            // narrow chart and then jumps.
-            <ChartPlot
-              points={points}
-              kind={kind}
-              width={plotWidth}
-              height={PLOT_HEIGHT}
-              showLabels={toggles.labels}
-              showGrid={toggles.grid}
-              label={`${series} by ${x}`}
-            />
-          ) : null}
+        <div className="min-h-0 flex-1 px-3">
+          {/* Recharts measures its own container, so there is nothing to measure here and nothing
+              to scroll: past a couple of hundred points the bars thin rather than overflow. */}
+          <ChartPlot
+            points={points}
+            kind={kind}
+            height={PLOT_HEIGHT}
+            showLabels={toggles.labels}
+            showGrid={toggles.grid}
+            label={`${series} by ${x}`}
+          />
         </div>
 
         {points.length > 0 ? (
@@ -156,27 +150,4 @@ export function Chart({ rows }: { rows: Row[] }) {
       />
     </div>
   );
-}
-
-/**
- * The plot is drawn in pixels, so it has to know how many it has.
- *
- * A callback ref rather than an effect: the measured element sits behind the not-chartable early
- * return, so it mounts and unmounts under this component. An effect with an empty dependency list
- * runs once, before that element exists, and never attaches — leaving the chart measuring zero and
- * rendering nothing at all for a result that followed a non-chartable one in the same tab.
- */
-function useMeasuredWidth() {
-  const [value, setValue] = useState(0);
-
-  const ref = useCallback((element: HTMLDivElement | null) => {
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setValue(entry.contentRect.width));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  // A tuple, not an object: a hook returning `{ ref, value }` reads to the lint rules as a ref being
-  // unwrapped during render.
-  return [ref, value] as const;
 }

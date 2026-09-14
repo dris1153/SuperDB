@@ -1,11 +1,18 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { count as compact } from "@/lib/format";
 import type { ServiceCard } from "@/lib/logs-sql";
-import { StackedBars } from "./stacked-bars";
 import { Card } from "./ui/card";
+
+// Charts are recharts now, and recharts is large. Loaded on demand so it stays out of the project
+// page's first load; the placeholder is the same height, so nothing moves when it arrives.
+const StackedBars = dynamic(() => import("./stacked-bars").then((m) => m.StackedBars), {
+  ssr: false,
+  loading: () => <div className="h-24 w-full animate-pulse rounded bg-muted/30 motion-reduce:animate-none" />,
+});
 
 /** How far the row may reach past its container on each side. */
 const MAX_BLEED = 320;

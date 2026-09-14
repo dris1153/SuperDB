@@ -176,6 +176,70 @@ shadowed rather than dropped and could reappear on a later result that selected 
 dead "nothing here is a number" branch that `numericColumns` makes unreachable; and the chart-type
 buttons signalled their state by colour alone.
 
+## Superseded: both charts moved to recharts
+
+2026-09-15. The decision below — hand-rolled SVG, no dependency — was reversed deliberately, for a
+reason the original argument did not weigh: **one library for every chart in the app**, and the
+animation that comes with it. The costs were put on the table again first and the answer was still
+yes, so this section records what it actually cost rather than pretending the earlier argument won.
+
+The app has exactly two charts: this one, and `components/stacked-bars.tsx`, the sparkline in the
+project overview's service cards. Both are recharts now.
+
+**What it cost, measured after the build:**
+
+| Route | Before | After |
+|---|---|---|
+| `/p/[ref]` | 757,609 | 761,452 (+3,843) |
+| `/p/[ref]/sql` | 750,077 | 750,282 (+205) |
+| `/`, `/p/[ref]/tables` | — | +31 |
+
+recharts itself lands in lazy chunks of roughly 400KB uncompressed and is in **no route's first
+load**, because both charts are behind `next/dynamic`. The sparkline pays for that by leaving the
+server-rendered HTML: it used to paint before hydration, and now paints after the chunk arrives,
+behind a placeholder of exactly its own height. That is the trade, on the one route another plan
+exists to speed up.
+
+recharts 3.10.1 installs ≈20.8MB of packages, including `@reduxjs/toolkit`, `react-redux`, `immer`
+and `reselect` — a state-management stack inside a charting library — plus `victory-vendor` (d3) and
+`es-toolkit`.
+
+**`lib/chart-data.ts` did not move, and that is the point.** Everything that decides *what* to draw
+stays tested: the column inference, the numeric-as-string rule, the cumulative series, the per-column
+timestamp axis, and `scaleOf`. `labelStride` was deleted with its test, because recharts decides tick
+spacing now.
+
+**The domain and the ticks are handed to recharts explicitly.** Its own default domain starts at the
+lowest value rather than at zero — the exact defect this phase fixed once already — and against a
+pinned domain it crowds its last two ticks together (`0, 350, 700, 1.1K, 1.2K` for `[0, 1234]`). Both
+come from `scaleOf` now, so the tests that guard them still guard something.
+
+## Review findings on the migration
+
+Reviewed 2026-09-15, by running recharts' own domain and scale functions rather than reasoning about
+them. The zero-including domain was verified to survive for all-zero, all-negative, mixed-sign and
+empty results — recharts can only widen a user domain, never narrow it. Fixed:
+
+- **recharts' accessibility layer is on by default**, which makes each chart's `<svg>` focusable with
+  `role="application"` — inside a wrapper that said `role="img"`, whose descendants are presentational.
+  Six service cards meant six unnamed tab stops in a horizontally scrolled row, each scrolling the
+  carousel sideways when focused. The sparkline turns the layer off: it has no tooltip for a keyboard
+  to drive. The SQL chart keeps it and drops the wrapper's `role="img"`, labelling the chart itself.
+- **The Y tick ladder had regressed** and `scaleOf().ticks` had gone dead. Passed explicitly now.
+- **"Show grid" off removed the baseline too.** The horizontal lines stay, faintly: a mixed-sign
+  result with no line at zero gives no way to see where zero is. Only the vertical lines toggle.
+- **A hook duplicating a library built-in.** `isAnimationActive` defaults to `'auto'`, which already
+  resolves to "not server-rendered and not `prefers-reduced-motion`" — and passing `true` would have
+  overridden the server half of that guard. The hook is deleted.
+- A zero-valued bar vanished entirely; `minPointSize={1}` restores the hairline the hand-rolled
+  version drew. The two loading placeholders now stop pulsing under `prefers-reduced-motion` — they
+  were the only animation such a reader would have seen on those pages.
+
+Known and not fixed: recharts resolves `react-is@16` for its `<Cell>` lookup, which cannot recognise
+a React 19 element. Nothing here uses `<Cell>`, so it is inert — but it is a trap for whoever adds
+per-bar colouring. pnpm 11 no longer reads `pnpm.overrides` from `package.json`, so pinning it needs
+a `pnpm-workspace.yaml` this repo does not have, which is more machinery than the risk earns today.
+
 ## Success Criteria
 
 - [x] The gate was explicitly passed, not assumed — asked at the end of phase 4, opened by the
@@ -189,13 +253,13 @@ buttons signalled their state by colour alone.
       all-text results, a single row, an empty result, booleans, nulls, a column with one text value
       in it, the numeric-as-string case that would otherwise mis-read every `count(*)`, hex and octal
       literals, and the all-zero scale that used to draw upside down.
-- [x] No new dependency was added; the three candidates' versions, publish dates and sizes are
-      recorded above and in the commit.
+- [~] No new dependency was added — true until 2026-09-15, when recharts was adopted deliberately
+      for one charting library across the app. See the superseding section above for what it cost.
 - [x] The chart code is absent from the route's initial chunks — measured, not assumed: the chart
       chunk is 12 KB after the rebuild, appears in no route's `firstLoadChunkPaths`, and is
       referenced only by the sql route's loadable manifest. The route's first load moved 738 KB to 750 KB, which is the tab
       strip in `results.tsx`, not the chart.
-- [x] `pnpm test` (372), `pnpm typecheck`, `pnpm lint`, `pnpm build` green.
+- [x] `pnpm test` (371 after `labelStride` was retired), `pnpm typecheck`, `pnpm lint`, `pnpm build` green.
 - [ ] **Needs the app.** The tab appears with a result, the chart renders, and the pickers change it.
 
 ## Risk Assessment

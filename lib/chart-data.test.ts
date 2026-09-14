@@ -11,7 +11,6 @@ import {
   scaleOf,
   cumulative,
   labelFormatter,
-  labelStride,
 } from "./chart-data.ts";
 
 test("numbers that arrive as strings are still numbers", () => {
@@ -235,14 +234,6 @@ test("buildPoints uses the formatter the column chose", () => {
   const rows = [{ at: "2026-09-01T04:00:00Z", n: 3 }];
   const { points } = buildPoints(rows, "at", "n", labelFormatter(rows, "at"));
   assert.equal(points[0].label, "Sep 1 2026 04:00");
-});
-
-test("label stride thins out instead of overlapping", () => {
-  assert.equal(labelStride(7, 12), 1, "everything fits, so name everything");
-  assert.equal(labelStride(24, 12), 2);
-  assert.equal(labelStride(200, 12), 17);
-  assert.equal(labelStride(0, 12), 1, "never zero: it is a modulus");
-  assert.equal(labelStride(10, 0), 10, "no room for labels still has to divide");
 });
 
 test("a timestamp with no zone keeps the clock the database wrote", () => {
