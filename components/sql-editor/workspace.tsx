@@ -116,7 +116,9 @@ export function SqlWorkspace({
         </div>
 
         <div className="min-h-0 flex-1">
-          <Results result={result} pending={running} />
+          {/* Keyed like the editor: which view is open, and which columns are charted, belong to
+              the tab that ran the statement rather than following the user to the next one. */}
+          <Results key={activeId} result={result} pending={running} />
         </div>
       </div>
 

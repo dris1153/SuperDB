@@ -1,10 +1,18 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import dynamic from "next/dynamic";
+import { memo, useMemo, useState } from "react";
 import { DataGrid, type Column } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
 import type { RunResult, Row } from "@/lib/sql-editor-actions";
 import { cn } from "@/lib/utils";
+
+// Loaded when the tab is opened. Small — it is hand-rolled SVG, not a charting library — but this
+// route already carries CodeMirror, and nothing that is never opened should be in its first load.
+const Chart = dynamic(() => import("./chart").then((m) => m.Chart), {
+  ssr: false,
+  loading: () => <div className="h-full animate-pulse bg-muted/20" />,
+});
 
 /**
  * What came back: rows, nothing, or why not.
@@ -24,9 +32,33 @@ export const Results = memo(function Results({
 }) {
   const rows = result?.status === "rows" ? result.rows : null;
   const columns = useMemo(() => columnsOf(rows), [rows]);
+  const [tab, setTab] = useState<"results" | "chart">("results");
+
+  // Only a result with rows has anything to chart, so the tabs appear with one rather than sitting
+  // there inviting a click that can only say no.
+  const charted = tab === "chart" && rows !== null && rows.length > 0;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {rows !== null && rows.length > 0 ? (
+        <div className="flex shrink-0 items-stretch border-b border-border text-xs">
+          {(["results", "chart"] as const).map((option) => (
+            <button
+              key={option}
+              onClick={() => setTab(option)}
+              className={cn(
+                "px-3 py-1.5 capitalize",
+                tab === option
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-subtle hover:text-foreground",
+              )}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className={cn("min-h-0 flex-1 transition-opacity", pending && "opacity-50")}>
         {result?.status === "error" ? (
           <Panel>
@@ -50,6 +82,8 @@ export const Results = memo(function Results({
           // A successful write looks exactly like this: the endpoint reports no affected-row count,
           // so "nothing came back" is all that can honestly be said.
           <Panel>Success. No rows returned.</Panel>
+        ) : charted ? (
+          <Chart rows={rows} />
         ) : (
           <DataGrid
             className="superdb-grid rdg-dark h-full"

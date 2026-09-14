@@ -24,7 +24,7 @@ Design, the measured API behaviour it rests on, and what cannot be matched:
 | 2 | [Saved queries](phase-02-saved-queries.md) | in-progress | ~1d | 1 |
 | 3 | [Query tabs](phase-03-query-tabs.md) | in-progress | ~1d | 1, 2 |
 | 4 | [Templates and running queries](phase-04-templates-and-running.md) | in-progress | ~4h | 1 |
-| 5 | [Chart](phase-05-chart.md) | pending | ~1d | 1 |
+| 5 | [Chart](phase-05-chart.md) | in-progress | ~1d | 1 |
 
 Phase 1 is the whole value; the rest is chrome around it. Phase 5 is P3 and **gated — ask before
 building it.**
