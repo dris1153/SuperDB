@@ -209,6 +209,44 @@ Left alone, deliberately: a result set with duplicate column names loses one (th
 JSON objects, so the keys collapse before this code sees them, and it returns no column metadata to
 work from).
 
+## The editor looked wrong, and Monaco was not the reason
+
+Raised 2026-09-14: the editor did not fit the app. It had a white stripe down the left and a pale
+blue bar across the active line, and the question asked was whether to switch to Monaco.
+
+**It was never the choice of editor.** `editor.tsx` passed CodeMirror a theme that set only height
+and font, and no `{ dark: true }`. Without that flag CodeMirror applies its `&light` rules, which are
+in `@codemirror/view` verbatim:
+
+```
+.cm-gutters       backgroundColor: "#f5f5f5"
+&light .cm-activeLine  backgroundColor: "#cceeff44"
+```
+
+On `--background: #121212` that is exactly what was on screen. `basicSetup` also ships
+`defaultHighlightStyle`, which is tuned for a light background, so the syntax colours were off for
+the same reason.
+
+Monaco was re-checked rather than waved away, 2026-09-14: `monaco-editor` 0.56.0, published
+2026-07-20, **97.9 MB unpacked**, plus `@monaco-editor/react` 4.7.0 which loads Monaco from a CDN by
+default — this app has no runtime CDN dependency — and needs web workers wired into Next. It also
+ships `vs-dark`, which is *a* dark theme but not this app's palette, so it would have needed a custom
+theme too. Switching would have paid a large dependency for a default that still had to be replaced,
+and would have meant rebuilding the error underlining, the shortcut, the placeholder and the dynamic
+import. Declined again, on numbers.
+
+What was built instead is `components/sql-editor/editor-theme.ts`: surfaces mapped to the app's own
+tokens (`--card`, `--border`, `--muted`, `--primary`, `--color-subtle`) and a `HighlightStyle` whose
+colours were read out of the installed `github-dark-default` — the theme `lib/highlight.ts` already
+gives Shiki — so SQL reads the same here as in the table editor's Definition tab. The highlighting
+goes *before* `basicSetup`, because in CodeMirror the earlier extension wins.
+
+`@codemirror/language` 6.12.4 and `@lezer/highlight` 1.2.3 are now declared rather than borrowed:
+both were already present as transitive dependencies, and pnpm will not resolve those.
+
+Measured after: the editor chunk is still 424 KB and still absent from every route's first load; the
+route's first load is unchanged. **Not verified by eye — that needs the app.**
+
 ## Risk Assessment
 
 **A destructive statement with no undo.** This is the feature, not a defect. The mitigations are the

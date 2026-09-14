@@ -17,6 +17,9 @@ importers:
       '@codemirror/lang-sql':
         specifier: ^6.10.0
         version: 6.10.0
+      '@codemirror/language':
+        specifier: ^6.12.4
+        version: 6.12.4
       '@codemirror/lint':
         specifier: ^6.9.7
         version: 6.9.7
@@ -26,6 +29,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.11
         version: 6.43.11
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
       '@supabase/ssr':
         specifier: ^0.12.4
         version: 0.12.4(@supabase/supabase-js@2.112.3)

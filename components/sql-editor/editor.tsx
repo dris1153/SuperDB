@@ -7,6 +7,7 @@ import { setDiagnostics } from "@codemirror/lint";
 import { PostgreSQL, sql } from "@codemirror/lang-sql";
 import { basicSetup } from "codemirror";
 import type { SqlError } from "@/lib/sql-error";
+import { editorHighlighting, editorTheme } from "./editor-theme";
 
 /**
  * CodeMirror 6, mounted once and driven by effects.
@@ -56,16 +57,16 @@ export default function SqlCodeEditor({
               { key: "Mod-Enter", preventDefault: true, run: () => (latest.current.onRun(), true) },
             ]),
           ),
+          // Before basicSetup, which ships defaultHighlightStyle for a light background: in
+          // CodeMirror the earlier extension wins.
+          editorHighlighting,
           basicSetup,
           sql({ dialect: PostgreSQL }),
           placeholder("Write SQL here. Ctrl/Cmd + Enter runs it."),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) latest.current.onChange(update.state.doc.toString());
           }),
-          EditorView.theme({
-            "&": { height: "100%", fontSize: "0.8125rem" },
-            ".cm-scroller": { fontFamily: "var(--font-mono, ui-monospace, monospace)" },
-          }),
+          editorTheme,
         ],
       }),
     });
