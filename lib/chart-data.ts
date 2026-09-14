@@ -104,7 +104,13 @@ export function chartProblem(rows: Row[]): string | null {
  * Rows whose value is not a number are dropped rather than treated as zero: a gap is honest, a zero
  * is a measurement nobody took. The count of those is returned so the UI can say so.
  */
-export function buildPoints(rows: Row[], x: string, y: string): { points: Point[]; skipped: number } {
+export function buildPoints(
+  rows: Row[],
+  x: string,
+  y: string,
+  /** Chosen once for the whole column by `labelFormatter`; defaults to plain text. */
+  format: (value: unknown) => string = labelOf,
+): { points: Point[]; skipped: number } {
   const points: Point[] = [];
   let skipped = 0;
 
@@ -114,7 +120,7 @@ export function buildPoints(rows: Row[], x: string, y: string): { points: Point[
       skipped += 1;
       continue;
     }
-    points.push({ label: labelOf(row[x]), value });
+    points.push({ label: format(row[x]), value });
   }
 
   return { points, skipped };
@@ -149,3 +155,95 @@ export function scaleOf(points: Point[]): { top: number; bottom: number; ticks: 
   const middle = (top + bottom) / 2;
   return { top, bottom, ticks: [...new Set([top, middle, bottom])] };
 }
+
+/**
+ * A running total. The chart offers it because the original does, and the legend says so when it is
+ * on — a cumulative series is a different measurement from the one the query returned, and reading
+ * one as the other is the failure this whole module exists to avoid.
+ */
+export function cumulative(points: Point[]): Point[] {
+  let total = 0;
+  return points.map((point) => {
+    total += point.value;
+    return { ...point, value: total };
+  });
+}
+
+/**
+ * How the category axis is written, decided **once for the whole column**.
+ *
+ * A timestamp column stringifies to `2026-09-01T04:00:00+00:00` — twenty-five characters that have
+ * to be rotated and truncated to fit, which is most of what made this chart hard to read. Formatted
+ * it is `Sep 1 2026 04:00`, which sits flat under the bar.
+ *
+ * Per column, never per value: one unparseable value among timestamps means the column is not a
+ * time series, and an axis that is half dates and half raw strings is an axis that lies about what
+ * it is showing.
+ */
+export function labelFormatter(rows: Row[], column: string): (value: unknown) => string {
+  return isTimestampColumn(rows, column) ? formatTimestamp : labelOf;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ]|$)/;
+const HAS_TIME = /^\d{4}-\d{2}-\d{2}[T ]/;
+const ZONED = /(Z|[+-]\d{2}(:?\d{2})?)$/i;
+
+/**
+ * A timestamp with no zone on it is a wall clock, and has to be read as one.
+ *
+ * Measured against the query endpoint 2026-09-14: `timestamptz` comes back as
+ * `2026-09-14 16:55:59.660151+00`, but `timestamp` and anything cast with `::text` come back as
+ * `2026-09-14 16:55:59.660151` with nothing on the end. `Date.parse` reads that second form in the
+ * *browser's* zone, and formatting the result back in UTC then moves it — seven hours, and a day,
+ * on the machine this was measured on. Stamping a Z on it keeps the clock the database wrote.
+ */
+const asUtc = (text: string) =>
+  !HAS_TIME.test(text) || ZONED.test(text) ? text : `${text.replace(" ", "T")}Z`;
+
+function isTimestampColumn(rows: Row[], column: string): boolean {
+  let found = 0;
+  for (const row of rows) {
+    const value = row[column];
+    if (value === null || value === undefined) continue;
+    // The shape check comes first: Date.parse accepts "12" and a pile of other things that are not
+    // timestamps, and a column of short numeric ids would otherwise become a date axis.
+    if (
+      typeof value !== "string" ||
+      !ISO_DATE.test(value.trim()) ||
+      !Number.isFinite(Date.parse(asUtc(value.trim())))
+    ) {
+      return false;
+    }
+    found += 1;
+  }
+  return found > 0;
+}
+
+/** UTC, like the running-queries panel: the API returns UTC and guessing a zone would be worse. */
+// en-US, not en-GB: the latter abbreviates September to "Sept", which is a character wider than
+// every other month and makes the axis jump.
+const TIMESTAMP = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+function formatTimestamp(value: unknown): string {
+  const parsed = typeof value === "string" ? Date.parse(asUtc(value.trim())) : NaN;
+  if (!Number.isFinite(parsed)) return labelOf(value);
+
+  const parts = Object.fromEntries(
+    TIMESTAMP.formatToParts(new Date(parsed)).map((part) => [part.type, part.value]),
+  );
+  return `${parts.month} ${parts.day} ${parts.year} ${parts.hour}:${parts.minute}`;
+}
+
+/**
+ * Draw every nth label, so they thin out instead of overlapping or being rotated into a fan. The
+ * points themselves are all still drawn — this only decides which ones are named.
+ */
+export const labelStride = (count: number, max: number) => Math.max(1, Math.ceil(count / Math.max(1, max)));

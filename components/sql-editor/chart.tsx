@@ -1,32 +1,36 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   buildPoints,
   chartProblem,
   columnsOf,
+  cumulative,
   defaultChoice,
+  labelFormatter,
   MAX_POINTS,
   numericColumns,
-  scaleOf,
-  type Point,
   type Row,
 } from "@/lib/chart-data";
+import { ChartOptions, type ChartToggles } from "./chart-options";
+import { ChartPlot } from "./chart-plot";
 import { cn } from "@/lib/utils";
 
 /**
- * The current result set, plotted.
+ * The current result set, plotted, with its options beside it.
  *
  * Hand-rolled SVG, following `components/stacked-bars.tsx`. The alternatives were checked against
  * the registry rather than reputation, 2026-09-14: recharts 3.10.1 is 7.4MB unpacked, chart.js
- * 4.5.1 is 6.2MB, uplot 1.6.32 is 545KB. Two chart types over an ad-hoc result is not worth any of
- * them on a route that an entire other plan exists to make faster — and none of them would do the
- * part that is actually hard, which is deciding what to plot. That lives in `lib/chart-data.ts`,
- * tested.
+ * 4.5.1 is 6.2MB, uplot 1.6.32 is 545KB. Rechecked when the design bar rose: a library would have
+ * replaced about sixty lines of geometry and none of the column inference, the options panel, the
+ * cumulative series or the timestamp axis — which is all of the actual work.
  *
  * Which columns were chosen is always visible and always overridable: a chart built on the wrong
  * column looks perfectly fine and means nothing.
  */
+const PLOT_HEIGHT = 240;
+const DEFAULT_TOGGLES: ChartToggles = { cumulative: true, labels: true, grid: true };
+
 export function Chart({ rows }: { rows: Row[] }) {
   // Everything below reasons about the rows that are actually drawn. Inferring over the whole result
   // and drawing a prefix of it disagrees in both directions: one text value in row 50,000 would take
@@ -41,17 +45,24 @@ export function Chart({ rows }: { rows: Row[] }) {
   const fallback = useMemo(() => defaultChoice(visible), [visible]);
 
   const [kind, setKind] = useState<"bar" | "line">("bar");
-  const [chosen, setChosen] = useState<{ x: string; y: string } | null>(null);
+  const [toggles, setToggles] = useState(DEFAULT_TOGGLES);
+  const [chosen, setChosen] = useState<{ columns: string; x: string; y: string } | null>(null);
 
-  // A choice naming a column this result does not have is dropped rather than carried between
-  // statements: the same tab runs one query after another, and they share no columns.
-  const x = chosen && columns.includes(chosen.x) ? chosen.x : (fallback.x ?? "");
-  const y = chosen && numeric.includes(chosen.y) ? chosen.y : (fallback.y ?? "");
+  // Tied to the columns it was made against, so it applies to this result and no other. Matching on
+  // the column names alone would let a choice from two statements ago reappear on a third that
+  // happens to select the same names.
+  const signature = columns.join("\u0000");
+  const mine = chosen?.columns === signature ? chosen : null;
+  const x = mine && columns.includes(mine.x) ? mine.x : (fallback.x ?? "");
+  const y = mine && numeric.includes(mine.y) ? mine.y : (fallback.y ?? "");
 
-  const { points, skipped } = useMemo(
-    () => (problem ? { points: [], skipped: 0 } : buildPoints(visible, x, y)),
-    [visible, x, y, problem],
-  );
+  const { points, skipped } = useMemo(() => {
+    if (problem) return { points: [], skipped: 0 };
+    const built = buildPoints(visible, x, y, labelFormatter(visible, x));
+    return toggles.cumulative ? { points: cumulative(built.points), skipped: built.skipped } : built;
+  }, [visible, x, y, problem, toggles.cumulative]);
+
+  const [plotRef, plotWidth] = useMeasuredWidth();
 
   if (problem) {
     return (
@@ -61,182 +72,111 @@ export function Chart({ rows }: { rows: Row[] }) {
     );
   }
 
+  // What the series actually is, said the same way in the legend and in the accessible name: a
+  // running total is a different measurement from the one the query returned, and over a truncated
+  // result it is a total of the part that was drawn.
+  const series =
+    y +
+    (toggles.cumulative ? (rows.length > MAX_POINTS ? " (cumulative, first rows)" : " (cumulative)") : "");
+
+  const summary = [
+    `${points.length} point${points.length === 1 ? "" : "s"}`,
+    rows.length > MAX_POINTS ? `first ${MAX_POINTS} of ${rows.length} rows` : null,
+    skipped > 0 ? `${skipped} row${skipped === 1 ? "" : "s"} without a number left out` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-1.5 text-[11px]">
-        <div className="flex overflow-hidden rounded-md border border-border">
-          {(["bar", "line"] as const).map((option) => (
-            <button
-              key={option}
-              onClick={() => setKind(option)}
-              className={cn(
-                "px-2 py-0.5 capitalize",
-                kind === option ? "bg-muted text-foreground" : "text-subtle hover:bg-muted/60",
-              )}
-            >
-              {option}
-            </button>
-          ))}
+    <div className="flex h-full min-h-0">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center gap-2 px-3 py-1.5 text-[11px]">
+          <div className="flex overflow-hidden rounded-md border border-border">
+            {(["bar", "line"] as const).map((option) => (
+              <button
+                key={option}
+                aria-pressed={kind === option}
+                onClick={() => setKind(option)}
+                className={cn(
+                  "px-2 py-0.5 capitalize",
+                  kind === option ? "bg-muted text-foreground" : "text-subtle hover:bg-muted/60",
+                )}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <Picker label="x" value={x} options={columns} onChange={(next) => setChosen({ x: next, y })} />
-        <Picker label="y" value={y} options={numeric} onChange={(next) => setChosen({ x, y: next })} />
+        <div ref={plotRef} className="min-h-0 flex-1 overflow-x-auto px-3">
+          {plotWidth > 0 ? (
+            // Nothing is drawn until the container has been measured: a guessed width paints a
+            // narrow chart and then jumps.
+            <ChartPlot
+              points={points}
+              kind={kind}
+              width={plotWidth}
+              height={PLOT_HEIGHT}
+              showLabels={toggles.labels}
+              showGrid={toggles.grid}
+              label={`${series} by ${x}`}
+            />
+          ) : null}
+        </div>
 
-        <span className="ml-auto text-subtle">
-          {points.length} point{points.length === 1 ? "" : "s"}
-          {skipped > 0 ? ` · ${skipped} row${skipped === 1 ? "" : "s"} without a number left out` : ""}
-          {rows.length > MAX_POINTS ? ` · first ${MAX_POINTS} of ${rows.length} rows` : ""}
-        </span>
-      </div>
-
-      <div className="min-h-0 flex-1 p-3">
-        {points.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-subtle">
-            Nothing in {y} is a number, so there is nothing to plot.
+        {points.length > 0 ? (
+          <div className="shrink-0 space-y-1 px-3 pb-2">
+            <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="size-2 rounded-[2px] bg-primary" aria-hidden />
+              {/* Said out loud while it is on: a running total is a different measurement from the
+                  one the query returned, and reading one as the other is the mistake this module
+                  exists to prevent. */}
+              {series}
+            </div>
+            <div className="flex justify-between font-mono text-[10px] text-subtle">
+              <span>{points[0].label}</span>
+              <span>{points.at(-1)?.label}</span>
+            </div>
           </div>
-        ) : (
-          <Plot points={points} kind={kind} label={`${y} by ${x}`} />
-        )}
+        ) : null}
       </div>
+
+      <ChartOptions
+        columns={columns}
+        numeric={numeric}
+        x={x}
+        y={y}
+        toggles={toggles}
+        summary={summary}
+        onPick={(axis, column) =>
+          setChosen(axis === "x" ? { columns: signature, x: column, y } : { columns: signature, x, y: column })
+        }
+        onFlip={() => setChosen({ columns: signature, x: y, y: x })}
+        onToggle={(key, value) => setToggles((current) => ({ ...current, [key]: value }))}
+      />
     </div>
   );
 }
 
-function Picker({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="flex items-center gap-1 text-subtle">
-      {label}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-border bg-transparent px-1.5 py-0.5 text-foreground"
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-const HEIGHT = 240;
-const PAD = { left: 56, right: 8, top: 8, bottom: 44 };
-
 /**
- * One SVG, sized in pixels rather than scaled by `preserveAspectRatio`, so the text on the axes does
- * not stretch with the container the way `stacked-bars.tsx` deliberately lets its bars.
+ * The plot is drawn in pixels, so it has to know how many it has.
  *
- * The vertical scale always includes zero. A bar chart whose baseline is not zero exaggerates every
- * difference on it, which is the oldest way to make a chart lie by accident.
+ * A callback ref rather than an effect: the measured element sits behind the not-chartable early
+ * return, so it mounts and unmounts under this component. An effect with an empty dependency list
+ * runs once, before that element exists, and never attaches — leaving the chart measuring zero and
+ * rendering nothing at all for a result that followed a non-chartable one in the same tab.
  */
-function Plot({ points, kind, label }: { points: Point[]; kind: "bar" | "line"; label: string }) {
-  const width = Math.max(320, PAD.left + PAD.right + points.length * (kind === "bar" ? 28 : 12));
-  const plotWidth = width - PAD.left - PAD.right;
-  const plotHeight = HEIGHT - PAD.top - PAD.bottom;
+function useMeasuredWidth() {
+  const [value, setValue] = useState(0);
 
-  // Scale and ticks come from lib/chart-data.ts, where they are tested: a scale can lie as quietly
-  // as an inference can, and an all-zero result used to put the baseline at the top of the frame.
-  const { top, bottom, ticks } = scaleOf(points);
-  const span = top - bottom;
+  const ref = useCallback((element: HTMLDivElement | null) => {
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => setValue(entry.contentRect.width));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
-  const yOf = (value: number) => PAD.top + ((top - value) / span) * plotHeight;
-  const slot = plotWidth / points.length;
-  const xOf = (index: number) => PAD.left + slot * (index + 0.5);
-
-  const zero = yOf(0);
-
-  // Every label would overlap past a few dozen bars; thinning keeps the axis readable and honest,
-  // since the points themselves are all still drawn.
-  const every = Math.ceil(points.length / 12);
-
-  return (
-    <div className="h-full overflow-x-auto">
-      <svg width={width} height={HEIGHT} role="img" aria-label={label} className="text-subtle">
-        {ticks.map((value, index) => (
-          <g key={index}>
-            <line
-              x1={PAD.left}
-              x2={width - PAD.right}
-              y1={yOf(value)}
-              y2={yOf(value)}
-              stroke="var(--border)"
-            />
-            <text x={PAD.left - 6} y={yOf(value) + 3} textAnchor="end" fontSize={10} fill="currentColor">
-              {format(value)}
-            </text>
-          </g>
-        ))}
-
-        {kind === "bar" ? (
-          points.map((point, index) => {
-            const height = Math.abs(yOf(point.value) - zero);
-            return (
-              <rect
-                key={index}
-                x={xOf(index) - slot * 0.3}
-                y={Math.min(yOf(point.value), zero)}
-                width={Math.max(1, slot * 0.6)}
-                height={Math.max(1, height)}
-                fill="var(--primary)"
-              >
-                <title>{`${point.label}: ${point.value}`}</title>
-              </rect>
-            );
-          })
-        ) : (
-          <>
-            <polyline
-              fill="none"
-              stroke="var(--primary)"
-              strokeWidth={1.5}
-              points={points.map((p, i) => `${xOf(i)},${yOf(p.value)}`).join(" ")}
-            />
-            {points.map((point, index) => (
-              <circle key={index} cx={xOf(index)} cy={yOf(point.value)} r={2} fill="var(--primary)">
-                <title>{`${point.label}: ${point.value}`}</title>
-              </circle>
-            ))}
-          </>
-        )}
-
-        {points.map((point, index) =>
-          index % every === 0 ? (
-            <text
-              key={index}
-              x={xOf(index)}
-              y={HEIGHT - PAD.bottom + 14}
-              fontSize={10}
-              fill="currentColor"
-              textAnchor="end"
-              transform={`rotate(-35 ${xOf(index)} ${HEIGHT - PAD.bottom + 14})`}
-            >
-              {point.label.length > 18 ? `${point.label.slice(0, 17)}…` : point.label}
-            </text>
-          ) : null,
-        )}
-      </svg>
-    </div>
-  );
+  // A tuple, not an object: a hook returning `{ ref, value }` reads to the lint rules as a ref being
+  // unwrapped during render.
+  return [ref, value] as const;
 }
-
-/**
- * Short, because an axis is not the place to read fifteen significant figures — but by significant
- * digits rather than decimal places, or a result of rates and ratios prints "0" three times beside
- * bars that are visibly different heights.
- */
-const format = (value: number) =>
-  Math.abs(value) >= 1000
-    ? value.toLocaleString(undefined, { notation: "compact" })
-    : value.toLocaleString(undefined, { maximumSignificantDigits: 4 });

@@ -124,6 +124,58 @@ with the grid by one; and `select *` over a join can return two columns of the s
 merges before any of this sees it. Neither is created here, and neither has a fix that is smaller
 than the problem.
 
+## The chart UI, rebuilt
+
+Raised 2026-09-14 against Supabase's own Chart tab. Three defects, all measurable:
+
+- The SVG width came from the point count — `max(320, 56 + 8 + 7 * 28)` is **320px for seven
+  points**, sitting in a pane a thousand pixels wide.
+- A timestamp column stringified to `2026-09-01T04:00:00+00:00`: twenty-five characters, truncated
+  to seventeen and rotated −35°, which was most of what made it unreadable.
+- No vertical grid, no legend, no range captions, and the controls in an eleven-pixel strip.
+
+Now: an options panel beside the plot (X Axis, Y Axis, Cumulative, Show labels, Show grid, Flip), a
+width measured with `ResizeObserver` that scrolls only when the points genuinely need more room, flat
+timestamp labels, grid on both axes, a legend, and the first and last label under the plot. The
+component split three ways to stay under the repo's 200-line rule.
+
+**Timestamps are formatted per column, never per value.** Every non-null value must match
+`^\d{4}-\d{2}-\d{2}` *and* parse. One value that does not, and the whole column stays text: an axis
+that is half dates and half raw strings lies about what it is showing.
+
+**Cumulative defaults on**, matching the original — and the legend *and* the accessible name both say
+so, because a running total is a different measurement from the one the query returned. Over a
+truncated result they say "(cumulative, first rows)": the last bar is the total of what was drawn,
+not a grand total.
+
+**Flip is offered only when the category column is numeric.** Swapping a text column onto the value
+axis leaves nothing to measure, so the control is disabled with that reason on it rather than
+failing when pressed.
+
+## Review findings on the rebuild
+
+Reviewed 2026-09-14. Two High, both invisible to the test suite, both fixed:
+
+- **The chart could render nothing at all, silently.** The width was measured by a `useEffect` with
+  an empty dependency list, but the element it measures sits behind the not-chartable early return.
+  Run a text-only query, open Chart, then run a chartable one in the same tab — `Results` is keyed by
+  editor tab, so the component never remounts, the effect never runs again, the width stays zero and
+  the pane stays empty. No chart, no message, no error. It is a callback ref now, attached and
+  detached with the element itself.
+- **Zone-less timestamps were shifted by the reader's clock.** Probed against the endpoint
+  2026-09-14: `timestamptz` returns `2026-09-14 16:55:59.660151+00`, but `timestamp` and anything
+  cast with `::text` return `2026-09-14 16:55:59.660151` with nothing on the end. `Date.parse` reads
+  that second form in the browser's zone, and formatting it back in UTC then moved it — measured
+  here, `16:55` rendered as `09:55`, and a midnight value moved to the previous day. Zone-less text
+  is now stamped UTC before parsing, with a test that fails in any zone but UTC without the fix.
+
+Also fixed: the padding was subtracted twice, so the plot left 24px empty on the right — the exact
+thing this rebuild set out to stop; the axis budgeted for full label lengths while drawing truncated
+ones, so a single long JSON label thinned a seven-point axis down to two; a column choice was
+shadowed rather than dropped and could reappear on a later result that selected the same names; a
+dead "nothing here is a number" branch that `numericColumns` makes unreachable; and the chart-type
+buttons signalled their state by colour alone.
+
 ## Success Criteria
 
 - [x] The gate was explicitly passed, not assumed — asked at the end of phase 4, opened by the
@@ -140,10 +192,10 @@ than the problem.
 - [x] No new dependency was added; the three candidates' versions, publish dates and sizes are
       recorded above and in the commit.
 - [x] The chart code is absent from the route's initial chunks — measured, not assumed: the chart
-      chunk is 8 KB, appears in no route's `firstLoadChunkPaths`, and is referenced only by the sql
-      route's loadable manifest. The route's first load moved 738 KB to 750 KB, which is the tab
+      chunk is 12 KB after the rebuild, appears in no route's `firstLoadChunkPaths`, and is
+      referenced only by the sql route's loadable manifest. The route's first load moved 738 KB to 750 KB, which is the tab
       strip in `results.tsx`, not the chart.
-- [x] `pnpm test` (359), `pnpm typecheck`, `pnpm lint`, `pnpm build` green.
+- [x] `pnpm test` (372), `pnpm typecheck`, `pnpm lint`, `pnpm build` green.
 - [ ] **Needs the app.** The tab appears with a result, the chart renders, and the pickers change it.
 
 ## Risk Assessment

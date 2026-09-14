@@ -9,6 +9,9 @@ import {
   numericColumns,
   numericValue,
   scaleOf,
+  cumulative,
+  labelFormatter,
+  labelStride,
 } from "./chart-data.ts";
 
 test("numbers that arrive as strings are still numbers", () => {
@@ -174,4 +177,105 @@ test("ticks never repeat a number", () => {
 
 test("an empty point list still yields a usable scale", () => {
   assert.deepEqual(scaleOf([]), { top: 1, bottom: 0, ticks: [1, 0.5, 0] });
+});
+
+test("cumulative adds up as it goes, and keeps the labels", () => {
+  const points = [
+    { label: "a", value: 2 },
+    { label: "b", value: 3 },
+    { label: "c", value: 5 },
+  ];
+  assert.deepEqual(cumulative(points), [
+    { label: "a", value: 2 },
+    { label: "b", value: 5 },
+    { label: "c", value: 10 },
+  ]);
+  assert.deepEqual(points[1], { label: "b", value: 3 }, "the input is not mutated");
+});
+
+test("cumulative handles negatives and an empty series", () => {
+  assert.deepEqual(
+    cumulative([{ label: "a", value: 5 }, { label: "b", value: -2 }]).map((p) => p.value),
+    [5, 3],
+  );
+  assert.deepEqual(cumulative([]), []);
+});
+
+test("a timestamp column is formatted flat, in UTC", () => {
+  const rows = [{ at: "2026-09-01T04:00:00+00:00" }, { at: "2026-06-05T15:35:00+00:00" }];
+  const format = labelFormatter(rows, "at");
+  assert.equal(format(rows[0].at), "Sep 1 2026 04:00");
+  assert.equal(format(rows[1].at), "Jun 5 2026 15:35");
+});
+
+test("a column with one non-timestamp in it is not a time axis", () => {
+  // Half dates and half raw strings is an axis that lies about what it is showing.
+  const rows = [{ at: "2026-09-01T04:00:00Z" }, { at: "unknown" }];
+  assert.equal(labelFormatter(rows, "at")(rows[0].at), "2026-09-01T04:00:00Z");
+});
+
+test("short numbers are not dates, whatever Date.parse thinks of them", () => {
+  // Date.parse("12") is a valid date in some engines. A column of ids is not a time series.
+  for (const value of ["12", "2026", "20260901", 1725163200]) {
+    const rows = [{ at: value }];
+    assert.equal(labelFormatter(rows, "at")(value), String(value), `for ${value}`);
+  }
+});
+
+test("a date with no time still formats", () => {
+  const rows = [{ d: "2026-09-01" }];
+  assert.equal(labelFormatter(rows, "d")(rows[0].d), "Sep 1 2026 00:00");
+});
+
+test("an all-null column is not a time axis", () => {
+  assert.equal(labelFormatter([{ at: null }], "at")(null), "null");
+});
+
+test("buildPoints uses the formatter the column chose", () => {
+  const rows = [{ at: "2026-09-01T04:00:00Z", n: 3 }];
+  const { points } = buildPoints(rows, "at", "n", labelFormatter(rows, "at"));
+  assert.equal(points[0].label, "Sep 1 2026 04:00");
+});
+
+test("label stride thins out instead of overlapping", () => {
+  assert.equal(labelStride(7, 12), 1, "everything fits, so name everything");
+  assert.equal(labelStride(24, 12), 2);
+  assert.equal(labelStride(200, 12), 17);
+  assert.equal(labelStride(0, 12), 1, "never zero: it is a modulus");
+  assert.equal(labelStride(10, 0), 10, "no room for labels still has to divide");
+});
+
+test("a timestamp with no zone keeps the clock the database wrote", () => {
+  // Measured 2026-09-14: `timestamp` and anything cast with ::text come back with nothing on the
+  // end, and Date.parse reads that in the browser's zone. This test fails in any zone but UTC
+  // without the fix, which is the point of it.
+  const rows = [{ at: "2026-09-14 16:55:59.660151" }];
+  assert.equal(labelFormatter(rows, "at")(rows[0].at), "Sep 14 2026 16:55");
+});
+
+test("the zoned shape the endpoint actually returns is read as written", () => {
+  // timestamptz comes back space-separated with a two-digit offset: `+00`, not `+00:00`.
+  const rows = [{ at: "2026-09-14 16:55:59.660151+00" }];
+  assert.equal(labelFormatter(rows, "at")(rows[0].at), "Sep 14 2026 16:55");
+});
+
+test("cumulative runs over the rows that were drawn, not the ones that were cut", () => {
+  // The UI composes them in this order, so the last bar is the total of the first MAX_POINTS rows.
+  const rows = Array.from({ length: MAX_POINTS + 10 }, (_, i) => ({ k: `r${i}`, v: 1 }));
+  const { points } = buildPoints(rows, "k", "v");
+  const running = cumulative(points);
+  assert.equal(running.length, MAX_POINTS);
+  assert.equal(running.at(-1)?.value, MAX_POINTS, "a partial total, not a grand total");
+});
+
+test("a running total that crosses zero still gets a scale containing zero", () => {
+  const running = cumulative([
+    { label: "a", value: -5 },
+    { label: "b", value: 2 },
+    { label: "c", value: 9 },
+  ]);
+  assert.deepEqual(running.map((p) => p.value), [-5, -3, 6]);
+  const { top, bottom } = scaleOf(running);
+  assert.equal(top, 6);
+  assert.equal(bottom, -5);
 });
