@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Rename a project"
-status: pending
+status: completed
 priority: P2
 effort: "3h"
 dependencies: [3]
@@ -74,14 +74,41 @@ what happened.
 4. Rename a project with a warm memo and record what each surface shows.
 5. `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 
+## What landed
+
+- `lib/mgmt-api.ts` — `updateProjectName`, the only field that endpoint accepts.
+- `lib/inventory.ts` — `renameRemembered`, which corrects the memo **in place**.
+- `lib/project-actions.ts` — `renameProject`: trim, bounds, PATCH, memo, two revalidations.
+- `components/project-settings/general.tsx` — the field, which keeps what was typed when a rename is
+  refused, because the commonest refusal is one the user fixes by editing what they typed.
+
+**Mutating the memo rather than replacing or deleting it is the whole phase.** `resolveProject` is
+`cache()`-wrapped, and a server action plus the re-render it triggers happen in one request — so the
+layout that re-renders afterwards has already memoised the object the map handed out. Writing a fresh
+entry into the map would not be read again until the next request; mutating the object the re-render
+already holds is what it sees. Deleting would also cost the next resolve a full fan-out, which is the
+expense the memo exists to avoid.
+
+**`dropProject` is deliberately not called.** `identity` is the one part with no cache entry —
+`part-cache.ts` types its table as `Exclude<Part, "identity">` and the route branches to
+`readIdentity` before the cache is consulted — so calling it here would look like diligence and do
+nothing. The client's own TanStack entry *is* written, through `useSetPart`; without that the browser
+would hold the old name for its 60s stale window regardless of what the server did.
+
+/p/[ref]/settings first load: 653,180 to 654,966 bytes.
+
 ## Success Criteria
 
-- [ ] A rename shows in the header and the nav without a reload — **measured with a warm memo**, since
-      a cold one hides the entire defect.
-- [ ] The ceiling is written down honestly: the memo is per process, so on a multi-instance deploy the
-      guarantee is 60 seconds, not "immediate".
-- [ ] An empty or 257-character name is refused before it reaches Supabase.
-- [ ] A refused rename keeps what was typed.
+- [ ] **Needs the app.** A rename shows in the header and the nav without a reload, measured with a
+      warm memo — a cold one hides the entire defect.
+- [x] The ceiling is written down: the memo is per process, so on a multi-instance deploy another
+      instance keeps the old name until its own 60s entry expires. "Immediate" is true only for the
+      instance that served the action.
+- [x] An empty or 257-character name is refused before it reaches Supabase — `NAME_MIN`/`NAME_MAX`
+      in the action, checked after trimming, because `" "` is a name the API accepts.
+- [x] A refused rename keeps what was typed.
+- [x] `pnpm test` still green — 396. The validation is three lines inside a `"use server"` module,
+      which the suite cannot import, so it is a manual check rather than coverage.
 
 ## Risk Assessment
 

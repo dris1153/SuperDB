@@ -127,6 +127,10 @@ export const listBranches = (t: string, ref: string) =>
   call<Branch[]>(t, `/v1/projects/${ref}/branches`);
 export const listMigrations = (t: string, ref: string) =>
   call<Migration[]>(t, `/v1/projects/${ref}/database/migrations`);
+/** The only field this endpoint accepts. Spec: `name` required, 1-256 characters. */
+export const updateProjectName = (t: string, ref: string, name: string) =>
+  call<Project>(t, `/v1/projects/${ref}`, { method: "PATCH", body: JSON.stringify({ name }) });
+
 /** Resuming a paused project. No request body — the ref is the whole request. */
 export const restoreProject = (t: string, ref: string) =>
   call<void>(t, `/v1/projects/${ref}/restore`, { method: "POST" });

@@ -116,6 +116,24 @@ const owners = (memo.__superdbOwners ??= new Map<
   { connectionId: string; project: Project; at: number }
 >());
 
+/**
+ * Corrects a remembered project's name after a rename, **in place**.
+ *
+ * Replacing the entry would not be enough, and deleting it would be worse. `resolveProject` is
+ * wrapped in React `cache()`, and a server action plus the re-render it triggers happen inside one
+ * request — so the layout that re-renders after the action has already memoised the object this memo
+ * handed out. Mutating that object is what the re-render sees; a fresh entry in the map is not,
+ * because nothing will read the map again until the next request.
+ *
+ * Deleting also costs the next resolve a full fan-out across every connection, which is the expense
+ * the memo exists to avoid.
+ */
+export async function renameRemembered(ref: string, name: string) {
+  const { user } = await requireUser();
+  const remembered = owners.get(`${user.id}:${ref}`);
+  if (remembered) remembered.project.name = name;
+}
+
 export const resolveProject = cache(async (ref: string) => {
   if (!isProjectRef(ref)) return null;
   const connections = await connectionsWithTokens();

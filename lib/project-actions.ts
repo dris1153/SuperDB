@@ -1,12 +1,53 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { resolveProject } from "./inventory";
-import { restoreProject } from "./mgmt-api";
+import { renameRemembered, resolveProject } from "./inventory";
+import { restoreProject, updateProjectName } from "./mgmt-api";
 import { dropProject } from "./part-cache";
 import { attempt } from "./safe";
 
 export type ResumeResult = { ok: true } | { ok: false; reason: string };
+export type RenameResult = { ok: true; name: string } | { ok: false; reason: string };
+
+/** The API's own bounds, and the app is not more permissive than they are. */
+const NAME_MIN = 1;
+const NAME_MAX = 256;
+
+/**
+ * Renaming a project.
+ *
+ * The call is one line. The rest of this function is the four places that hold the old name:
+ *
+ * - The `owners` memo in `inventory.ts`, which keeps the whole project body for a minute. It is
+ *   corrected in place — see the comment there for why replacing it would not work inside the same
+ *   request.
+ * - The nav, which renders from `p/[ref]/layout.tsx`. A bare `revalidatePath` invalidates the *page*;
+ *   reaching a layout and everything under it needs `type: "layout"`.
+ * - The board, which lists every project by name.
+ * - Not the part cache. `identity` is the one part with no reader and no cache entry —
+ *   `part-cache.ts` types its table as `Exclude<Part, "identity">` — so `dropProject` would be a
+ *   no-op here, and calling it would only look like diligence.
+ *
+ * Trimmed before the bounds are checked, because " " is a name the API accepts and nobody wants.
+ */
+export async function renameProject(projectRef: string, name: string): Promise<RenameResult> {
+  const trimmed = name.trim();
+  if (trimmed.length < NAME_MIN) return { ok: false, reason: "A project needs a name." };
+  if (trimmed.length > NAME_MAX) {
+    return { ok: false, reason: `That is longer than ${NAME_MAX} characters.` };
+  }
+
+  const found = await resolveProject(projectRef);
+  if (!found) return { ok: false, reason: "Project not found." };
+
+  const result = await attempt(() => updateProjectName(found.token, projectRef, trimmed));
+  if (!result.ok) return { ok: false, reason: result.reason };
+
+  await renameRemembered(projectRef, trimmed);
+  revalidatePath(`/p/${projectRef}`, "layout");
+  revalidatePath("/");
+  return { ok: true, name: trimmed };
+}
 
 /**
  * Resuming is not destructive — nothing is overwritten and no data is lost — so it goes through on
