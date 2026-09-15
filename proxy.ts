@@ -7,6 +7,18 @@ import { aalClaim, needsMfaChallenge } from "@/lib/mfa-gate";
 const PUBLIC = ["/login", "/signup", "/forgot-password", "/auth"];
 const SIGNED_OUT_ONLY = ["/login", "/signup", "/forgot-password"];
 
+/**
+ * The read endpoints, which must be refused with a status rather than a redirect.
+ *
+ * Matched exactly rather than by prefix: `/api/projectsfoo` is a different route, and a future one
+ * should not inherit this shape by accident.
+ */
+const isReadApi = (pathname: string) =>
+  pathname === "/api/projects" || pathname.startsWith("/api/projects/");
+
+const refuse = (status: number, reason: string) =>
+  NextResponse.json({ ok: false, reason }, { status, headers: { "Cache-Control": "no-store" } });
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -26,6 +38,11 @@ export async function proxy(request: NextRequest) {
   const isPublic = PUBLIC.some((p) => request.nextUrl.pathname.startsWith(p));
 
   if (!data.user && !isPublic) {
+    // An API answers with a status. A redirect hands `fetch` an HTML page — and because fetch
+    // follows redirects, the client sees 200 with HTML in it and reports an expired session as a
+    // JSON parse error. The handlers do their own `requireUser`; this only decides the shape.
+    if (isReadApi(request.nextUrl.pathname)) return refuse(401, "Not authenticated");
+
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -49,6 +66,10 @@ export async function proxy(request: NextRequest) {
       data: { session },
     } = await supabase.auth.getSession();
     if (needsMfaChallenge(data.user.factors, aalClaim(session?.access_token))) {
+      // Same reason as the sign-in branch, one gate later: `fetch` follows a redirect, so a client
+      // would receive the MFA page with a 200 on it and try to parse HTML as JSON.
+      if (isReadApi(request.nextUrl.pathname)) return refuse(403, "Verify your second factor first");
+
       const url = request.nextUrl.clone();
       url.pathname = "/mfa";
       url.search = "";

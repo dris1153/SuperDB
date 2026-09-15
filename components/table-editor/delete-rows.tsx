@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { IconTrash } from "@tabler/icons-react";
 import type { RowRecord } from "@/lib/table-rows";
 import type { ColumnInfo } from "@/lib/table-view";
@@ -9,6 +8,7 @@ import type { IncomingRef } from "@/lib/table-editor";
 import { countAffected, deleteImpact, deleteRows } from "@/lib/write-actions";
 import { Button } from "@/components/ui/button";
 import { WriteConfirm } from "./write-confirm";
+import { useRefreshTable } from "./use-refresh-table";
 
 /**
  * Deleting the selected rows.
@@ -33,7 +33,7 @@ export function DeleteRows({
   selected: RowRecord[];
   onDone: () => void;
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [open, setOpen] = useState(false);
   const [affected, setAffected] = useState<number | null>(null);
   const [impact, setImpact] = useState<IncomingRef[]>([]);
@@ -82,7 +82,7 @@ export function DeleteRows({
       }
       setOpen(false);
       onDone();
-      router.refresh();
+      await refresh();
     });
 
   return (

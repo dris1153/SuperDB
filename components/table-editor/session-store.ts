@@ -25,6 +25,15 @@ import { useCallback, useSyncExternalStore } from "react";
 const listeners = new Set<() => void>();
 const cache = new Map<string, { raw: string | null; value: unknown }>();
 
+/**
+ * Where values go when `sessionStorage` is unavailable — private browsing, blocked site data, some
+ * webviews. It used to be acceptable to drop those writes: the store held view preferences. It now
+ * holds the SQL editor's unsaved buffers, and silently dropping one means an editor that rolls back
+ * to nothing on the next tab switch, or a Run button that never enables. Memory-only lasts as long
+ * as the page rather than the browser tab, which is a degradation rather than a data loss.
+ */
+const memory = new Map<string, string>();
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {
@@ -32,14 +41,41 @@ function subscribe(listener: () => void) {
   };
 }
 
-function snapshot<T>(key: string, fallback: T, parse: (raw: string) => T): T {
-  let raw: string | null;
+/**
+ * For a view that depends on several keys at once and cannot be expressed as one `useSession` call.
+ * Exported so such a view shares this listener set rather than starting a second one — the reason
+ * this module exists is that `sessionStorage` notifies nobody in the tab that wrote it.
+ */
+export const subscribeSession = subscribe;
+
+/** A raw read, for the same case. Keeps every `sessionStorage` access in this module. */
+export function readSession(key: string): string | null {
   try {
-    raw = sessionStorage.getItem(key);
+    const stored = sessionStorage.getItem(key);
+    if (stored !== null) return stored;
   } catch {
-    // Private browsing and blocked site data throw on access; the fallback is the whole answer.
-    return fallback;
+    // Unavailable; the in-memory copy is all there is.
   }
+  return memory.get(key) ?? null;
+}
+
+/** Every stored key under a prefix, so a caller can sweep the ones nothing refers to any more. */
+export function sessionKeys(prefix: string): string[] {
+  const found = new Set<string>();
+  try {
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(prefix)) found.add(key);
+    }
+  } catch {
+    // Unavailable; the in-memory copy is all there is.
+  }
+  for (const key of memory.keys()) if (key.startsWith(prefix)) found.add(key);
+  return [...found];
+}
+
+function snapshot<T>(key: string, fallback: T, parse: (raw: string) => T): T {
+  const raw = readSession(key);
 
   const hit = cache.get(key);
   if (hit && hit.raw === raw) return hit.value as T;
@@ -62,11 +98,24 @@ export function useSession<T>(key: string, fallback: T, parse: (raw: string) => 
   return useSyncExternalStore(subscribe, get, getServer);
 }
 
+/** Removing a key is a write like any other: the same cache invalidation, the same notification. */
+export function clearSession(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Same as a failed write: the store is simply not available.
+  }
+  memory.delete(key);
+  cache.delete(key);
+  for (const listener of listeners) listener();
+}
+
 export function writeSession(key: string, raw: string) {
+  memory.set(key, raw);
   try {
     sessionStorage.setItem(key, raw);
   } catch {
-    // Session-only is an acceptable degradation for a view preference.
+    // Quota, or no storage at all. The in-memory copy above is what readers will find.
   }
   // Notify regardless: the in-memory cache is invalidated by the raw string changing, and a failed
   // write should still leave every subscriber agreeing on what the store now says.

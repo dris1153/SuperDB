@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { alterColumn, dropColumn } from "@/lib/ddl-statements";
 import type { ColumnChange } from "@/lib/ddl-build";
 import {
@@ -21,6 +20,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ColumnEditFields, DropWarning } from "./column-edit-fields";
+import { useRefreshTable } from "./use-refresh-table";
 import { DdlConfirm } from "./ddl-confirm";
 
 /**
@@ -49,7 +49,7 @@ export function ColumnEditSheet({
   table: string;
   columnCount: number;
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [notNull, setNotNull] = useState(false);
@@ -125,7 +125,7 @@ export function ColumnEditSheet({
         }
         setMode(null);
         onClose();
-        router.refresh();
+        refresh();
       } catch {
         // The action rejected rather than answering — a dropped connection, a redeployed server.
         // The statement may already have run, and on a path with no undo the wrong thing to imply

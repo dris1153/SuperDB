@@ -41,12 +41,26 @@ export class MgmtError extends Error {
   }
 }
 
+/**
+ * Set `SUPERDB_TIMING=1` to log how long each upstream call takes.
+ *
+ * Every Management API request in the app goes through `call()`, so this is the one place that can
+ * answer "which call is the page waiting for" without guessing. Off by default: it writes a line per
+ * request, and the path can carry a project ref.
+ */
+const TIMING = process.env.SUPERDB_TIMING === "1";
+
 async function call<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+  const started = TIMING ? performance.now() : 0;
   const res = await fetch(BASE + path, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...init?.headers },
     cache: "no-store",
   });
+  if (TIMING) {
+    // Before the body is read, because that is the wait the page is blocked on.
+    console.log(`[timing] ${Math.round(performance.now() - started)}ms ${res.status} ${path.split("?")[0]}`);
+  }
   if (!res.ok) {
     // The token lives in a header, so the request text is safe to surface.
     //
@@ -78,7 +92,17 @@ const SERVICES = ["auth", "db", "pooler", "realtime", "rest", "storage"] as cons
 export const getHealth = (t: string, ref: string) =>
   call<ServiceHealth[]>(t, `/v1/projects/${ref}/health?services=${SERVICES.join(",")}`);
 
-/** Read-only SQL. The endpoint rejects unqualified entity references, so schema-qualify everything. */
+/**
+ * Read-only SQL. Runs as `supabase_read_only_user`, which holds `rolbypassrls`, so results are not
+ * RLS-filtered.
+ *
+ * Every query this repo *builds* schema-qualifies its references, and should keep doing so: the
+ * schema is chosen by the caller, and resolving it through a search path would make the target
+ * depend on a role's configuration. But the endpoint does not require it — measured 2026-09-13 with
+ * scripts/probe-query-errors.mjs, `search_path` here is `"$user", public`, and an unqualified
+ * reference to a public table answers 201. That matters because the SQL editor sends whatever the
+ * user typed through this endpoint first.
+ */
 export const readOnlyQuery = <T = Record<string, unknown>>(t: string, ref: string, query: string) =>
   call<T[]>(t, `/v1/projects/${ref}/database/query/read-only`, {
     method: "POST",
@@ -103,6 +127,26 @@ export const listBranches = (t: string, ref: string) =>
   call<Branch[]>(t, `/v1/projects/${ref}/branches`);
 export const listMigrations = (t: string, ref: string) =>
   call<Migration[]>(t, `/v1/projects/${ref}/database/migrations`);
+/**
+ * Sets the project's database password. **The one call in this app that carries a secret in its
+ * request body** — everywhere else the vault hands this server ciphertext it cannot read.
+ *
+ * Safe here by structure rather than by intent, and worth knowing before changing any of it: the
+ * error thrown below is built from the URL path and the *response* body, never the request; the
+ * `SUPERDB_TIMING` line logs milliseconds, status and path; and this repo has no `middleware.ts` or
+ * `instrumentation.ts`, so there is no `onRequestError` and no proxy-layer body logging. Adding
+ * either re-opens the question.
+ */
+export const updateDatabasePassword = (t: string, ref: string, password: string) =>
+  call<void>(t, `/v1/projects/${ref}/database/password`, {
+    method: "PATCH",
+    body: JSON.stringify({ password }),
+  });
+
+/** The only field this endpoint accepts. Spec: `name` required, 1-256 characters. */
+export const updateProjectName = (t: string, ref: string, name: string) =>
+  call<Project>(t, `/v1/projects/${ref}`, { method: "PATCH", body: JSON.stringify({ name }) });
+
 /** Resuming a paused project. No request body — the ref is the whole request. */
 export const restoreProject = (t: string, ref: string) =>
   call<void>(t, `/v1/projects/${ref}/restore`, { method: "POST" });

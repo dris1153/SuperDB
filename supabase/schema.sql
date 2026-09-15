@@ -235,8 +235,9 @@ revoke all on public.project_order from anon;
 -- project_order: the project itself lives in Supabase, not here.
 --
 -- vault_blob is written by the browser and is opaque to this database and to the server — same scheme
--- as connection_secrets. There is deliberately no check constraint and no column describing what is
--- inside: nothing here can read it, and a comment claiming otherwise would be unverifiable.
+-- as connection_secrets. No column describes what is inside: nothing here can read it, and a comment
+-- claiming otherwise would be unverifiable. The one check below bounds its *length*, which is the
+-- only property this database can know about it.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.project_secrets (
@@ -248,6 +249,14 @@ create table if not exists public.project_secrets (
   primary key (user_id, project_ref)
 );
 
+-- The length check lives here rather than only in saveProjectSecret, for the reason spelled out on
+-- saved_queries below: the browser holds a session and the anon key, so an insert can reach this
+-- table without passing through the app's own code. `revoke all from anon` does not cover it — a
+-- signed-in browser arrives as `authenticated`, which is the role the policy admits.
+alter table public.project_secrets drop constraint if exists project_secrets_blob_len;
+alter table public.project_secrets
+  add constraint project_secrets_blob_len check (char_length(vault_blob) <= 8000);
+
 alter table public.project_secrets enable row level security;
 
 drop policy if exists "own project secrets" on public.project_secrets;
@@ -257,6 +266,61 @@ create policy "own project secrets" on public.project_secrets
   with check (user_id = auth.uid());
 
 revoke all on public.project_secrets from anon;
+
+-- ---------------------------------------------------------------------------
+-- Saved SQL editor queries. Keyed by ref like the two tables above, but with a surrogate id: a
+-- query is renameable, and a name is not a key.
+--
+-- No unique constraint on (user_id, project_ref, name). Two queries may share a name, and adding
+-- one would turn a rename into a failure case for no benefit.
+--
+-- The length checks live here rather than only in the action. The browser holds a session and the
+-- anon key, so an insert can reach this table without passing through the app's own code — a cap
+-- that only exists in TypeScript is not a cap.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.saved_queries (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  project_ref  text not null,
+  name         text not null constraint saved_queries_name_len check (char_length(name) between 1 and 120),
+  sql          text not null constraint saved_queries_sql_len check (char_length(sql) <= 100000),
+  favorite     boolean not null default false,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+alter table public.saved_queries enable row level security;
+
+drop policy if exists "own saved queries" on public.saved_queries;
+create policy "own saved queries" on public.saved_queries
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+revoke all on public.saved_queries from anon;
+
+-- What the sidebar asks for: this user's queries for one project, most recently changed first.
+create index if not exists saved_queries_by_project
+  on public.saved_queries (user_id, project_ref, updated_at desc);
+
+-- Converge the checks onto a table that already exists. `create table if not exists` above adds
+-- nothing to one that was created earlier — including from an earlier draft of this block, which
+-- had no constraints at all — so without these three statements the caps would live only in
+-- TypeScript on exactly the databases most likely to be in use.
+alter table public.saved_queries drop constraint if exists saved_queries_name_len;
+alter table public.saved_queries
+  add constraint saved_queries_name_len check (char_length(name) between 1 and 120);
+
+alter table public.saved_queries drop constraint if exists saved_queries_sql_len;
+alter table public.saved_queries
+  add constraint saved_queries_sql_len check (char_length(sql) <= 100000);
+
+-- A ref is twenty lowercase letters; anything else names no project and would leave a row nothing
+-- can ever match again. project_order and project_secrets predate this and do without it.
+alter table public.saved_queries drop constraint if exists saved_queries_ref_shape;
+alter table public.saved_queries
+  add constraint saved_queries_ref_shape check (project_ref ~ '^[a-z]{20}$');
 
 -- Converge an existing table: 'wrote' records a change made to a user's own database through the
 -- table editor. The constraint is unnamed in the CREATE above, so Postgres called it this.

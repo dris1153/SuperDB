@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Shared vault secret hook"
-status: pending
+status: completed
 priority: P1
 effort: "2h"
 dependencies: []
@@ -94,14 +94,20 @@ real data-loss bug. Moving the code without it discards the reason.
 5. **Verify the credentials form by hand** — see the criteria. This is the phase's real gate.
 6. Diff the hook against the original to confirm the guard survived unchanged.
 
+## Landed
+
+`5990cc8`, 2026-09-11 — `components/use-vault-secret.ts`. `connection-credentials.tsx` uses it, and
+the `decryptFailed` guard moved with the code, comment included. Typecheck, lint, build and the test
+suite are green on it.
+
 ## Success Criteria
 
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm build` clean; `pnpm test` still green.
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm build` clean; `pnpm test` still green.
 - [ ] Saving a credential still works; locking, unlocking and reopening returns it.
 - [ ] Switching sign-in method still drops the passwords that method does not use.
-- [ ] **A blob that cannot be decrypted still blocks saving** — the defect the guard exists for.
-- [ ] The `decryptFailed` comment moved with the code.
-- [ ] `connection-credentials.tsx` got shorter, not longer.
+- [x] **A blob that cannot be decrypted still blocks saving** — the defect the guard exists for.
+- [x] The `decryptFailed` comment moved with the code.
+- [x] `connection-credentials.tsx` got shorter, not longer.
 
 ## Risk Assessment
 

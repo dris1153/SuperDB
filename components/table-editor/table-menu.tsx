@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { IconCopy, IconDots, IconFileCode, IconPlus, IconTrash } from "@tabler/icons-react";
 import { dropTable } from "@/lib/ddl-statements";
 import { dropTable as dropTableAction } from "@/lib/ddl-actions";
@@ -15,6 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AddColumnSheet } from "./add-column-sheet";
+import { useRefreshTable } from "./use-refresh-table";
+import { useTableUrl } from "./url";
 import { DdlConfirm } from "./ddl-confirm";
 
 const copy = (text: string) => navigator.clipboard?.writeText(text).catch(() => {});
@@ -39,7 +40,8 @@ export function TableMenu({
   projectName: string;
   onViewDefinition: () => void;
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
+  const { set } = useTableUrl();
   const [adding, setAdding] = useState(false);
   const [dropping, setDropping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +59,11 @@ export function TableMenu({
           return;
         }
         setDropping(false);
-        router.refresh();
+        // The URL still names the table that was just dropped; refetching on it would ask for a
+        // relation that no longer exists. Clearing it first sends the editor to the schema's first
+        // table, which is where the sidebar already points.
+        set({ table: null, page: "1", sort: null, filter: [], q: null });
+        refresh();
       } catch {
         setError("The request failed before it answered. Reload and check the table list.");
       }

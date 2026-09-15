@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import type { RenderEditCellProps, RowsChangeData } from "react-data-grid";
 import type { RowRecord } from "@/lib/table-rows";
 import type { ColumnInfo } from "@/lib/table-view";
 import { countAffected, updateRow } from "@/lib/write-actions";
 import { isBoolColumn, parseValue, toText } from "@/lib/cell-value";
 import { ValueInput } from "./value-input";
+import { useRefreshTable } from "./use-refresh-table";
 import { WriteConfirm } from "./write-confirm";
 
 /**
@@ -111,7 +111,7 @@ export function CellEditDialog({
   /** Ran after a write lands, for a caller holding a copy of the row that is now stale. */
   onSaved?: () => void;
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [text, setText] = useState("");
   const [affected, setAffected] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -158,7 +158,7 @@ export function CellEditDialog({
       }
       onClose();
       onSaved?.();
-      router.refresh();
+      await refresh();
     });
 
   return (

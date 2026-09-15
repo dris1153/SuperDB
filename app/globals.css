@@ -208,6 +208,85 @@
   }
 }
 
+/*
+ * The loading placeholder's surface: a band of the border colour sweeping across the muted ground.
+ *
+ * The gradient is three times the element's width, so at both ends of the animation the band sits
+ * entirely off the element — which is what makes the loop invisible. A 200% sweep parks it on an
+ * edge and flicks back, and that flick is the thing that reads as cheap on a dark ground.
+ *
+ * `transparent` rather than a second copy of the ground colour: the stops composite over
+ * `background-color`, so a caller can tint the base without the band going out of step with it.
+ *
+ * The reduced-motion guard lives here rather than on every call site. It used to be a
+ * `motion-reduce:animate-none` class that four placeholders had simply forgotten.
+ */
+@utility skeleton {
+  background-color: var(--muted);
+  background-image: linear-gradient(90deg, transparent 40%, var(--border) 50%, transparent 60%);
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-sweep 1.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/*
+ * The same sweep over ruled rows, for the placeholders that stand in for a grid.
+ *
+ * One element rather than N: the stripes are a repeating gradient, so the placeholder fills whatever
+ * height it is given without counting rows against a viewport nobody has measured yet. `--row` is
+ * set by the caller from the grid's own row height, so the rules land where the real rows will.
+ *
+ * Two background layers, and the keyframe pins the second: animating `background-position` alone
+ * would drag the stripes along with the band.
+ */
+@utility skeleton-rows {
+  --row: 36px;
+  background-image:
+    linear-gradient(90deg, transparent 40%, var(--border) 50%, transparent 60%),
+    repeating-linear-gradient(
+      to bottom,
+      var(--muted) 0,
+      var(--muted) calc(var(--row) - 1px),
+      var(--border) calc(var(--row) - 1px),
+      var(--border) var(--row)
+    );
+  background-size:
+    300% 100%,
+    100% 100%;
+  background-repeat: no-repeat, repeat;
+  animation: skeleton-sweep-rows 1.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@keyframes skeleton-sweep-rows {
+  from {
+    background-position:
+      100% 0,
+      0 0;
+  }
+  to {
+    background-position:
+      0% 0,
+      0 0;
+  }
+}
+
 /* Arrow buttons drive the usage carousel; the bar itself would only crowd the cards. Scrolling by
    trackpad or keyboard still works — this hides the indicator, not the behaviour. */
 @utility scrollbar-none {

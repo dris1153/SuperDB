@@ -35,7 +35,7 @@ import {
   PENDING_FRAMEWORKS,
   frameworkFor,
 } from "@/lib/framework-content";
-import { Copyable, Step, StepFiles } from "./connect-primitives";
+import { Copyable, Step, StepFiles, StepSkeleton } from "./connect-primitives";
 import {
   Select,
   SelectContent,
@@ -236,7 +236,7 @@ export function FrameworkPanel({ projectRef }: { projectRef: string }) {
         {keys?.blocked ? (
           <p className="text-sm text-subtle">{keys.reason}</p>
         ) : guide === null ? (
-          <div className="h-40 animate-pulse rounded-md border border-border bg-card/50" />
+          <StepSkeleton steps={3} />
         ) : (
           <div
             className={`space-y-6 transition-opacity ${pending ? "opacity-50" : ""}`}

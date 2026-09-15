@@ -1,5 +1,6 @@
 import { Copyable, CodeBlock } from "@/components/connect-primitives";
 import { Empty } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * The synthesised `CREATE TABLE`, highlighted on the server like every other snippet in this app.
@@ -11,16 +12,35 @@ export function Definition({
   ddl,
   html,
   complete,
+  pending,
+  reason,
 }: {
   ddl: string | null;
   html: string | null;
   /** False when this shape cannot be fully reconstructed from the catalog. */
   complete: boolean;
+  /** Still being read. Without this, a wait was reported as "nothing could be reconstructed". */
+  pending: boolean;
+  /** Why it could not be read, when that is why there is nothing here. */
+  reason: string | null;
 }) {
+  if (pending) {
+    return (
+      <div className="min-h-0 flex-1 space-y-2 overflow-hidden p-4">
+        {["w-72", "w-96", "w-64", "w-80", "w-56", "w-72", "w-40"].map((width) => (
+          <Skeleton key={width} className={`h-4 ${width}`} />
+        ))}
+      </div>
+    );
+  }
+
   if (!ddl) {
     return (
       <div className="p-6">
-        <Empty>No definition could be reconstructed for this relation.</Empty>
+        <Empty>
+          {reason ? "The definition could not be read." : "No definition could be reconstructed for this relation."}
+          {reason ? <span className="mt-1 block text-xs">{reason}</span> : null}
+        </Empty>
       </div>
     );
   }

@@ -16,7 +16,11 @@ import { getServerEnv, type ServerEnv } from "@/lib/connect-actions";
 import { cn } from "@/lib/utils";
 import { FrameworkPanel } from "./connect-framework-panel";
 import { OrmPanel } from "./connect-orm-panel";
+import Link from "next/link";
+import { withPassword } from "@/lib/connection-string";
+import { useVaultSecret } from "./use-vault-secret";
 import { Copyable, Snippet, Step } from "./connect-primitives";
+import { Skeleton } from "./ui/skeleton";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -36,11 +40,22 @@ import {
 } from "./ui/select";
 
 export type ConnectInfo = {
+  /** Encrypted, and only ever decrypted in the browser. Null when no password has been stored. */
+  secret?: string | null;
   projectRef: string;
   projectUrl: string;
   dbHost: string | null;
   transactionPooler: string | null;
   sessionPooler: string | null;
+  /**
+   * Whether the pooler configuration is still on its way, and why it is not here if it failed.
+   *
+   * Without these, a missing string is indistinguishable from one that has not arrived yet, and the
+   * sheet says "unavailable for this project" — a claim about the project — while the request is
+   * still in flight.
+   */
+  poolerPending?: boolean;
+  poolerReason?: string | null;
 };
 
 export type Method = "framework" | "server" | "direct" | "orm" | "mcp";
@@ -85,6 +100,12 @@ function DirectPanel({ info }: { info: ConnectInfo }) {
   const [method, setMethod] = useState<"direct" | "transaction" | "session">(
     "direct",
   );
+
+  // The password never reaches the screen — only the clipboard, and only when someone asks. The
+  // string on display keeps its placeholder, which is still readable as a *shape*; a masked one
+  // would be neither. `useVaultSecret` decrypts in the browser, as everywhere else in the vault.
+  const { value: stored } = useVaultSecret<{ db_password?: string }>(info.secret);
+  const password = stored.db_password ?? "";
 
   const options = [
     {
@@ -184,24 +205,34 @@ function DirectPanel({ info }: { info: ConnectInfo }) {
             {selected.value ? (
               <>
                 <Snippet value={selected.value} />
+                {password ? (
+                  <div className="flex items-center gap-2">
+                    <Copyable
+                      value={withPassword(selected.value, password)}
+                      label="Copy with password"
+                    />
+                    <span className="text-xs text-subtle">
+                      Puts the stored password on the clipboard. It is never shown here.
+                    </span>
+                  </div>
+                ) : null}
                 <p className="text-xs text-subtle">
                   Supabase does not return the database password through its
-                  API, so the placeholder stays — paste your own in. Resetting
-                  it is a destructive action and lives in the{" "}
-                  <a
-                    href={`https://supabase.com/dashboard/project/${info.projectRef}/settings/database`}
-                    target="_blank"
-                    rel="noreferrer"
+                  API, so the placeholder stays.{" "}
+                  <Link
+                    href={`/p/${info.projectRef}/settings/passwords`}
                     className="text-brand-text hover:underline"
                   >
-                    Supabase dashboard
-                  </a>
-                  .
+                    Store or reset it
+                  </Link>{" "}
+                  to copy a string that works as it is.
                 </p>
               </>
+            ) : info.poolerPending ? (
+              <Skeleton className="h-9 border border-border" />
             ) : (
               <p className="text-xs text-subtle">
-                This connection type is unavailable for this project.
+                {info.poolerReason ?? "This connection type is unavailable for this project."}
               </p>
             )}
           </Step>
@@ -284,7 +315,14 @@ function ServerPanel({ projectRef }: { projectRef: string }) {
         description="Copy these into your environment so your handler can verify users and call the API."
       >
         {state === null ? (
-          <div className="h-24 animate-pulse rounded-md border border-border bg-card/50" />
+          // The label row and the block it labels, which is what lands here.
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Skeleton className="h-4 w-10" />
+              <Skeleton className="h-7 w-16" />
+            </div>
+            <Skeleton className="h-20 border border-border" />
+          </div>
         ) : state.blocked ? (
           <p className="text-xs text-subtle">{state.reason}</p>
         ) : (

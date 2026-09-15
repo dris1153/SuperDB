@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { IconPlus, IconRefresh, IconUpload } from "@tabler/icons-react";
 import type { Policy } from "@/lib/table-editor";
@@ -17,6 +16,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { FilterBuilder } from "./filter-builder";
+import { useRefreshTable } from "./use-refresh-table";
 import { RlsPanel } from "./rls-panel";
 import { SortBuilder } from "./sort-builder";
 import { ImportSheet } from "./import-sheet";
@@ -71,7 +71,7 @@ export function Toolbar({
   editable: boolean;
   isView: boolean;
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [refreshing, startRefresh] = useTransition();
   const { density, setDensity } = useDensity();
   const [inserting, setInserting] = useState(false);
@@ -126,7 +126,7 @@ export function Toolbar({
         />
 
         <button
-          onClick={() => startRefresh(() => router.refresh())}
+          onClick={() => startRefresh(refresh)}
           aria-label="Refresh rows"
           className="rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted"
         >

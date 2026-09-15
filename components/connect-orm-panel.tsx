@@ -5,7 +5,7 @@ import { Prisma } from "developer-icons";
 import { buildOrmGuide, type OrmGuide } from "@/lib/orm-actions";
 import { ORMS } from "@/lib/orm-content";
 import { cn } from "@/lib/utils";
-import { Copyable, Step, StepFiles } from "./connect-primitives";
+import { Copyable, Step, StepFiles, StepSkeleton } from "./connect-primitives";
 
 const LOGOS: Record<string, typeof Prisma> = { Prisma };
 
@@ -92,7 +92,7 @@ export function OrmPanel({
         </div>
 
         {guide === null ? (
-          <div className="h-40 animate-pulse rounded-md border border-border bg-card/50" />
+          <StepSkeleton />
         ) : guide.blocked ? (
           <p className="text-sm text-subtle">{guide.reason}</p>
         ) : (

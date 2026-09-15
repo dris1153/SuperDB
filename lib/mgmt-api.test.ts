@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { afterEach, test } from "node:test";
-import { MgmtError, listProjects, restoreProject } from "./mgmt-api.ts";
+import { MgmtError, listProjects, readOnlyQuery, restoreProject } from "./mgmt-api.ts";
 
 const real = globalThis.fetch;
 afterEach(() => {
@@ -23,6 +23,14 @@ test("a success with a body is still parsed", async () => {
   replyWith(200, JSON.stringify([{ ref: "abc", name: "one" }]));
   const projects = await listProjects("token");
   assert.equal(projects[0].ref, "abc");
+});
+
+test("a query answers 201, and 201 is a success", async () => {
+  // Measured 2026-09-12: the query endpoints answer 201, not 200, with the rows array and no
+  // envelope. The SQL editor's run flow reads a non-2xx as "this statement failed", so a check on
+  // `status === 200` anywhere in here would report every successful query as an error.
+  replyWith(201, JSON.stringify([{ ok: 1 }]));
+  assert.deepEqual(await readOnlyQuery("token", "abc", "select 1 as ok"), [{ ok: 1 }]);
 });
 
 test("a 204 carries no body either", async () => {

@@ -1,14 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import {
-  SERVICES,
-  bucketUnit,
-  buildServiceLogsSql,
-  successRate,
-  toCards,
-  windowMinutes,
-  type LogRow,
-} from "./logs-sql.ts";
+import { SERVICES, asInterval, bucketUnit, buildServiceLogsSql, successRate, toCards, type LogRow, windowMinutes } from "./logs-sql.ts";
 
 const MICRO = 1_000; // Logflare reports microseconds; a JS millisecond is 1000 of them.
 
@@ -95,4 +87,13 @@ test("bucket size follows the window so the bar count stays readable", () => {
   assert.equal(bucketUnit(windowMinutes("15min")), "minute");
   assert.equal(bucketUnit(windowMinutes("30min")), "minute");
   assert.equal(bucketUnit(windowMinutes("1day")), "hour");
+});
+
+test("an interval from the URL resolves, and an unknown one falls back", () => {
+  // Shared by the page and the read endpoint, so the two cannot disagree about what "1hr" means.
+  assert.equal(asInterval("15min"), "15min");
+  assert.equal(asInterval("1day"), "1day");
+  for (const bad of [null, undefined, "", "1hour", "15MIN", "; drop table", "0"]) {
+    assert.equal(asInterval(bad), "1hr", `for ${JSON.stringify(bad)}`);
+  }
 });

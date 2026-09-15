@@ -3,6 +3,8 @@ import type { RowCount, RowRecord } from "@/lib/table-rows";
 import type { ColumnInfo, SortKey } from "@/lib/table-view";
 import type { Filter } from "@/lib/table-filter";
 import { Empty } from "@/components/ui/empty-state";
+import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
+import { ROW_HEIGHT, useDensity } from "./column-prefs";
 import { Definition } from "./definition";
 import { TableFooter } from "./footer";
 import { TableGrid } from "./grid";
@@ -20,6 +22,7 @@ export function TableWorkspace({
   schemas,
   columns,
   rows,
+  rowsPending,
   sort,
   filters,
   search,
@@ -30,6 +33,8 @@ export function TableWorkspace({
   size,
   view,
   definition,
+  definitionPending,
+  definitionReason,
   editable,
 }: {
   projectRef: string;
@@ -39,6 +44,8 @@ export function TableWorkspace({
   schemas: string[];
   columns: ColumnInfo[];
   rows: RowRecord[] | null;
+  /** No rows *yet* is not the same as no rows: one is a wait, the other is an answer. */
+  rowsPending: boolean;
   sort: SortKey[];
   filters: Filter[];
   search: string;
@@ -52,7 +59,14 @@ export function TableWorkspace({
   editable: boolean;
   /** Only fetched when the definition tab is the one being looked at. */
   definition: { ddl: string; html: string | null; complete: boolean } | null;
+  /** The definition's own wait and its own refusal, which are not the same as having none. */
+  definitionPending: boolean;
+  definitionReason: string | null;
 }) {
+  // Read here as well as in the grid so the placeholder's rules land on the same pitch the real rows
+  // will use. A fixed pitch would redraw itself the moment the answer arrived.
+  const { density } = useDensity();
+
   if (view === "definition") {
     return (
       <>
@@ -77,6 +91,8 @@ export function TableWorkspace({
           ddl={definition?.ddl ?? null}
           html={definition?.html ?? null}
           complete={definition?.complete ?? true}
+          pending={definitionPending}
+          reason={definitionReason}
         />
         <TableFooter
           page={page}
@@ -111,11 +127,30 @@ export function TableWorkspace({
       />
 
       {!rows ? (
-        <div className="p-6">
-          <Empty>
-            Could not read {schema}.{entry.name}.
-          </Empty>
-        </div>
+        rowsPending ? (
+          // Shaped like the grid it is waiting for, and sized by the same box: a fixed-height block
+          // in a padded box left a 384px placeholder where a grid the height of the window was about
+          // to land, and everything below it jumped when it did.
+          <>
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="h-10 shrink-0 border-b border-border bg-card" />
+              <SkeletonRows rowHeight={ROW_HEIGHT[density]} className="min-h-0 flex-1" />
+            </div>
+            {/* The real footer would print "count unavailable" here, which is a claim about the
+                answer rather than about the wait. Its height is what has to be held. */}
+            <div className="flex shrink-0 items-center gap-3 border-t border-border px-3 py-2">
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="ml-auto h-7 w-36" />
+            </div>
+          </>
+        ) : (
+          <div className="p-6">
+            <Empty>
+              Could not read {schema}.{entry.name}.
+            </Empty>
+          </div>
+        )
       ) : (
         <>
           <div className="relative min-h-0 flex-1">

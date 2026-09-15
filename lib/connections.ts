@@ -3,6 +3,7 @@ import { recordEvent } from "./audit";
 import { normaliseTags } from "./tags";
 import { open, seal } from "./crypto";
 import { listOrgs } from "./mgmt-api";
+import { dropUser } from "./part-cache";
 import { refreshTokens, revoke, type OAuthTokens } from "./oauth";
 import { requireUser } from "./supabase/server";
 
@@ -72,6 +73,27 @@ const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 type Row = Connection & { dek_wrapped: string; secret_cipher: string; expires_at: string | null };
 
 /**
+ * One refresh per connection at a time, within this process.
+ *
+ * A refresh token is single-use and Supabase rotates it, so concurrent refreshes of the same
+ * connection have exactly one winner. That used to be theoretical — a page render refreshed once —
+ * and the read endpoints made it ordinary: nine parts are nine requests, all of them resolving the
+ * same connection inside the same second. Sharing the in-flight promise means one upstream call and
+ * one audit event instead of nine, and nothing for the losers to mis-handle.
+ *
+ * Per process, so several instances can still race; the re-read below is what covers that.
+ *
+ * Pinned to `globalThis`, like `lib/part-cache.ts` and the owners memo: one compiled copy per bundle
+ * layer means one map per layer, and a route handler would not share its in-flight refresh with a
+ * server action — which is exactly the concurrent case this exists for. Single-flight that only works
+ * within one layer is not single-flight.
+ */
+const flight = globalThis as typeof globalThis & {
+  __superdbRefreshes?: Map<string, Promise<string>>;
+};
+const refreshes = (flight.__superdbRefreshes ??= new Map<string, Promise<string>>());
+
+/**
  * A failed refresh means the user revoked the app upstream. Record it and leave the row alone so the
  * UI can offer Reconnect; retrying in a loop would only burn the remaining grant.
  */
@@ -83,8 +105,21 @@ async function accessTokenFor(
   if (row.kind !== "oauth" || !secret.refresh || !row.expires_at) return secret.access;
   if (Date.parse(row.expires_at) - Date.now() > REFRESH_MARGIN_MS) return secret.access;
 
+  const inFlight = refreshes.get(row.id);
+  if (inFlight) return inFlight;
+
+  const refresh = refreshOnce(supabase, row, secret.refresh).finally(() => refreshes.delete(row.id));
+  refreshes.set(row.id, refresh);
+  return refresh;
+}
+
+async function refreshOnce(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  row: Row,
+  refreshToken: string,
+): Promise<string> {
   try {
-    const tokens = await refreshTokens(secret.refresh);
+    const tokens = await refreshTokens(refreshToken);
     await supabase
       .from("connections")
       .update({ ...oauthColumns(tokens), synced_at: new Date().toISOString(), last_error: null })
@@ -98,6 +133,22 @@ async function accessTokenFor(
     return tokens.access_token;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+
+    // A refresh token is single-use: Supabase rotates it, so when several requests refresh the same
+    // connection at once exactly one wins and the rest fail on a token that is no longer current.
+    // That is not a revoked grant, and recording it as one would put a healthy connection into
+    // "Reconnect required" and 404 every read through it. Re-read the row: if someone else rotated
+    // it while this call was in flight, use what they stored.
+    const { data: fresh } = await supabase
+      .from("connections")
+      .select(`${SAFE_COLUMNS}, dek_wrapped, secret_cipher, expires_at`)
+      .eq("id", row.id)
+      .maybeSingle();
+
+    if (fresh && (fresh as Row).expires_at !== row.expires_at) {
+      return openSecret(fresh as Row).access;
+    }
+
     await supabase.from("connections").update({ last_error: message }).eq("id", row.id);
     await recordEvent(supabase, {
       connectionId: row.id,
@@ -343,7 +394,7 @@ export async function listTags(): Promise<string[]> {
 }
 
 export async function removeConnection(id: string) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { data } = await supabase
     .from("connections")
     .select("kind, display_name, dek_wrapped, secret_cipher")
@@ -358,6 +409,11 @@ export async function removeConnection(id: string) {
 
   const { error } = await supabase.from("connections").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  // The read cache is keyed by project, not by connection, so there is no way to drop only what this
+  // token fetched. Everything of theirs goes: a disconnect that leaves five minutes of data fetched
+  // through the removed grant is not a disconnect.
+  dropUser(user.id);
 
   // Written after the delete so a failed delete is not logged as a success. connection_id survives
   // as a dangling reference on purpose — it is the row most worth keeping.

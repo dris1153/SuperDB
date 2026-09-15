@@ -34,7 +34,19 @@ export async function setupVault(meta: VaultMeta): Promise<void> {
  * Rotating the master password: the client re-encrypts every blob under the new key and sends them
  * back together with the new parameters. Done in one call so a half-rotated vault cannot exist.
  */
-export async function rotateVault(meta: VaultMeta, blobs: { connection_id: string; vault_blob: string }[]) {
+export async function rotateVault(
+  meta: VaultMeta,
+  blobs: { connection_id: string; vault_blob: string }[],
+  /**
+   * **Required, not optional, and that is the point.** This function replaces the vault's salt in the
+   * same call that re-encrypts the blobs, so the old key stops existing the moment it returns — and
+   * anything it did not re-encrypt is unreadable for good. It used to take connection blobs only,
+   * which meant every database password in `project_secrets` would have been silently destroyed by
+   * the first change-master-password screen anyone built. A required argument is what stops the next
+   * table being forgotten the same way: adding one has to fail the build.
+   */
+  projectBlobs: { project_ref: string; vault_blob: string }[],
+) {
   const { supabase, user } = await requireUser();
 
   const { error: metaError } = await supabase.from("vault").update(meta).eq("user_id", user.id);
@@ -45,6 +57,15 @@ export async function rotateVault(meta: VaultMeta, blobs: { connection_id: strin
       .from("connection_secrets")
       .update({ vault_blob, updated_at: new Date().toISOString() })
       .eq("connection_id", connection_id);
+    if (error) throw new Error(error.message);
+  }
+
+  for (const { project_ref, vault_blob } of projectBlobs) {
+    const { error } = await supabase
+      .from("project_secrets")
+      .update({ vault_blob, updated_at: new Date().toISOString() })
+      .eq("project_ref", project_ref)
+      .eq("user_id", user.id);
     if (error) throw new Error(error.message);
   }
 }

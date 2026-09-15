@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { batch, buildImportRows, type Mapping } from "@/lib/csv-import";
 import { IMPORT_BATCH, type CsvFile } from "@/lib/csv-parse";
 import { insertRows } from "@/lib/write-actions";
@@ -17,6 +16,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { CsvPicker } from "./csv-picker";
+import { useRefreshTable } from "./use-refresh-table";
 import { ImportMapping } from "./import-mapping";
 import { ImportStatus, type Report } from "./import-report";
 import { WriteConfirm } from "./write-confirm";
@@ -48,7 +48,7 @@ export function ImportSheet({
   table: string;
   columns: ColumnInfo[];
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [file, setFile] = useState<CsvFile | null>(null);
   const [mapping, setMapping] = useState<Mapping>([]);
   const [emptyAsNull, setEmptyAsNull] = useState(true);
@@ -94,13 +94,13 @@ export function ImportSheet({
             reason: "The request failed before it answered, so this batch may or may not have run.",
           });
           setConfirming(false);
-          router.refresh();
+          refresh();
           return;
         }
         if (!result.ok) {
           setReport({ committed, failedBatch: i + 1, reason: result.reason });
           setConfirming(false);
-          router.refresh();
+          refresh();
           return;
         }
         committed += result.affected;
@@ -113,7 +113,7 @@ export function ImportSheet({
       reset();
       setReport({ committed });
       setConfirming(false);
-      router.refresh();
+      refresh();
     });
 
   return (
