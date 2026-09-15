@@ -95,3 +95,29 @@ loop and no viewport measurement. The whole grid placeholder is a single div.
 - The four shape-mismatched sites render the frame of what replaces them.
 - No layout shift when an answer lands — **verified in a browser, not asserted**.
 - `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` stay green; 378 tests.
+
+---
+
+## What shipped, where it differs from the design above
+
+Four commits: `fc298c6`, `21a903a`, `9693636`, `8d7f68b`.
+
+- The shimmer is an `@utility` with a nested reduced-motion guard rather than a `--animate-*` token
+  plus a `motion-reduce:` class. It covers `skeleton-rows` too, which a class on the primitive could
+  not have.
+- `ServiceCarouselSkeleton` stands in for the whole row rather than one tile, in `service-carousel.tsx`
+  as designed.
+- The connect guides' code column is a bordered block, not "four or five mono lines" — `CodeBlock`
+  is a bordered box and the block matches it.
+- Scope was 12 files plus three the design missed: `app/(app)/loading.tsx`,
+  `app/(app)/p/[ref]/loading.tsx` and `app/(app)/p/[ref]/tables/loading.tsx` were already `Skeleton`
+  consumers, so changing the primitive's default changed them. They pass the border explicitly now,
+  and the tables route uses `SkeletonRows`.
+- Two faults the review found were older than this work and in scope for it: the SQL results pane
+  said "Click Run to execute your query." during the first run, and the Definition tab said "No
+  definition could be reconstructed" while fetching and when refused. Both are fixed in `8d7f68b`.
+- Measured shifts closed: 24px in the tables card (`h-4` cells against a `text-sm` line box), and the
+  carousel's and usage figure's first rows against `text-2xl`.
+
+Still open, and still needing a browser: that nothing moves when an answer lands, and how the sweep's
+contrast reads on the real dark ground.
