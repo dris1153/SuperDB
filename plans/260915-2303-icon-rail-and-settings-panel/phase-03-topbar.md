@@ -16,8 +16,14 @@ The project name and the way back to the board, which the rail no longer has roo
 ## Requirements
 
 - A bar across the top of every project route: a link to the board, then the project name.
+- It carries the app-level navigation the sidebar stopped showing in phase 2 — Connections, and the
+  account settings and sign-out that live at the bottom of `components/sidebar.tsx`.
 - It replaces the header in `project-nav.tsx:61-72`, which goes away with the rail.
 - No project switcher — settled in the plan.
+
+**The app nav has to land somewhere.** Phase 2 stands the app sidebar down and leaves only an
+"All projects" row in the rail as the way out. This is where Connections and the account menu come
+back, and until it ships the board is the only route to them.
 
 ## Architecture
 

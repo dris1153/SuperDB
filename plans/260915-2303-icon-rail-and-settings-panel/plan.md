@@ -21,7 +21,7 @@ Design, what the screenshot actually showed, and what was rejected:
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
 | 1 | [The layout owns the height](phase-01-layout-owns-height.md) | **in-progress** | ~2h | — |
-| 2 | [The icon rail](phase-02-icon-rail.md) | pending | ~3h | — |
+| 2 | [The icon rail](phase-02-icon-rail.md) | **in-progress** | ~3h | — |
 | 3 | [Topbar breadcrumb](phase-03-topbar.md) | pending | ~2h | 1, 2 |
 | 4 | [Settings as a panel](phase-04-settings-panel.md) | pending | ~3h | 2 |
 
@@ -36,6 +36,12 @@ Phases 1 and 2 are independent of each other and of everything else.
 
 Do not re-open these during implementation:
 
+- **The rail in `/p/` is the *project* nav, and the app nav gives up its place.** Found during
+  phase 1: `components/sidebar.tsx:26` already drops the app-level sidebar to `w-12` inside a project,
+  so those routes are *already* rail + panel + content. Shrinking the project nav as well would have
+  produced two 48px icon columns side by side — 96px of unlabelled icons — and removed every project
+  navigation label from the screen. The screenshot has one rail because Supabase has no app rail
+  there: its global chrome is in the topbar. This plan does the same.
 - **The rail does not expand.** Fixed icons plus a tooltip, as the screenshot has. Hover-expand was
   rejected on three counts: it does not exist on touch, it needs `focus-within` to be reachable by
   keyboard, and it fires when a mouse merely crosses the rail. Supabase used to do it and stopped.

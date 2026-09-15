@@ -17,6 +17,7 @@ import {
   IconTable,
   IconTelescope,
 } from "@tabler/icons-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,28 +54,49 @@ const SECTIONS: { items: { slug: string; label: string; icon: typeof IconHome; r
   },
 ];
 
+const ROW = "flex size-9 items-center justify-center rounded-md transition-colors";
+
+/**
+ * The project's own rail: 48px of icons, each named by a tooltip.
+ *
+ * **There is exactly one rail inside a project and this is it.** `components/sidebar.tsx` stands down
+ * on these routes — it used to shrink to icons here, which would have put two 48px icon columns side
+ * by side once this one existed, and taken every project label off the screen. The Supabase layout
+ * this copies has a single rail for the same reason: its global chrome is in the topbar.
+ *
+ * **No collapsed state, nothing remembered.** That is what makes it work on a touch screen and under
+ * a keyboard without special cases, rather than an omission. The table editor's sidebar collapses on
+ * click and remembers it; the two sit on one screen under different laws, which is fine — sharing a
+ * flag between them would not be.
+ */
 export function ProjectNav({ projectRef, name }: { projectRef: string; name: string }) {
   const pathname = usePathname();
   const base = `/p/${projectRef}`;
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-card">
-      <div className="border-b border-border p-3">
-        <Link
-          href="/"
-          className="mb-2 flex items-center gap-1 text-xs text-subtle transition-colors hover:text-foreground"
-        >
-          <IconChevronLeft size={13} stroke={1.5} />
-          All projects
-        </Link>
-        <div className="truncate text-sm text-foreground" title={name}>
-          {name}
-        </div>
-      </div>
+    <aside className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-card py-2">
+      {/* The way out, and it stays here until the topbar carries it: this rail can ship before that
+          does, and a project nobody can leave is worse than one without a breadcrumb. */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            href="/"
+            className={cn(ROW, "text-subtle hover:bg-muted hover:text-foreground")}
+            aria-label="All projects"
+          >
+            <IconChevronLeft size={16} stroke={1.5} />
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right">All projects — {name}</TooltipContent>
+      </Tooltip>
 
-      <nav className="flex-1 space-y-4 overflow-y-auto p-2">
+      <div className="my-1 h-px w-6 bg-border" />
+
+      <nav className="flex flex-col items-center gap-1 overflow-y-auto">
         {SECTIONS.map((section, index) => (
-          <div key={index} className="space-y-1">
+          <div key={index} className="flex flex-col items-center gap-1">
+            {index > 0 ? <div className="my-1 h-px w-6 bg-border" /> : null}
+
             {section.items.map(({ slug, label, icon: Icon, ready }) => {
               const href = slug ? `${base}/${slug}` : base;
               // Prefix, not equality: settings has routes beneath it, and an exact test left
@@ -82,34 +104,46 @@ export function ProjectNav({ projectRef, name }: { projectRef: string; name: str
               // this changes nothing for them.
               const active = slug ? pathname.startsWith(href) : pathname === base;
 
-              if (!ready) {
-                return (
-                  <span
-                    key={label}
-                    aria-disabled
-                    className="flex cursor-not-allowed items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-subtle/50"
-                  >
-                    <Icon size={16} stroke={1.5} />
-                    <span className="flex-1">{label}</span>
-                    <span className="text-[10px] uppercase tracking-wide text-subtle/70">soon</span>
-                  </span>
-                );
-              }
-
               return (
-                <Link
-                  key={label}
-                  href={href}
-                  className={cn(
-                    "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors",
-                    active
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                  )}
-                >
-                  <Icon size={16} stroke={1.5} className={active ? "text-primary" : undefined} />
-                  {label}
-                </Link>
+                <Tooltip key={label}>
+                  <TooltipTrigger asChild>
+                    {ready ? (
+                      <Link
+                        href={href}
+                        aria-label={label}
+                        className={cn(
+                          ROW,
+                          active
+                            ? "bg-muted text-primary"
+                            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                        )}
+                      >
+                        <Icon size={16} stroke={1.5} />
+                      </Link>
+                    ) : (
+                      /*
+                       * `aria-disabled` on a live button, not `disabled`. At this width the tooltip is
+                       * the only thing naming a row, and a disabled button leaves the tab order
+                       * entirely — so a keyboard user would pass an unlabelled icon with no way to
+                       * learn what it is. Radix also ignores pointer events on a truly disabled
+                       * element, which would leave the tooltip silently never opening.
+                       */
+                      <button
+                        type="button"
+                        aria-disabled
+                        onClick={(e) => e.preventDefault()}
+                        aria-label={`${label} — not built yet`}
+                        className={cn(ROW, "cursor-not-allowed text-subtle/40")}
+                      >
+                        <Icon size={16} stroke={1.5} />
+                      </button>
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {label}
+                    {ready ? null : <span className="text-subtle"> — soon</span>}
+                  </TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
