@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useProjectPart } from "@/components/use-project-part";
+import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
 
 const HEAD = "text-xs font-normal text-subtle";
 const COLUMNS = ["Schema", "Table", "Rows (est.)", "Size", "Columns", "RLS"];
@@ -33,14 +33,14 @@ export function DatabaseTables({ projectRef }: { projectRef: string }) {
     <section className="space-y-2">
       <h2 className="text-sm text-muted-foreground">Tables</h2>
 
-      {tables.status === "pending" ? (
+      {isWaiting(tables) ? (
         // Roughly a header and six rows, which is what an ordinary project fills. A third of that
         // would move everything below it when the list lands.
         <Skeleton className="h-72 w-full rounded-lg" />
       ) : tables.status !== "ready" ? (
         <Empty>
           Could not query this database. Paused projects and restricted tokens return nothing here.
-          <span className="mt-1 block text-xs">{tables.reason}</span>
+          <span className="mt-1 block text-xs">{reasonOf(tables)}</span>
         </Empty>
       ) : !Array.isArray(tables.data) || tables.data.length === 0 ? (
         <Empty>No user tables yet.</Empty>

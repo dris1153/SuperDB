@@ -1,19 +1,20 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useTransition, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 
 /**
- * Every control in the Table Editor changes the URL and lets the server refetch — the same trade
- * `interval-picker.tsx` makes. There is no `loading.tsx` anywhere in this app, so without a pending
- * flag an RSC navigation just freezes the page for a few hundred milliseconds.
+ * Every control in the Table Editor changes the URL, and the URL is what the queries are keyed on.
  *
- * One transition is shared by all of them on purpose. Per-component transitions only report on the
- * control that was clicked, so paging forward would dim the footer while the grid — the only part
- * actually changing — sat opaque showing stale rows.
+ * It is written with the history API rather than the router: the data comes from `/api/projects`
+ * now, so a navigation would re-render the page on the server to produce markup that has not
+ * changed. Next integrates `replaceState` with `useSearchParams`, which is what makes `editor.tsx`
+ * re-read it and refetch. `replaceState`, not `pushState`, because Back should leave the table
+ * editor rather than step back through every sort the user tried.
  *
- * Current values arrive as props from the server rather than through `useSearchParams`, which keeps
- * these components out of the Suspense requirement that hook carries.
+ * `pending` is no longer a navigation's transition — it is whether the queries behind the grid are
+ * still fetching, and it arrives from the component that runs them. One flag for all the controls,
+ * as before: per-control flags dim the control that was clicked rather than the grid that is
+ * actually changing.
  */
 /** An array replaces every occurrence of a repeatable param, which is how filters are carried. */
 type Patch = Record<string, string | string[] | null>;
@@ -23,15 +24,15 @@ const TableUrlContext = createContext<TableUrl | null>(null);
 
 export function TableUrlProvider({
   current,
+  pending,
   children,
 }: {
   /** The page's own query string, so repeated params survive a round trip through here. */
   current: string;
+  /** Whether the queries keyed on this URL are still in flight. */
+  pending: boolean;
   children: ReactNode;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [pending, startTransition] = useTransition();
 
   const set = useCallback(
     (patch: Patch) => {
@@ -41,9 +42,9 @@ export function TableUrlProvider({
         if (Array.isArray(value)) for (const v of value) next.append(key, v);
         else if (value !== null) next.set(key, value);
       }
-      startTransition(() => router.replace(`${pathname}?${next.toString()}`, { scroll: false }));
+      window.history.replaceState(null, "", `?${next.toString()}`);
     },
-    [current, pathname, router],
+    [current],
   );
 
   const value = useMemo(() => ({ set, pending }), [set, pending]);

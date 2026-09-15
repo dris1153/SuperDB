@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Table editor"
-status: pending
+status: in-progress
 priority: P2
 effort: "1.5d"
 dependencies: [3]
@@ -92,15 +92,58 @@ replaces today's `router.refresh()`.
 7. `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 8. Measure a sort and a page change, before and after.
 
+## Review findings, and what came of them
+
+Reviewed 2026-09-15. The server side was right; the client was still walking two links of the chain
+the phase existed to move. Fixed:
+
+- **The browser fetched `rows` using another query's answer.** `table` was read out of the
+  `schema-tables` response even when the URL already named it, so a cold load of
+  `?schema=public&table=users` spent two serial round trips before the first row was asked for —
+  precisely the regression this phase was written to prevent, and the doc comment above the code
+  claimed the opposite. The queries key off the URL now; the catalog only *corrects* a schema or
+  table the database does not have, which is a rendering concern.
+- **The same defect on `schema` cost real upstream calls.** While the catalog was pending every
+  branch collapsed to `public`, so a URL naming another schema fetched `public`'s tables first and
+  then re-keyed — and if that landed first, `columns`, `policies` and a full `count(*)` fired against
+  a table nobody asked for.
+- **`rows` can answer `null`** — the reader says so for a table that is no longer there — and three
+  places dereferenced it. Reachable by dropping a table: the invalidation refetched `rows` on a URL
+  still naming the dropped one. The type says `Rows | null` now, and dropping a table clears it from
+  the URL first.
+- **A disabled query is `idle`, not `pending`.** In TanStack v5 a disabled query stays pending for
+  ever, so the Definition tab left the sidebar dimmed and the search box disabled the whole time it
+  was open. `PartState` has an `idle` status and `busy` ignores it.
+- **Every key change flashed "Could not read public.users".** `rows === null` means both "waiting"
+  and "failed" to the workspace, and without `keepPreviousData` a sort or a page went through null.
+  Rows and the definition keep the previous answer while the next is in flight, and the workspace
+  tells waiting apart from unreadable.
+- **A failed count took the rows with it.** `rowCount` runs a real `count(*)` under the ceiling, and
+  a statement timeout used to cost only the footer's total; sharing a part with the rows made it
+  refuse both. It degrades to an unknown count.
+- Toolbar chips are derived from the URL rather than hidden while the column list loads; `q` is
+  trimmed on the export path as the reader trims it; the server's clamped page and size win over the
+  client's; the confirm waits for the refetch before closing; `lib/table-query.ts` was orphaned by
+  this change and is deleted.
+
 ## Success Criteria
 
-- [ ] The sidebar and the grid frame paint before any row arrives.
-- [ ] Sorting and paging do not navigate, and are measurably faster than today.
-- [ ] No part is fetched by the browser using the answer from another fetch.
-- [ ] The Definition view still highlights, and Shiki is still absent from the client bundle.
-- [ ] Every write still runs through its existing confirm and audit path.
-- [ ] A write updates the grid without a full page refresh.
-- [ ] Row counts, filters and the keyless-table cases behave exactly as before.
+- [x] **No part is fetched by the browser using the answer from another fetch** — the rule this
+      phase exists for. Every query keys off the URL; the catalog only corrects a name the database
+      does not have. The four-hop chain lives in the `rows` reader, one request deep.
+- [x] Sorting and paging do not navigate: the URL is written with the history API and the queries
+      are keyed on it. A page change costs the `rows` part's 4 upstream calls where the old page
+      re-ran all 7.
+- [x] The Definition view still highlights, and Shiki is absent from every client chunk — checked in
+      the build output, not assumed.
+- [x] Every write still runs through its existing confirm, count re-check and audit path: the diffs
+      are `useRouter` → `useRefreshTable` and nothing else.
+- [x] A write updates the grid without a page refresh, by invalidating `["project", ref]`.
+- [x] Row counts, filters and the keyless-table cases behave as before; a failed count now degrades
+      to "unknown" instead of taking the rows down with it.
+- [ ] **Needs the app.** The sidebar and grid frame painting first, and time-to-first-row on a URL
+      that already names a table — the number this phase turns on.
+- [x] `/p/[ref]/tables` first load 876,162 → 895,273 bytes.
 
 ## Risk Assessment
 

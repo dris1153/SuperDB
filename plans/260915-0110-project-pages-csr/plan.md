@@ -26,7 +26,7 @@ Design, the measurement behind it, and what this gives up:
 | 4 | [Project overview page](phase-04-overview-page.md) | **in-progress** | ~1d | 3 |
 | 5 | [Database page](phase-05-database-page.md) | **in-progress** | ~4h | 3 |
 | 6 | [Measure again, and the states nobody looks at](phase-06-verify.md) | pending | ~2h | 4, 5 |
-| 7 | [Table editor](phase-07-table-editor.md) | pending | ~1.5d | 3 |
+| 7 | [Table editor](phase-07-table-editor.md) | **in-progress** | ~1.5d | 3 |
 | 8 | [SQL editor page](phase-08-sql-editor-page.md) | pending | ~2h | 3 |
 
 ## The decision, and what it costs

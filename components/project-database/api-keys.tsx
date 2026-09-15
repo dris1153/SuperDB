@@ -2,7 +2,7 @@
 
 import type { KeySummary } from "@/lib/project-parts";
 import { Badge } from "@/components/ui/badge";
-import { useProjectPart } from "@/components/use-project-part";
+import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
 
 /**
  * The project's API keys, by name and prefix.
@@ -20,7 +20,7 @@ export function DatabaseApiKeys({ projectRef }: { projectRef: string }) {
     <section className="space-y-2">
       <h2 className="text-sm text-muted-foreground">API keys</h2>
 
-      {keys.status === "pending" ? (
+      {isWaiting(keys) ? (
         <div className="flex flex-wrap gap-2">
           {[0, 1, 2].map((i) => (
             <span
@@ -30,7 +30,7 @@ export function DatabaseApiKeys({ projectRef }: { projectRef: string }) {
           ))}
         </div>
       ) : keys.status !== "ready" ? (
-        <p className="text-sm text-subtle">{keys.reason}</p>
+        <p className="text-sm text-subtle">{reasonOf(keys)}</p>
       ) : Array.isArray(keys.data) && keys.data.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {keys.data.map((key) => (

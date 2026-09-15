@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { IconPlus } from "@tabler/icons-react";
 import { createTable } from "@/lib/ddl-statements";
 import type { NewColumn } from "@/lib/ddl-build";
@@ -18,6 +17,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ColumnForm, blankColumn } from "./column-form";
+import { useRefreshTable } from "./use-refresh-table";
 import { DdlConfirm } from "./ddl-confirm";
 
 /** What Supabase's own New Table dialog starts you with, and what B2 needs to edit a row at all. */
@@ -45,7 +45,7 @@ export function NewTableSheet({
   projectName: string;
   schema: string;
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [name, setName] = useState("");
   const [rls, setRls] = useState(true);
   const [columns, setColumns] = useState(starter);
@@ -102,7 +102,7 @@ export function NewTableSheet({
           return;
         }
         close();
-        router.refresh();
+        refresh();
       } catch {
         // The action rejected rather than answering. The table may already exist; saying nothing
         // would send the user to create it again.

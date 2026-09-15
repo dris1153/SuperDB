@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { addColumn } from "@/lib/ddl-statements";
 import { addColumn as addColumnAction, listColumnTypes } from "@/lib/ddl-actions";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ColumnForm, blankColumn } from "./column-form";
+import { useRefreshTable } from "./use-refresh-table";
 import { DdlConfirm } from "./ddl-confirm";
 
 /**
@@ -38,7 +38,7 @@ export function AddColumnSheet({
   schema: string;
   table: string;
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [column, setColumn] = useState(blankColumn);
   /** Null until the catalog answers; empty means it answered with nothing. */
   const [types, setTypes] = useState<string[] | null>(null);
@@ -85,7 +85,7 @@ export function AddColumnSheet({
           return;
         }
         close();
-        router.refresh();
+        refresh();
       } catch {
         setError("The request failed before it answered. Reload and check the table.");
       }

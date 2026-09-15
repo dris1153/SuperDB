@@ -3,6 +3,7 @@ import type { RowCount, RowRecord } from "@/lib/table-rows";
 import type { ColumnInfo, SortKey } from "@/lib/table-view";
 import type { Filter } from "@/lib/table-filter";
 import { Empty } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Definition } from "./definition";
 import { TableFooter } from "./footer";
 import { TableGrid } from "./grid";
@@ -20,6 +21,7 @@ export function TableWorkspace({
   schemas,
   columns,
   rows,
+  rowsPending,
   sort,
   filters,
   search,
@@ -39,6 +41,8 @@ export function TableWorkspace({
   schemas: string[];
   columns: ColumnInfo[];
   rows: RowRecord[] | null;
+  /** No rows *yet* is not the same as no rows: one is a wait, the other is an answer. */
+  rowsPending: boolean;
   sort: SortKey[];
   filters: Filter[];
   search: string;
@@ -112,9 +116,13 @@ export function TableWorkspace({
 
       {!rows ? (
         <div className="p-6">
-          <Empty>
-            Could not read {schema}.{entry.name}.
-          </Empty>
+          {rowsPending ? (
+            <Skeleton className="h-96 w-full rounded-lg" />
+          ) : (
+            <Empty>
+              Could not read {schema}.{entry.name}.
+            </Empty>
+          )}
         </div>
       ) : (
         <>

@@ -24,6 +24,14 @@ export const PART_NAMES = [
   "api-keys",
   "metrics",
   "logs",
+  // The table editor. `tables` above is the database page's inventory of the whole database; these
+  // are one schema, one table, one page of rows.
+  "schemas",
+  "schema-tables",
+  "columns",
+  "policies",
+  "rows",
+  "definition",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

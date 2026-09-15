@@ -2,7 +2,7 @@
 
 import type { ServiceHealth } from "@/lib/mgmt-api";
 import { ServiceStatus } from "@/components/status";
-import { useProjectPart } from "@/components/use-project-part";
+import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
 
 /**
  * Which services the project reports as healthy.
@@ -18,7 +18,7 @@ export function DatabaseServices({ projectRef }: { projectRef: string }) {
     <section className="space-y-2">
       <h2 className="text-sm text-muted-foreground">Services</h2>
 
-      {health.status === "pending" ? (
+      {isWaiting(health) ? (
         <div className="flex flex-wrap gap-2">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <span
@@ -31,7 +31,7 @@ export function DatabaseServices({ projectRef }: { projectRef: string }) {
         // The paused hint stays: it is the most common reason this call fails, and the API's own
         // sentence rarely says so.
         <p className="text-sm text-subtle">
-          {health.reason} The project may be paused.
+          {reasonOf(health)} The project may be paused.
         </p>
       ) : !Array.isArray(health.data) || health.data.length === 0 ? (
         <p className="text-sm text-subtle">Health unavailable — the project may be paused.</p>

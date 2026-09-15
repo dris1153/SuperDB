@@ -33,7 +33,7 @@ export function PartValue<T>({
   state: PartState<T>;
   children: (data: T) => ReactNode;
 }) {
-  if (state.status === "pending") {
+  if (state.status === "pending" || state.status === "idle") {
     // The height of the line it replaces, so nothing moves when the answer lands.
     return <span className="block h-6 w-24 animate-pulse rounded bg-muted motion-reduce:animate-none" />;
   }

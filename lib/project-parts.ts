@@ -25,6 +25,14 @@ import {
 } from "./logs-sql";
 import type { Part } from "./project-part-names";
 import { memoryUsedPercent, parseMetrics } from "./prometheus";
+import { describeTable, listPolicies, listSchemas, listTablesIn } from "./table-editor";
+import { tableDefinition } from "./table-ddl";
+import { rowCount, selectRows, type RowCount } from "./table-rows";
+import { parseFilters } from "./table-filter";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseSort } from "./table-view";
+import { clampInt } from "./sql-ident";
+import { highlight } from "./highlight";
+import { getExposedSchemas } from "./mgmt-api";
 import { attempt, type Attempt } from "./safe";
 
 /**
@@ -93,6 +101,91 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   "api-keys": async (t, ref): Promise<KeySummary[]> =>
     (await listApiKeys(t, ref)).map(({ id, name, prefix }) => ({ id, name, prefix })),
   metrics: async (t, ref) => ({ memoryPercent: memoryUsedPercent(parseMetrics(await getMetricsText(t, ref))) }),
+  /** What the sidebar lists, and whether PostgREST serves the schema the user is looking at. */
+  schemas: async (t, ref) => {
+    const [schemas, exposed] = await Promise.all([listSchemas(t, ref), safeExposed(t, ref)]);
+    return { schemas, exposed };
+  },
+
+  "schema-tables": (t, ref, search) => listTablesIn(t, ref, schemaOf(search)),
+
+  columns: (t, ref, search) => describeTable(t, ref, schemaOf(search), tableOf(search)),
+
+  policies: (t, ref, search) => listPolicies(t, ref, schemaOf(search), tableOf(search)),
+
+  definition: async (t, ref, search) => {
+    const built = await tableDefinition(t, ref, schemaOf(search), tableOf(search));
+    if (!built) return null;
+    // Highlighted here, not in the browser: `lib/highlight.ts` is server-only precisely so Shiki's
+    // grammars and WASM never ship, and colouring one tab is not worth a megabyte on this route.
+    return { ddl: built.ddl, html: await highlight(built.ddl, "sql"), complete: built.complete };
+  },
+
+  /**
+   * A page of rows, and how many there are.
+   *
+   * Four upstream calls, all of them on the server, because each one needs the answer before it:
+   * the table's entry says what kind of relation it is, the columns decide what may be selected,
+   * sorted and filtered, and only then can the rows and the count be asked for. Moving that chain
+   * into the browser would turn four server-side hops into four round trips, on the page people
+   * spend the most time on — which is why the plan's rule is that a part may make several calls but
+   * the browser never walks a chain.
+   *
+   * Sort keys and filters naming a column that does not exist are dropped **here**, against the
+   * catalog, not wherever the URL came from. Quoting keeps a hostile name inert; this keeps an
+   * unknown one from being asked about at all.
+   */
+  rows: async (t, ref, search) => {
+    const schema = schemaOf(search);
+    const table = tableOf(search);
+
+    const entry = (await listTablesIn(t, ref, schema)).find((e) => e.name === table);
+    if (!entry) return null;
+
+    const columns = await describeTable(t, ref, schema, table);
+    const known = new Set(columns.map((c) => c.name));
+    const sort = parseSort(search.get("sort")).filter((k) => known.has(k.column));
+    const filters = parseFilters(search.getAll("filter")).filter((f) => known.has(f.column));
+    const searchText = (search.get("q") ?? "").trim();
+
+    const size = PAGE_SIZES.includes(Number(search.get("size")) as (typeof PAGE_SIZES)[number])
+      ? Number(search.get("size"))
+      : DEFAULT_PAGE_SIZE;
+    const requested = clampInt(search.get("page"), 1, Number.MAX_SAFE_INTEGER, 1);
+
+    // Counting is allowed to fail on its own: it runs a real `count(*)` under the ceiling, and a
+    // statement timeout there used to cost the page nothing — the footer just showed no total. Now
+    // that the count shares a part with the rows, an unwrapped throw would refuse both.
+    const total = await rowCount(t, ref, schema, table, {
+      kind: entry.kind,
+      estimate: entry.est_rows,
+      columns,
+      filters,
+      search: searchText,
+    }).catch((): RowCount => ({ n: null, exact: false }));
+
+    // Land on the last real page rather than rendering "Page 900 of 3" over an empty grid. Only
+    // possible where the count is known — a view has no last page to clamp to.
+    const last = total.n == null ? null : Math.max(1, Math.ceil(total.n / size));
+    const page = last == null ? requested : Math.min(requested, last);
+
+    // Without columns there is nothing to order by, and an unordered LIMIT/OFFSET pages
+    // non-deterministically — better to fetch nothing than to fetch wrong.
+    const rows =
+      columns.length === 0
+        ? []
+        : await selectRows(t, ref, schema, table, {
+            columns,
+            sort,
+            filters,
+            search: searchText,
+            limit: size,
+            offset: (page - 1) * size,
+          });
+
+    return { rows, total, page, size };
+  },
+
   logs: async (t, ref, search) => {
     const minutes = windowMinutes(asInterval(search.get("interval")));
     const to = Date.now();
@@ -141,3 +234,12 @@ export async function readIdentity(ref: string) {
     connection: connection.display_name,
   };
 }
+/** The sidebar renders an unknown exposure as no icon at all rather than guessing. */
+const safeExposed = (t: string, ref: string) =>
+  getExposedSchemas(t, ref).then(
+    (schemas) => schemas,
+    () => null,
+  );
+
+const schemaOf = (search: URLSearchParams) => search.get("schema") ?? "public";
+const tableOf = (search: URLSearchParams) => search.get("table") ?? "";

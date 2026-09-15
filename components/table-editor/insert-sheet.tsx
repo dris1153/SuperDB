@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { IconPlus } from "@tabler/icons-react";
 import { insertRows } from "@/lib/write-actions";
 import type { ColumnInfo } from "@/lib/table-view";
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/sheet";
 import { parseValue } from "@/lib/cell-value";
 import { ValueInput } from "./value-input";
+import { useRefreshTable } from "./use-refresh-table";
 import { WriteConfirm } from "./write-confirm";
 
 /**
@@ -44,7 +44,7 @@ export function InsertSheet({
   table: string;
   columns: ColumnInfo[];
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +82,7 @@ export function InsertSheet({
       }
       setConfirming(false);
       close();
-      router.refresh();
+      await refresh();
     });
 
   return (

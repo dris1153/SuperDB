@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { setRls } from "@/lib/ddl-statements";
 import { setRls as setRlsAction } from "@/lib/ddl-actions";
 import { Button } from "@/components/ui/button";
 import { DdlConfirm } from "./ddl-confirm";
+import { useRefreshTable } from "./use-refresh-table";
 
 /**
  * Turning row level security on or off.
@@ -29,7 +29,7 @@ export function RlsToggle({
   rls: boolean;
   policyCount: number;
 }) {
-  const router = useRouter();
+  const refresh = useRefreshTable(projectRef);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, start] = useTransition();
@@ -44,7 +44,7 @@ export function RlsToggle({
           return;
         }
         setConfirming(false);
-        router.refresh();
+        refresh();
       } catch {
         setError("The request failed before it answered. Reload and check whether RLS is on.");
       }
