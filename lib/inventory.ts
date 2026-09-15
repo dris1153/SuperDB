@@ -103,7 +103,18 @@ export { isProjectRef };
  * to fetch both again anyway. A stale entry whose connection is gone falls back to the fan-out.
  */
 const OWNER_TTL_MS = 60_000;
-const owners = new Map<string, { connectionId: string; project: Project; at: number }>();
+
+// Pinned to `globalThis` for the same reason as `lib/part-cache.ts`: Next compiles a module once per
+// bundle layer, and this one is reached from a route handler, a server action and an RSC render. A
+// plain module-level Map gives each layer its own, so the entry the page shell warmed was not the one
+// the browser's part requests read — the memo simply missed, quietly, and paid the fan-out again.
+const memo = globalThis as typeof globalThis & {
+  __superdbOwners?: Map<string, { connectionId: string; project: Project; at: number }>;
+};
+const owners = (memo.__superdbOwners ??= new Map<
+  string,
+  { connectionId: string; project: Project; at: number }
+>());
 
 export const resolveProject = cache(async (ref: string) => {
   if (!isProjectRef(ref)) return null;

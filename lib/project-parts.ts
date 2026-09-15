@@ -23,7 +23,7 @@ import {
   windowMinutes,
   type LogRow,
 } from "./logs-sql";
-import { partKey, PART_TTL_MS, readCached, writeCached } from "./part-cache";
+import { generationOf, partKey, PART_TTL_MS, readCached, writeCached } from "./part-cache";
 import type { Part } from "./project-part-names";
 import { memoryUsedPercent, parseMetrics } from "./prometheus";
 import { savedQueries } from "./saved-queries";
@@ -243,12 +243,16 @@ export async function readPart(
   const hit = readCached(key, ttl);
   if (hit) return { ok: true, data: hit.value };
 
+  // Read before the call, checked when it lands: a write that commits during these 800–1200ms
+  // invalidates what this request is about to return, and storing it anyway would put the pre-write
+  // state back for a full TTL.
+  const generation = generationOf(ref);
   const result = await attempt(() => READERS[part](found.token, ref, search));
 
   // Successes only. A refusal is usually something the reader can fix — a missing OAuth scope, a
   // paused project — and a cached one would survive the fix, so re-authorising would appear to
   // change nothing.
-  if (result.ok) writeCached(key, result.data, ttl);
+  if (result.ok) writeCached(key, result.data, ttl, ref, generation);
   return result;
 }
 

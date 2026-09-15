@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { resolveProject } from "./inventory";
 import { restoreProject } from "./mgmt-api";
+import { dropProject } from "./part-cache";
 import { attempt } from "./safe";
 
 export type ResumeResult = { ok: true } | { ok: false; reason: string };
@@ -20,6 +21,10 @@ export async function resumeProject(projectRef: string): Promise<ResumeResult> {
   if (!found) return { ok: false, reason: "Project not found." };
 
   const result = await attempt(() => restoreProject(found.token, projectRef));
+
+  // Not a write to the database, but a change of state the cached reads describe: health and disk
+  // answered for a paused project and would otherwise keep saying so for a minute after it came up.
+  dropProject(projectRef);
 
   // "This project is no longer in a paused state, it is COMING_UP" is the API telling us the job is
   // already under way — someone used another tab, or this page was stale. Reporting that in red

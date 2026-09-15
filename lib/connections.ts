@@ -3,6 +3,7 @@ import { recordEvent } from "./audit";
 import { normaliseTags } from "./tags";
 import { open, seal } from "./crypto";
 import { listOrgs } from "./mgmt-api";
+import { dropUser } from "./part-cache";
 import { refreshTokens, revoke, type OAuthTokens } from "./oauth";
 import { requireUser } from "./supabase/server";
 
@@ -81,8 +82,16 @@ type Row = Connection & { dek_wrapped: string; secret_cipher: string; expires_at
  * one audit event instead of nine, and nothing for the losers to mis-handle.
  *
  * Per process, so several instances can still race; the re-read below is what covers that.
+ *
+ * Pinned to `globalThis`, like `lib/part-cache.ts` and the owners memo: one compiled copy per bundle
+ * layer means one map per layer, and a route handler would not share its in-flight refresh with a
+ * server action — which is exactly the concurrent case this exists for. Single-flight that only works
+ * within one layer is not single-flight.
  */
-const refreshes = new Map<string, Promise<string>>();
+const flight = globalThis as typeof globalThis & {
+  __superdbRefreshes?: Map<string, Promise<string>>;
+};
+const refreshes = (flight.__superdbRefreshes ??= new Map<string, Promise<string>>());
 
 /**
  * A failed refresh means the user revoked the app upstream. Record it and leave the row alone so the
@@ -385,7 +394,7 @@ export async function listTags(): Promise<string[]> {
 }
 
 export async function removeConnection(id: string) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { data } = await supabase
     .from("connections")
     .select("kind, display_name, dek_wrapped, secret_cipher")
@@ -400,6 +409,11 @@ export async function removeConnection(id: string) {
 
   const { error } = await supabase.from("connections").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  // The read cache is keyed by project, not by connection, so there is no way to drop only what this
+  // token fetched. Everything of theirs goes: a disconnect that leaves five minutes of data fetched
+  // through the removed grant is not a disconnect.
+  dropUser(user.id);
 
   // Written after the delete so a failed delete is not logged as a success. connection_id survives
   // as a dangling reference on purpose — it is the row most worth keeping.
