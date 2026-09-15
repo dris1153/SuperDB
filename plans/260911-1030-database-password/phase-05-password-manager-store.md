@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Password Manager: store"
-status: pending
+status: in-progress  # code done; the schema is a manual deploy and has not run
 priority: P1
 effort: "4h"
 dependencies: [1, 2, 3]
@@ -150,21 +150,60 @@ deferred, put a comment at `lib/vault-actions.ts:37` naming `project_secrets` as
 5. `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 6. By hand: save, reload, lock, unlock, reopen.
 
+## What landed
+
+- `lib/project-secret-actions.ts` — the `"use server"` half, because `lib/project-secrets.ts` is
+  `server-only` by design and a client component cannot call it. **Storing and clearing are two
+  functions**, so the difference between "save this", "leave it alone" and "delete it" can never
+  depend on a value happening to be `undefined` — which is precisely what `seal()` returns when the
+  vault has locked.
+- `lib/project-secrets.ts` — `listProjectSecrets`, and the comment at `:14` corrected: it claimed the
+  action wrapper could live in a page, which a `"use server"` file cannot do.
+- `lib/vault-actions.ts` — `rotateVault` now takes project blobs as a **required** third argument.
+  It replaces the vault's salt in the same call that re-encrypts, so the old key stops existing when
+  it returns; anything it skipped is unreadable for good. It took connection blobs only, which meant
+  the first change-master-password screen anyone built would have destroyed every stored database
+  password. Required rather than defaulted, so forgetting the next table fails the build.
+- `supabase/schema.sql` — `project_secrets_blob_len`. `MAX_BLOB` lived only in TypeScript, and the
+  `saved_queries` block twenty lines below already explains why that is not a cap: a signed-in
+  browser reaches PostgREST as `authenticated`, which is the role the policy admits, without passing
+  through this app's code at all.
+- `components/project-settings/password-manager.tsx` and its route.
+
+**The decrypt window is handled at the call site, not in the hook.** Between mount and the decrypt
+resolving, `value` is `{}` and `decryptFailed` is false — so `seal({})` returns null and a save would
+delete the row while every guard reports health. `decryptFailed` cannot cover it, because the blob
+decrypts perfectly; it just has not finished. Save is blocked while a blob exists and no value has
+arrived.
+
+/p/[ref]/settings/passwords first load: 646,909 bytes.
+
+## NOT DONE: the schema has not been applied
+
+`supabase/schema.sql` still has not run. The app's own database lives in a Supabase project that
+`SB_TOKEN` cannot reach — checked — and there is no `psql` or service-role key on this machine, so
+this is the manual deploy the plan said it was.
+
+**Until it runs, this page cannot store anything**, `project_secrets` still has no rows, and phase 1's
+six criteria remain unchecked. `saved_queries` is in the same state and is applied by the same run.
+
 ## Success Criteria
 
-- [ ] `supabase/schema.sql` applied; phase 1's criteria checked and recorded there.
-- [ ] A saved password survives a reload and a lock/unlock cycle.
-- [ ] **A blob that cannot be decrypted blocks saving** rather than overwriting it.
-- [ ] Each of the five states is reachable and distinguishable.
-- [ ] **The server never receives plaintext** — verified by inspecting the request payload in the
-      network tab, not by reading the code. That criterion is worded this way on purpose: it is the
-      only check a plausible-looking implementation cannot satisfy by accident.
-- [ ] The page says the password cannot be validated, and no test-connection feature was built.
-- [ ] The blob length cap exists in the database, not only in TypeScript.
-- [ ] `rotateVault` either covers `project_secrets` or says in a comment that it does not.
-- [ ] Save is impossible during the decrypt window, not merely unlikely.
-- [ ] `pnpm test` still green — **`lib` only, no DOM harness, so every component criterion above is a
-      manual check rather than coverage.**
+- [ ] **Blocked on the schema.** `supabase/schema.sql` applied; phase 1's criteria checked and
+      recorded there.
+- [ ] **Blocked on the schema.** A saved password survives a reload and a lock/unlock cycle.
+- [ ] **Needs the app.** A blob that cannot be decrypted blocks saving rather than overwriting it.
+- [ ] **Needs the app.** Each of the five states is reachable and distinguishable.
+- [ ] **Needs the app.** The server never receives plaintext — verified by inspecting the request
+      payload in the network tab, not by reading the code.
+- [x] The page says the password cannot be validated, and no test-connection feature was built.
+- [x] The blob length cap exists in the database, not only in TypeScript — written into the schema,
+      pending the same deploy.
+- [x] `rotateVault` covers `project_secrets`, and its signature makes the next omission a build
+      failure rather than a silent loss.
+- [x] Save is impossible during the decrypt window, not merely unlikely.
+- [x] `pnpm test` still green — 396. `lib` only, no DOM harness, so every component row above is a
+      manual check rather than coverage.
 
 ## Risk Assessment
 

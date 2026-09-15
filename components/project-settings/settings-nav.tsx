@@ -24,6 +24,7 @@ const ROWS: { slug: string; label: string; endpoint: string; ready?: boolean }[]
     slug: "passwords",
     label: "Password Manager",
     endpoint: "PATCH /v1/projects/{ref}/database/password",
+    ready: true,
   },
   {
     slug: "infrastructure",

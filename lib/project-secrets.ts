@@ -10,8 +10,9 @@ import { isProjectRef } from "./project-ref";
  * and only because it is the key.
  *
  * Not a "use server" module. Every export of one becomes an action the browser can call, and the read
- * is used by a server component — the same reason write-audit.ts stays out. The action wrapper lives
- * in the page beside its neighbours.
+ * is used by a server component — the same reason write-audit.ts stays out. The browser-facing half
+ * is `project-secret-actions.ts`: a `"use server"` file may only export async functions, so the
+ * wrapper cannot live in a page, as this comment used to claim.
  */
 
 /**
@@ -33,6 +34,23 @@ export async function projectSecret(ref: string): Promise<string | null> {
   if (error) throw new Error(error.message);
 
   return (data?.vault_blob as string | null) ?? null;
+}
+
+/**
+ * Every stored project blob for the signed-in user.
+ *
+ * Exists for `rotateVault`, which re-encrypts everything under a new key and would otherwise have no
+ * way to see these rows — see the comment there.
+ */
+export async function listProjectSecrets(): Promise<{ project_ref: string; vault_blob: string }[]> {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase
+    .from("project_secrets")
+    .select("project_ref, vault_blob")
+    .not("vault_blob", "is", null);
+  if (error) throw new Error(error.message);
+
+  return (data ?? []) as { project_ref: string; vault_blob: string }[];
 }
 
 /** Passing null clears the entry — the caller decides that, never this function. */

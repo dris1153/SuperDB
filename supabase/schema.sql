@@ -248,6 +248,14 @@ create table if not exists public.project_secrets (
   primary key (user_id, project_ref)
 );
 
+-- The length check lives here rather than only in saveProjectSecret, for the reason spelled out on
+-- saved_queries below: the browser holds a session and the anon key, so an insert can reach this
+-- table without passing through the app's own code. `revoke all from anon` does not cover it — a
+-- signed-in browser arrives as `authenticated`, which is the role the policy admits.
+alter table public.project_secrets drop constraint if exists project_secrets_blob_len;
+alter table public.project_secrets
+  add constraint project_secrets_blob_len check (char_length(vault_blob) <= 8000);
+
 alter table public.project_secrets enable row level security;
 
 drop policy if exists "own project secrets" on public.project_secrets;

@@ -32,7 +32,7 @@ Design, the constraint that made it possible, and what was settled without askin
 | 2 | [Shared vault secret hook](phase-02-vault-secret-hook.md) | **done** | ~2h | — |
 | 3 | [Settings shell and General](phase-03-settings-shell.md) | **done** | ~2h | — |
 | 4 | [Rename a project](phase-04-rename.md) | **done** | ~3h | 3 |
-| 5 | [Password Manager: store](phase-05-password-manager-store.md) | pending | ~4h | 1, 2, 3 |
+| 5 | [Password Manager: store](phase-05-password-manager-store.md) | **in-progress** | ~4h | 1, 2, 3 |
 | 6 | [Reset](phase-06-reset.md) | pending | ~4h | 5 |
 | 7 | [Connect sheet](phase-07-connect-sheet.md) | pending | ~3h | 5 |
 
