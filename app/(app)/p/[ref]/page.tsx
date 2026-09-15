@@ -13,7 +13,7 @@ import {
 } from "@/lib/mgmt-api";
 import { dbOverview } from "@/lib/db-introspect";
 import { isMoving, isPaused } from "@/lib/project-status";
-import type { ChartInterval } from "@/lib/logs-sql";
+import { asInterval, type ChartInterval } from "@/lib/logs-sql";
 import { memoryUsedPercent, parseMetrics } from "@/lib/prometheus";
 import { computeLabel, regionCountry, regionLabel, statusLabel } from "@/lib/regions";
 import { attempt, safe } from "@/lib/safe";
@@ -28,7 +28,6 @@ import { StatusDots } from "@/components/status-dots";
 
 export const dynamic = "force-dynamic";
 
-const INTERVALS: ChartInterval[] = ["15min", "30min", "1hr", "1day"];
 
 export default async function ProjectOverviewPage({
   params,
@@ -38,9 +37,7 @@ export default async function ProjectOverviewPage({
   searchParams: Promise<{ interval?: string }>;
 }) {
   const [{ ref }, { interval: rawInterval }] = await Promise.all([params, searchParams]);
-  const interval = INTERVALS.includes(rawInterval as ChartInterval)
-    ? (rawInterval as ChartInterval)
-    : "1hr";
+  const interval = asInterval(rawInterval);
 
   const found = await resolveProject(ref);
   if (!found) notFound();

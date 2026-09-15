@@ -4,6 +4,7 @@ import { connectionsWithTokens, type Connection, type ConnectionKind } from "./c
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
 import { projectOrder } from "./project-order";
 import { isProjectRef } from "./project-ref";
+import { requireUser } from "./supabase/server";
 import { bySavedOrder } from "./project-sort";
 
 export type InventoryProject = Project & {
@@ -85,19 +86,48 @@ export { isProjectRef };
  * Wrapped in cache() because the project layout and the page inside it both need this, and each call
  * fans out one request per connection — without deduplication every navigation would double them.
  */
+/**
+ * Which connection last answered for a ref, per user, for a minute.
+ *
+ * `cache()` below deduplicates within one request, which was enough while a page resolved the
+ * project once. The read endpoints turned that into one resolve *per part*, and each resolve asks
+ * every connection — three connections and ten cards is thirty upstream calls spent on authorisation
+ * alone, against an API that throttles.
+ *
+ * Only a connection id is remembered, never a token, and it is only ever used to pick from rows the
+ * caller's own RLS-scoped query returned. A stale entry costs one wasted call and falls back to the
+ * fan-out, so ownership cannot be inherited from it.
+ */
+const OWNER_TTL_MS = 60_000;
+const owners = new Map<string, { connectionId: string; at: number }>();
+
 export const resolveProject = cache(async (ref: string) => {
   if (!isProjectRef(ref)) return null;
   const connections = await connectionsWithTokens();
 
-  const hits = await Promise.all(
-    connections.map(async ({ token, ...connection }) => {
-      if (!token) return null;
-      try {
-        return { token, connection, project: await getProject(token, ref) };
-      } catch {
-        return null;
-      }
-    }),
-  );
-  return hits.find((h) => h !== null) ?? null;
+  const { user } = await requireUser();
+  const key = `${user.id}:${ref}`;
+  const remembered = owners.get(key);
+
+  const ask = async (entry: (typeof connections)[number]) => {
+    const { token, ...connection } = entry;
+    if (!token) return null;
+    try {
+      return { token, connection, project: await getProject(token, ref) };
+    } catch {
+      return null;
+    }
+  };
+
+  if (remembered && Date.now() - remembered.at < OWNER_TTL_MS) {
+    const known = connections.find((c) => c.id === remembered.connectionId);
+    const hit = known ? await ask(known) : null;
+    if (hit) return hit;
+    owners.delete(key);
+  }
+
+  const hits = await Promise.all(connections.map(ask));
+  const hit = hits.find((h) => h !== null) ?? null;
+  if (hit) owners.set(key, { connectionId: hit.connection.id, at: Date.now() });
+  return hit;
 });

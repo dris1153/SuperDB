@@ -98,6 +98,22 @@ async function accessTokenFor(
     return tokens.access_token;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+
+    // A refresh token is single-use: Supabase rotates it, so when several requests refresh the same
+    // connection at once exactly one wins and the rest fail on a token that is no longer current.
+    // That is not a revoked grant, and recording it as one would put a healthy connection into
+    // "Reconnect required" and 404 every read through it. Re-read the row: if someone else rotated
+    // it while this call was in flight, use what they stored.
+    const { data: fresh } = await supabase
+      .from("connections")
+      .select(`${SAFE_COLUMNS}, dek_wrapped, secret_cipher, expires_at`)
+      .eq("id", row.id)
+      .maybeSingle();
+
+    if (fresh && (fresh as Row).expires_at !== row.expires_at) {
+      return openSecret(fresh as Row).access;
+    }
+
     await supabase.from("connections").update({ last_error: message }).eq("id", row.id);
     await recordEvent(supabase, {
       connectionId: row.id,

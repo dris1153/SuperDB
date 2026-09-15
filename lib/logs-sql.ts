@@ -46,6 +46,12 @@ const STEP_MS: Record<string, number> = { minute: 60_000, hour: 3_600_000 };
 
 export const windowMinutes = (interval: ChartInterval) => WINDOW_MINUTES[interval];
 
+export const INTERVALS: ChartInterval[] = ["15min", "30min", "1hr", "1day"];
+
+/** Whatever arrived in the URL, resolved to an interval. An unknown one is the default, not an error. */
+export const asInterval = (raw: string | null | undefined): ChartInterval =>
+  INTERVALS.includes(raw as ChartInterval) ? (raw as ChartInterval) : "1hr";
+
 /** 15, 30 or 60 bars for the short windows; 24 for a day. timestamp_trunc has nothing in between. */
 export const bucketUnit = (minutes: number) => (minutes <= 90 ? "minute" : "hour");
 

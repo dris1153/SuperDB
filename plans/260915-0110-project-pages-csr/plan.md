@@ -21,7 +21,7 @@ Design, the measurement behind it, and what this gives up:
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
 | 1 | [Measure the baseline](phase-01-baseline.md) | **done** | ~1h | — |
-| 2 | [The read endpoint family](phase-02-read-endpoints.md) | pending | ~4h | — |
+| 2 | [The read endpoint family](phase-02-read-endpoints.md) | **in-progress** | ~4h | — |
 | 3 | [Query client and hooks](phase-03-query-client.md) | pending | ~2h | 2 |
 | 4 | [Project overview page](phase-04-overview-page.md) | pending | ~1d | 3 |
 | 5 | [Database page](phase-05-database-page.md) | pending | ~4h | 3 |
