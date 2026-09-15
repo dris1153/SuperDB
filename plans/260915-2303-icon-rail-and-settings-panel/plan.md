@@ -23,7 +23,7 @@ Design, what the screenshot actually showed, and what was rejected:
 | 1 | [The layout owns the height](phase-01-layout-owns-height.md) | **in-progress** | ~2h | — |
 | 2 | [The icon rail](phase-02-icon-rail.md) | **in-progress** | ~3h | — |
 | 3 | [Topbar breadcrumb](phase-03-topbar.md) | **in-progress** | ~2h | 1, 2 |
-| 4 | [Settings as a panel](phase-04-settings-panel.md) | pending | ~3h | 2 |
+| 4 | [Settings as a panel](phase-04-settings-panel.md) | **in-progress** | ~3h | 2 |
 
 **Phase 1 exists to be checked before anything hides its evidence.** Two pages are `h-screen` and
 assume they own the viewport; the topbar in phase 3 makes that false. Doing them together means a

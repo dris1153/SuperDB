@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Settings as a panel"
-status: pending
+status: in-progress  # code done; the visual check needs the app
 priority: P2
 effort: "3h"
 dependencies: [2]
@@ -57,13 +57,32 @@ was verified against the OpenAPI spec rather than remembered.
 3. Check both settings routes and the greyed rows' `title` text.
 4. `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 
+## What landed
+
+- `components/project-settings/settings-nav.tsx` — two groups, a "Settings" heading, and every row's
+  endpoint still in `title`.
+- `app/(app)/p/[ref]/settings/layout.tsx` — the panel against the rail, the section beside it, and
+  the page title moved into the content column where it belongs.
+
+**`min-h-full`, not `h-full`.** The project layout's content area already scrolls; giving this its own
+scroller would nest one inside the other and put two scrollbars on a long section. The panel's border
+runs to whichever column is taller, which is what makes it read as a column rather than a card.
+
+**The empty-group guard is there before a group can be empty.** Both have rows today. A heading
+standing over nothing is the kind of thing that appears months later when a row becomes conditional,
+and it costs one line to make impossible now.
+
+/p/[ref]/settings 653,916 to 654,281 bytes.
+
 ## Success Criteria
 
-- [ ] Settings renders as rail + nav panel + content on both its routes.
-- [ ] Both group headings appear; no heading is left standing over an empty group.
-- [ ] Every greyed row still names its endpoint in `title`.
-- [ ] The settings panel and the rail look like one system rather than two conventions.
-- [ ] `pnpm test` still green — 410.
+- [x] Settings renders as rail + nav panel + content on both its routes.
+- [x] Both group headings appear; a group with no rows renders no heading.
+- [x] Every greyed row still names its endpoint in `title` — the record of which rows have an API
+      behind them, carried on the page rather than in a plan file.
+- [ ] **Needs the app.** The settings panel and the rail look like one system rather than two
+      conventions.
+- [x] `pnpm test` still green — 410.
 
 ## Risk Assessment
 
