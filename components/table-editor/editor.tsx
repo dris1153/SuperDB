@@ -11,7 +11,7 @@ import { TablesSidebar } from "./sidebar";
 import { TabBar } from "./tab-bar";
 import { TableWorkspace } from "./workspace";
 import { TableUrlProvider } from "./url";
-import { useProjectPart } from "@/components/use-project-part";
+import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
 
 type Schemas = { schemas: string[]; exposed: string[] | null };
 type Rows = { rows: RowRecord[]; total: RowCount; page: number; size: number };
@@ -185,6 +185,8 @@ export function TableEditor({ projectRef, projectName }: { projectRef: string; p
               size={page ? page.size : size}
               view={view}
               definition={definition.status === "ready" ? definition.data : null}
+              definitionPending={isWaiting(definition)}
+              definitionReason={reasonOf(definition)}
               // Only an ordinary table with a primary key can have one of its rows addressed. A view
               // and a keyless table each fail for their own reason, which the toolbar states.
               editable={

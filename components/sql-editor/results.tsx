@@ -6,7 +6,7 @@ import { DataGrid, type Column } from "react-data-grid";
 import "react-data-grid/lib/styles.css";
 import type { RunResult, Row } from "@/lib/sql-editor-actions";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
 
 // Loaded when the tab is opened. recharts is large and this route already carries CodeMirror, so
 // nothing that is never opened belongs in its first load.
@@ -77,6 +77,13 @@ export const Results = memo(function Results({
               ) : null}
             </div>
           </Panel>
+        ) : pending && rows == null ? (
+          // "Click Run" is an answer — that nothing has been run — and the user has just run
+          // something. Shaped like the grid below it: a 36px header over 32px rows.
+          <div className="flex h-full flex-col">
+            <div className="h-9 shrink-0 border-b border-border bg-card" />
+            <SkeletonRows rowHeight={32} className="min-h-0 flex-1" />
+          </div>
         ) : rows == null ? (
           <Panel>Click Run to execute your query.</Panel>
         ) : rows.length === 0 ? (

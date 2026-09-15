@@ -24,17 +24,19 @@ const StackedBars = dynamic(() => import("./stacked-bars").then((m) => m.Stacked
  */
 export function ServiceCarouselSkeleton() {
   return (
-    <div className="flex gap-3 overflow-hidden">
+    <div aria-hidden className="flex gap-3 overflow-hidden">
       {[0, 1, 2].map((card) => (
         <Card key={card} className="w-72 shrink-0 gap-0 p-4">
           <div className="flex items-start justify-between gap-3">
+            {/* Sized to the line boxes they replace, not to the glyphs: `text-2xl` is 32px and the
+                label above it is 16px, which is where this was four pixels short. */}
             <div className="min-w-0 space-y-1">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-7 w-16" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-8 w-16" />
             </div>
             <div className="flex shrink-0 gap-4">
-              <Skeleton className="h-8 w-14" />
-              <Skeleton className="h-8 w-14" />
+              <Skeleton className="h-9 w-14" />
+              <Skeleton className="h-9 w-14" />
             </div>
           </div>
           <Skeleton className="mt-4 h-24 w-full" />

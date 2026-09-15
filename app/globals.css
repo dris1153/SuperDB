@@ -245,7 +245,6 @@
  */
 @utility skeleton-rows {
   --row: 36px;
-  background-color: var(--card);
   background-image:
     linear-gradient(90deg, transparent 40%, var(--border) 50%, transparent 60%),
     repeating-linear-gradient(

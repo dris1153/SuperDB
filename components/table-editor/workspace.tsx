@@ -33,6 +33,8 @@ export function TableWorkspace({
   size,
   view,
   definition,
+  definitionPending,
+  definitionReason,
   editable,
 }: {
   projectRef: string;
@@ -57,6 +59,9 @@ export function TableWorkspace({
   editable: boolean;
   /** Only fetched when the definition tab is the one being looked at. */
   definition: { ddl: string; html: string | null; complete: boolean } | null;
+  /** The definition's own wait and its own refusal, which are not the same as having none. */
+  definitionPending: boolean;
+  definitionReason: string | null;
 }) {
   // Read here as well as in the grid so the placeholder's rules land on the same pitch the real rows
   // will use. A fixed pitch would redraw itself the moment the answer arrived.
@@ -86,6 +91,8 @@ export function TableWorkspace({
           ddl={definition?.ddl ?? null}
           html={definition?.html ?? null}
           complete={definition?.complete ?? true}
+          pending={definitionPending}
+          reason={definitionReason}
         />
         <TableFooter
           page={page}

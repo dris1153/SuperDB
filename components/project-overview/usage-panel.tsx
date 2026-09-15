@@ -7,7 +7,7 @@ import { IntervalPicker } from "@/components/interval-picker";
 import { ServiceCarousel, ServiceCarouselSkeleton } from "@/components/service-carousel";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { reasonOf, useProjectPart } from "@/components/use-project-part";
+import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
 
 type Usage = { from: number; to: number; cards: ServiceCard[] };
 
@@ -37,8 +37,10 @@ export function UsagePanel({ projectRef }: { projectRef: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <div className="flex items-baseline gap-2">
-            {usage.status === "pending" ? (
-              <Skeleton className="inline-block h-7 w-16" />
+            {isWaiting(usage) ? (
+              // h-8: `text-2xl` below is a 32px line box, and a shorter box moves the row it is
+              // baseline-aligned in when the figure lands.
+              <Skeleton className="h-8 w-16" />
             ) : usage.status === "ready" ? (
               <span className="text-2xl tabular-nums text-foreground">{compact(total)}</span>
             ) : (
@@ -58,7 +60,7 @@ export function UsagePanel({ projectRef }: { projectRef: string }) {
         <IntervalPicker value={interval} />
       </div>
 
-      {usage.status === "pending" || usage.status === "idle" ? (
+      {isWaiting(usage) ? (
         <ServiceCarouselSkeleton />
       ) : usage.status !== "ready" ? (
         <Card className="p-6 text-center text-sm text-subtle">{reasonOf(usage)}</Card>

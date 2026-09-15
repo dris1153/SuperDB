@@ -1,4 +1,4 @@
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
 
 /**
  * The editor's chrome is a fixed three-part frame — sidebar, tab bar, grid — so the skeleton can
@@ -30,11 +30,10 @@ export default function Loading() {
           <Skeleton className="ml-auto h-8 w-32 rounded" />
         </div>
 
-        <div className="min-h-0 flex-1 space-y-px p-px">
-          {Array.from({ length: 18 }, (_, i) => (
-            <Skeleton key={i} className="h-9 rounded-none" />
-          ))}
-        </div>
+        {/* The grid's own geometry: a 40px header over 36px rows. Eighteen fills separated by a
+            1px gap made a 37px pitch, which drifted a row out of step every thirty-six. */}
+        <div className="h-10 shrink-0 border-b border-border bg-card" />
+        <SkeletonRows rowHeight={36} className="min-h-0 flex-1" />
       </div>
     </div>
   );

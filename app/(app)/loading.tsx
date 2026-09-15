@@ -19,13 +19,13 @@ export default function Loading() {
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-[76px]" />
+          <Skeleton key={i} className="h-[76px] border border-border" />
         ))}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }, (_, i) => (
-          <Skeleton key={i} className="h-[124px]" />
+          <Skeleton key={i} className="h-[124px] border border-border" />
         ))}
       </div>
     </div>

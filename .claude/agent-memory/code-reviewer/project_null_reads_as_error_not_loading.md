@@ -1,19 +1,30 @@
 ---
 name: null-reads-as-error-not-loading
-description: table-editor presentation components treat a null prop as "could not read", so passing null while a query is pending renders a hard error message as the loading state
+description: presentation components in this repo treat a null/empty prop as "could not read" or an instruction, so passing it while a query is in flight renders an answer as the loading state — three sites confirmed, one still open
 metadata:
   type: project
 ---
 
-`workspace.tsx` renders `Could not read {schema}.{table}` for `rows === null`, and `definition.tsx`
-renders `No definition could be reconstructed` for `ddl === null`. Both were written against the
-server page, where null could only ever mean a failed `safe()` call — there was no "not yet".
+A prop that used to mean "the server read failed" gets reused for "not back yet", and the component
+prints a definite answer during a wait. Recurring bug class here; check it on every review.
 
-**Why:** with TanStack and no `placeholderData`, a query key change (sort, page, filter, table) drops
-back to `pending` with `data === undefined`. Mapping that to the same `null` the failure path uses
-makes every interaction flash a hard error before the data lands.
+Status as of 2026-09-15:
 
-**How to apply:** when converting a server page here, a prop that used to mean "read failed" needs a
-third value, or the query needs `placeholderData: keepPreviousData`. Do not accept "it resolves in
-200ms" — these are the components users stare at. Related:
-[[partstate-collapses-disabled-into-pending]].
+- `components/table-editor/workspace.tsx` — **fixed**. Splits on a separate `rowsPending` prop and
+  renders a grid-shaped skeleton; `Could not read {schema}.{table}` is now only the failure path.
+- `components/table-editor/definition.tsx` — **still open**. `ddl === null` renders
+  `No definition could be reconstructed for this relation.` and `editor.tsx` passes
+  `definition?.ddl ?? null`, which is null for pending/idle/refused/failed alike. Every first visit
+  to the Definition tab shows that sentence before the DDL arrives.
+- `components/sql-editor/results.tsx` — **still open**. `rows == null` renders
+  `Click Run to execute your query.`, so the first Run in a tab tells the user to do what they just
+  did, at 50% opacity.
+
+**Why:** these were written against the old server pages, where null could only come from a failed
+`safe()` call — there was no "not yet". The CSR migration introduced a third meaning and did not
+revisit the presentation components.
+
+**How to apply:** for any component taking `T | null`, ask what null means when the query is
+`pending` *and* when it is `idle`. The fix is a third value (a `pending` boolean prop), not
+`placeholderData` alone. Related: [[partstate-collapses-disabled-into-pending]],
+[[part-ok-true-without-data]].

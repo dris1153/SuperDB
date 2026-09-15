@@ -12,7 +12,10 @@ import { cn } from "@/lib/utils";
  * two places that replace a card.
  */
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn("skeleton rounded-md", className)} />;
+  // A `span` rather than a `div`: half the call sites sit inside a paragraph or a `span` of text,
+  // where a div is invalid content. `block` makes it behave as one everywhere else, and a call site
+  // that wants it inline passes `inline-block`.
+  return <span aria-hidden className={cn("skeleton block rounded-md", className)} />;
 }
 
 /**

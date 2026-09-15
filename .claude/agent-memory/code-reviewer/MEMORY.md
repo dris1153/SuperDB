@@ -8,5 +8,5 @@
 - [CSR fan-out multiplies resolveProject](project_csr_fanout_amplifies_resolveproject.md) — mostly fixed by the owners memo + in-flight refresh map; both are in-process only
 - [25006 proves little](project_readonly_refusal_proves_little.md) — read-only refusals are by command tag; DDL "verified" by a 25006 probe is unverified
 - [ok:true with no data](project_part_ok_true_without_data.md) — an empty upstream body ships `{"ok":true}`; `state.data` is typed T but can be undefined, and the deref kills the whole route
-- [Disabled parts read as pending](project_partstate_collapses_disabled_into_pending.md) — `enabled:false` gives status "pending" forever; any aggregated busy flag built from it never clears
-- [null means error, not loading](project_null_reads_as_error_not_loading.md) — workspace/definition render a hard "could not read" for null, so a pending query flashes a failure message
+- [Disabled parts now read as idle](project_partstate_collapses_disabled_into_pending.md) — fixed; the live trap is branches on `status === "pending"` alone that drop `idle` into the else
+- [null means error, not loading](project_null_reads_as_error_not_loading.md) — recurring; definition.tsx and sql-editor/results.tsx still print an answer while a query is in flight

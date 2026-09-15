@@ -93,7 +93,7 @@ export function Step({
  */
 export function StepSkeleton({ steps = 2 }: { steps?: number }) {
   return (
-    <div className="space-y-6">
+    <div aria-hidden className="space-y-6">
       {Array.from({ length: steps }, (_, step) => (
         <div key={step} className="grid gap-3 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
           <div className="flex gap-2.5">
@@ -103,7 +103,8 @@ export function StepSkeleton({ steps = 2 }: { steps?: number }) {
               <Skeleton className="h-3 w-full" />
             </div>
           </div>
-          <Skeleton className="h-24 min-w-0" />
+          {/* Bordered, because what lands here is a `CodeBlock`, which is bordered. */}
+          <Skeleton className="h-24 min-w-0 border border-border" />
         </div>
       ))}
     </div>

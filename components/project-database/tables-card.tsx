@@ -39,7 +39,9 @@ export function DatabaseTables({ projectRef }: { projectRef: string }) {
       {isWaiting(tables) ? (
         // The real header and six rows, not a block the height of them: the columns are already
         // laid out when the names arrive, so nothing re-flows. Six is what an ordinary project fills.
-        <div className="overflow-hidden rounded-lg border border-border">
+        // `aria-hidden` on the whole thing: the cells are hidden individually, but the table around
+        // them still announces six columns and six rows — a claim that six tables exist.
+        <div aria-hidden className="overflow-hidden rounded-lg border border-border">
           <Table className="min-w-2xl">
             <TableHeader className="bg-card">
               <TableRow className="hover:bg-transparent">
@@ -54,8 +56,10 @@ export function DatabaseTables({ projectRef }: { projectRef: string }) {
               {[0, 1, 2, 3, 4, 5].map((row) => (
                 <TableRow key={row} className="hover:bg-transparent">
                   {CELLS.map((width, cell) => (
+                    // h-5, not h-4: the cell's own text is `text-sm`, a 20px line box, and four
+                    // pixels short across six rows is 24px of shift the moment the list lands.
                     <TableCell key={cell}>
-                      <Skeleton className={`h-4 ${width} ${cell === 5 ? "rounded-full" : ""}`} />
+                      <Skeleton className={`h-5 ${width} ${cell === 5 ? "rounded-full" : ""}`} />
                     </TableCell>
                   ))}
                 </TableRow>

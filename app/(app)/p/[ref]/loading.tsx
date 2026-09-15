@@ -30,11 +30,11 @@ export default function Loading() {
 
         {/* The dotted canvas is cheap and static, so it renders for real rather than as a block. */}
         <div className="relative flex min-h-80 items-center justify-center rounded-lg border border-border bg-[radial-gradient(var(--color-subtle)_0.5px,transparent_0.5px)] [background-size:16px_16px]">
-          <Skeleton className="h-40 w-full max-w-sm rounded-lg" />
+          <Skeleton className="h-40 w-full max-w-sm rounded-lg border border-border" />
         </div>
       </div>
 
-      <Skeleton className="h-40 rounded-lg" />
+      <Skeleton className="h-40 rounded-lg border border-border" />
     </div>
   );
 }

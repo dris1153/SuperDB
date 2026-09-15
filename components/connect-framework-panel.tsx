@@ -236,7 +236,7 @@ export function FrameworkPanel({ projectRef }: { projectRef: string }) {
         {keys?.blocked ? (
           <p className="text-sm text-subtle">{keys.reason}</p>
         ) : guide === null ? (
-          <StepSkeleton />
+          <StepSkeleton steps={3} />
         ) : (
           <div
             className={`space-y-6 transition-opacity ${pending ? "opacity-50" : ""}`}
