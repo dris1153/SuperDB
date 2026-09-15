@@ -17,6 +17,7 @@ export function SqlTabBar({
   activeId,
   queries,
   dirtyIds,
+  loading,
   onSelect,
   onClose,
   onAdd,
@@ -26,6 +27,8 @@ export function SqlTabBar({
   queries: SavedQuery[];
   /** Tabs whose buffer differs from what is saved. */
   dirtyIds: ReadonlySet<string>;
+  /** The saved list is still being read, so a tab's query cannot be named yet. */
+  loading: boolean;
   onSelect: (id: string) => void;
   onClose: (tab: SqlTab) => void;
   onAdd: () => void;
@@ -38,8 +41,10 @@ export function SqlTabBar({
         const dirty = dirtyIds.has(tab.id);
         // A tab holding an id that resolves to nothing is not the same as one never saved: the query
         // was deleted, or sits past the list's limit. Either way the text here is not known to be
-        // stored anywhere, and saying "Untitled" would imply it never was.
-        const label = saved?.name ?? (tab.queryId ? "Unlinked query" : "Untitled query");
+        // stored anywhere, and saying "Untitled" would imply it never was. While the list is still
+        // being read, it resolves to nothing for a much duller reason.
+        const label =
+          saved?.name ?? (!tab.queryId ? "Untitled query" : loading ? "Loading…" : "Unlinked query");
 
         return (
           <div

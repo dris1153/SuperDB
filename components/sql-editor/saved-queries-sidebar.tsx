@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
  */
 export function SavedQueriesSidebar({
   queries,
+  loading,
   unavailable,
   activeId,
   pending,
@@ -33,8 +34,10 @@ export function SavedQueriesSidebar({
   onShowRunning,
 }: {
   queries: SavedQuery[];
-  /** The list could not be read. Saying "nothing saved yet" instead would be a claim, not a fact. */
-  unavailable: boolean;
+  /** Still being read. An empty sidebar during that would claim there is nothing saved. */
+  loading: boolean;
+  /** Why the list could not be read, if it could not. */
+  unavailable: string | null;
   activeId: string | null;
   /** A mutation is in flight. The row controls go with it — see the note on QuerySection. */
   pending: boolean;
@@ -75,9 +78,19 @@ export function SavedQueriesSidebar({
       </div>
 
       <div className={cn("flex-1 overflow-y-auto pb-2 transition-opacity", pending && "opacity-60")}>
-        {unavailable ? (
+        {loading ? (
+          <div className="space-y-1 px-3 py-2">
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="block h-5 w-full animate-pulse rounded bg-muted motion-reduce:animate-none"
+              />
+            ))}
+          </div>
+        ) : unavailable ? (
           <p className="px-3 py-6 text-center text-xs text-subtle">
             Saved queries could not be read. The editor still works.
+            <span className="mt-1 block">{unavailable}</span>
           </p>
         ) : queries.length === 0 ? (
           <p className="px-3 py-6 text-center text-xs text-subtle">

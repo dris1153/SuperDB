@@ -25,6 +25,7 @@ import {
 } from "./logs-sql";
 import type { Part } from "./project-part-names";
 import { memoryUsedPercent, parseMetrics } from "./prometheus";
+import { savedQueries } from "./saved-queries";
 import { describeTable, listPolicies, listSchemas, listTablesIn } from "./table-editor";
 import { tableDefinition } from "./table-ddl";
 import { rowCount, selectRows, type RowCount } from "./table-rows";
@@ -185,6 +186,20 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
 
     return { rows, total, page, size };
   },
+
+  /**
+   * The only reader that does not touch the Management API: saved queries live in this app's own
+   * database, behind RLS, and `savedQueries` already scopes them to the caller. The project's
+   * ownership is still checked first — `readPart` resolves it before any reader runs — so a ref the
+   * user has no connection to answers 404 rather than an empty list.
+   */
+  "saved-queries": async (_t, ref) =>
+    savedQueries(ref).catch(() => {
+      // Deliberately not the Postgres message. Every other reader's reason comes from the user's own
+      // project and is theirs to act on; this one comes from *this app's* database, where
+      // `relation "public.saved_queries" does not exist` is a deployment detail, not an instruction.
+      throw new Error("Saved queries are unavailable on this instance.");
+    }),
 
   logs: async (t, ref, search) => {
     const minutes = windowMinutes(asInterval(search.get("interval")));

@@ -32,6 +32,8 @@ export const PART_NAMES = [
   "policies",
   "rows",
   "definition",
+  // The SQL editor's sidebar. Its own table in this app's database, not the project's.
+  "saved-queries",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

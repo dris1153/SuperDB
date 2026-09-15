@@ -85,16 +85,26 @@ export function dirtyTabs(
   tabs: SqlTab[],
   bufferOf: (tabId: string) => string,
   savedSqlOf: (queryId: string) => string | undefined,
+  /** False while the saved list is still being read, when "not found" means "not yet". */
+  listed = true,
 ): { signature: string; ids: Set<string> } {
   let signature = "";
   const ids = new Set<string>();
 
   for (const tab of tabs) {
+    const saved = tab.queryId === null ? "" : savedSqlOf(tab.queryId);
+
+    // Unresolved, not deleted. The list arrives after the tabs do, and treating that window as
+    // "gone" put an unsaved dot on every restored tab for as long as the fetch took.
+    if (saved === undefined && !listed) {
+      signature += `${tab.id}:?;`;
+      continue;
+    }
+
     // A tab whose saved query is gone — deleted, or beyond the list's limit — compares against
     // nothing, so a buffer with text in it reads as unsaved. Which it is: nothing here can confirm
     // otherwise.
-    const saved = tab.queryId === null ? "" : (savedSqlOf(tab.queryId) ?? "");
-    const dirty = bufferOf(tab.id) !== saved;
+    const dirty = bufferOf(tab.id) !== (saved ?? "");
     signature += `${tab.id}:${dirty ? 1 : 0};`;
     if (dirty) ids.add(tab.id);
   }

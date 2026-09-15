@@ -154,7 +154,13 @@ const NONE: ReadonlySet<string> = new Set();
 /** Not a signature anything can produce: a real one is a sequence of `id:flag;` groups, or empty. */
 const NO_SIGNATURE = "unset";
 
-export function useDirtyTabs(ref: string, tabs: SqlTab[], queries: SavedQuery[]): ReadonlySet<string> {
+export function useDirtyTabs(
+  ref: string,
+  tabs: SqlTab[],
+  queries: SavedQuery[],
+  /** True while the list is being read: a tab's query cannot be looked up yet. */
+  loading = false,
+): ReadonlySet<string> {
   const cache = useRef<{ signature: string; ids: ReadonlySet<string> }>({
     signature: NO_SIGNATURE,
     ids: NONE,
@@ -165,10 +171,11 @@ export function useDirtyTabs(ref: string, tabs: SqlTab[], queries: SavedQuery[])
       tabs,
       (tabId) => readSession(bufferKey(ref, tabId)) ?? EMPTY_BUFFER,
       (queryId) => queries.find((q) => q.id === queryId)?.sql,
+      !loading,
     );
     if (signature !== cache.current.signature) cache.current = { signature, ids };
     return cache.current.ids;
-  }, [ref, tabs, queries]);
+  }, [ref, tabs, queries, loading]);
 
   const getServer = useCallback(() => NONE, []);
   return useSyncExternalStore(subscribeSession, get, getServer);

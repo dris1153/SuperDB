@@ -92,6 +92,19 @@ test("a tab whose query is gone reads as unsaved rather than as clean", () => {
   assert.deepEqual([...dirtyTabs(tabs, buffers({ a: "select 1" }), saved({})).ids], ["a"]);
 });
 
+test("a tab whose query has not been read yet is neither dirty nor gone", () => {
+  // The tabs come back from sessionStorage before the list comes back from the server. Reading that
+  // window as "deleted" marked every restored tab unsaved, and offered to save a duplicate of it.
+  const tabs = [{ id: "a", queryId: "q1" }];
+  const loading = dirtyTabs(tabs, buffers({ a: "select 1" }), saved({}), false);
+  assert.equal(loading.ids.size, 0);
+
+  // And once the list is in, a query that really is gone reads as unsaved again.
+  const listed = dirtyTabs(tabs, buffers({ a: "select 1" }), saved({}), true);
+  assert.deepEqual([...listed.ids], ["a"]);
+  assert.notEqual(loading.signature, listed.signature);
+});
+
 test("the signature changes only when the answer does", () => {
   const tabs = [{ id: "a", queryId: "q1" }, { id: "b", queryId: null }];
   const one = dirtyTabs(tabs, buffers({ a: "select 1" }), saved({ q1: "select 1" }));

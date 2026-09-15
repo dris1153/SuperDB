@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Part } from "@/lib/project-part-names";
 
 /**
@@ -68,7 +68,7 @@ export function useProjectPart<T>(
 ): PartState<T> {
   const key = queryOf(params);
   const enabled = options?.enabled ?? true;
-  const { data, error, isPending } = useQuery({
+  const { data, error } = useQuery({
     queryKey: ["project", ref, part, key],
     queryFn: () => fetchPart(ref, part, params),
     enabled,
@@ -80,15 +80,51 @@ export function useProjectPart<T>(
   // A disabled query stays `pending` for ever in TanStack v5, which is indistinguishable from slow
   // — and made the sidebar dim permanently whenever a part was switched off.
   if (!enabled) return { status: "idle" };
-  if (isPending) return { status: "pending" };
-  if (error) return { status: "failed", reason: error.message };
-  if (!data.ok) return { status: "refused", reason: data.reason };
-  return { status: "ready", data: data.data as T };
+
+  // Data before error, deliberately. A background refetch that fails leaves the previous answer in
+  // the cache and sets the error — reading the error first would replace a list that is still
+  // perfectly good with "could not be read", every time the network blinked.
+  if (data) {
+    return data.ok ? { status: "ready", data: data.data as T } : { status: "refused", reason: data.reason };
+  }
+  if (error) return { status: "failed", reason: error.message || "Request failed" };
+  return { status: "pending" };
+}
+
+/**
+ * Writes an answer the caller already has into the cache.
+ *
+ * The saved-query mutations return the fresh list, so refetching it would be asking the server to
+ * repeat what it just said. The cache holds the response envelope, which is why this wraps rather
+ * than storing the list bare.
+ */
+export function useSetPart<T>(ref: string, part: Part, params?: PartParams) {
+  const client = useQueryClient();
+  const queryKey = ["project", ref, part, queryOf(params)];
+
+  return async (data: T) => {
+    // Cancel first: a refetch already in flight resolves *after* this write and would put the
+    // pre-mutation list back. `setQueryData` refreshes `dataUpdatedAt`, so nothing would correct it
+    // for a full stale window — the star you just clicked would quietly un-star itself.
+    await client.cancelQueries({ queryKey });
+    client.setQueryData(queryKey, { ok: true, data });
+  };
+}
+
+/** For when the server says the caller's copy is out of date; the next read is the only fix. */
+export function useRefetchPart(ref: string, part: Part, params?: PartParams) {
+  const client = useQueryClient();
+  const queryKey = ["project", ref, part, queryOf(params)];
+  return () => client.invalidateQueries({ queryKey });
 }
 
 /** The reason a part has no data, when there is one. Pending and idle have none — they are not answers. */
 export const reasonOf = (state: PartState<unknown>): string | null =>
-  state.status === "refused" || state.status === "failed" ? state.reason : null;
+  state.status === "refused" || state.status === "failed"
+    ? // Never the empty string: callers branch on this, and a falsy reason reads as "no reason",
+      // which is how "could not be read" turns into "nothing here".
+      state.reason || "Unavailable right now."
+    : null;
 
 /** Waiting, in either of its two forms: not asked yet, or asked and not back. */
 export const isWaiting = (state: PartState<unknown>) =>

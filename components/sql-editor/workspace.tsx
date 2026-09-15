@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import type { SavedQuery } from "@/lib/saved-queries";
 import { QueryDialogs, type QueryDialog } from "./query-dialogs";
 import { Results } from "./results";
 import { RunConfirm } from "./run-confirm";
@@ -32,16 +31,13 @@ const SqlCodeEditor = dynamic(() => import("./editor"), {
 export function SqlWorkspace({
   projectRef,
   projectName,
-  initialQueries,
 }: {
   projectRef: string;
   projectName: string;
-  /** Null when the list could not be read at all — a different thing from having none. */
-  initialQueries: SavedQuery[] | null;
 }) {
-  const saved = useSavedQueries(projectRef, initialQueries ?? []);
+  const saved = useSavedQueries(projectRef);
   const { tabs, activeId, activate, open, openText, add, link, close } = useSqlTabs(projectRef);
-  const dirtyIds = useDirtyTabs(projectRef, tabs, saved.queries);
+  const dirtyIds = useDirtyTabs(projectRef, tabs, saved.queries, saved.loading);
 
   const sql = useBuffer(projectRef, activeId);
   const { result, confirming, running, busy, run, cancelConfirm, forget } = useRunSql(
@@ -62,11 +58,17 @@ export function SqlWorkspace({
     ? (saved.queries.find((q) => q.id === activeTab.queryId) ?? null)
     : null;
 
+  // A linked tab whose query has not arrived yet is not an unsaved buffer. Offering "Save as…" here
+  // would write a second row holding the same query, which is exactly what `onSave` below avoids
+  // once the list is in.
+  const unresolved = saved.loading && activeTab.queryId !== null && active === null;
+
   return (
     <div className="flex h-screen min-w-0">
       <SavedQueriesSidebar
         queries={saved.queries}
-        unavailable={initialQueries === null}
+        loading={saved.loading}
+        unavailable={saved.unavailable}
         activeId={activeTab.queryId}
         pending={saved.pending}
         error={saved.error}
@@ -84,6 +86,7 @@ export function SqlWorkspace({
           activeId={activeId}
           queries={saved.queries}
           dirtyIds={dirtyIds}
+          loading={saved.loading}
           onSelect={activate}
           onClose={(tab) => (dirtyIds.has(tab.id) ? setDialog({ kind: "close", tab }) : closeAll(tab))}
           onAdd={add}
@@ -95,6 +98,7 @@ export function SqlWorkspace({
           canRun={sql.trim() !== ""}
           savePending={saved.pending}
           activeName={active?.name ?? null}
+          unresolved={unresolved}
           dirty={dirtyIds.has(activeId)}
           onRun={() => run(sql, false)}
           // An open query is updated in place; an unsaved buffer needs a name first. Without this,

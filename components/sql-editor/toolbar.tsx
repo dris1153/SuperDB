@@ -16,6 +16,7 @@ export function EditorToolbar({
   canRun,
   savePending,
   activeName,
+  unresolved,
   dirty,
   onRun,
   onSave,
@@ -28,6 +29,8 @@ export function EditorToolbar({
   savePending: boolean;
   /** The open query's name, or null for an unsaved buffer — which is what Save asks about. */
   activeName: string | null;
+  /** This tab has a saved query, but it has not been read yet. Saving now would duplicate it. */
+  unresolved: boolean;
   dirty: boolean;
   onRun: () => void;
   onSave: () => void;
@@ -42,9 +45,14 @@ export function EditorToolbar({
         {running ? "Running…" : "Run"}
       </Button>
 
-      <Button variant="outline" size="sm" disabled={savePending || !canRun} onClick={onSave}>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={savePending || !canRun || unresolved}
+        onClick={onSave}
+      >
         <IconDeviceFloppy size={12} stroke={1.5} />
-        {activeName ? "Save" : "Save as…"}
+        {activeName || unresolved ? "Save" : "Save as…"}
       </Button>
 
       <Button variant="ghost" size="sm" onClick={onNew}>
