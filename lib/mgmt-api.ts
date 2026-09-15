@@ -41,12 +41,26 @@ export class MgmtError extends Error {
   }
 }
 
+/**
+ * Set `SUPERDB_TIMING=1` to log how long each upstream call takes.
+ *
+ * Every Management API request in the app goes through `call()`, so this is the one place that can
+ * answer "which call is the page waiting for" without guessing. Off by default: it writes a line per
+ * request, and the path can carry a project ref.
+ */
+const TIMING = process.env.SUPERDB_TIMING === "1";
+
 async function call<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+  const started = TIMING ? performance.now() : 0;
   const res = await fetch(BASE + path, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...init?.headers },
     cache: "no-store",
   });
+  if (TIMING) {
+    // Before the body is read, because that is the wait the page is blocked on.
+    console.log(`[timing] ${Math.round(performance.now() - started)}ms ${res.status} ${path.split("?")[0]}`);
+  }
   if (!res.ok) {
     // The token lives in a header, so the request text is safe to surface.
     //
