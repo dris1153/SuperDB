@@ -41,6 +41,15 @@ export type ConnectInfo = {
   dbHost: string | null;
   transactionPooler: string | null;
   sessionPooler: string | null;
+  /**
+   * Whether the pooler configuration is still on its way, and why it is not here if it failed.
+   *
+   * Without these, a missing string is indistinguishable from one that has not arrived yet, and the
+   * sheet says "unavailable for this project" — a claim about the project — while the request is
+   * still in flight.
+   */
+  poolerPending?: boolean;
+  poolerReason?: string | null;
 };
 
 export type Method = "framework" | "server" | "direct" | "orm" | "mcp";
@@ -199,9 +208,11 @@ function DirectPanel({ info }: { info: ConnectInfo }) {
                   .
                 </p>
               </>
+            ) : info.poolerPending ? (
+              <div className="h-9 animate-pulse rounded-md border border-border bg-card/50 motion-reduce:animate-none" />
             ) : (
               <p className="text-xs text-subtle">
-                This connection type is unavailable for this project.
+                {info.poolerReason ?? "This connection type is unavailable for this project."}
               </p>
             )}
           </Step>

@@ -72,6 +72,19 @@ const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 type Row = Connection & { dek_wrapped: string; secret_cipher: string; expires_at: string | null };
 
 /**
+ * One refresh per connection at a time, within this process.
+ *
+ * A refresh token is single-use and Supabase rotates it, so concurrent refreshes of the same
+ * connection have exactly one winner. That used to be theoretical — a page render refreshed once —
+ * and the read endpoints made it ordinary: nine parts are nine requests, all of them resolving the
+ * same connection inside the same second. Sharing the in-flight promise means one upstream call and
+ * one audit event instead of nine, and nothing for the losers to mis-handle.
+ *
+ * Per process, so several instances can still race; the re-read below is what covers that.
+ */
+const refreshes = new Map<string, Promise<string>>();
+
+/**
  * A failed refresh means the user revoked the app upstream. Record it and leave the row alone so the
  * UI can offer Reconnect; retrying in a loop would only burn the remaining grant.
  */
@@ -83,8 +96,21 @@ async function accessTokenFor(
   if (row.kind !== "oauth" || !secret.refresh || !row.expires_at) return secret.access;
   if (Date.parse(row.expires_at) - Date.now() > REFRESH_MARGIN_MS) return secret.access;
 
+  const inFlight = refreshes.get(row.id);
+  if (inFlight) return inFlight;
+
+  const refresh = refreshOnce(supabase, row, secret.refresh).finally(() => refreshes.delete(row.id));
+  refreshes.set(row.id, refresh);
+  return refresh;
+}
+
+async function refreshOnce(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  row: Row,
+  refreshToken: string,
+): Promise<string> {
   try {
-    const tokens = await refreshTokens(secret.refresh);
+    const tokens = await refreshTokens(refreshToken);
     await supabase
       .from("connections")
       .update({ ...oauthColumns(tokens), synced_at: new Date().toISOString(), last_error: null })

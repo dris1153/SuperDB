@@ -94,12 +94,16 @@ export { isProjectRef };
  * every connection — three connections and ten cards is thirty upstream calls spent on authorisation
  * alone, against an API that throttles.
  *
- * Only a connection id is remembered, never a token, and it is only ever used to pick from rows the
- * caller's own RLS-scoped query returned. A stale entry costs one wasted call and falls back to the
- * fan-out, so ownership cannot be inherited from it.
+ * The project body is remembered with it, because otherwise every part still pays one `getProject`
+ * to prove what the previous part just proved — nine parts, nine calls, before any of them read
+ * anything. Never a token: the token comes from the caller's own RLS-scoped query each time, so a
+ * remembered entry cannot grant access to a connection the caller no longer has.
+ *
+ * A minute of staleness costs a project name or status that is a minute old on a page that is about
+ * to fetch both again anyway. A stale entry whose connection is gone falls back to the fan-out.
  */
 const OWNER_TTL_MS = 60_000;
-const owners = new Map<string, { connectionId: string; at: number }>();
+const owners = new Map<string, { connectionId: string; project: Project; at: number }>();
 
 export const resolveProject = cache(async (ref: string) => {
   if (!isProjectRef(ref)) return null;
@@ -121,13 +125,17 @@ export const resolveProject = cache(async (ref: string) => {
 
   if (remembered && Date.now() - remembered.at < OWNER_TTL_MS) {
     const known = connections.find((c) => c.id === remembered.connectionId);
-    const hit = known ? await ask(known) : null;
-    if (hit) return hit;
+    if (known?.token) {
+      const { token, ...connection } = known;
+      return { token, connection, project: remembered.project };
+    }
     owners.delete(key);
   }
 
   const hits = await Promise.all(connections.map(ask));
   const hit = hits.find((h) => h !== null) ?? null;
-  if (hit) owners.set(key, { connectionId: hit.connection.id, at: Date.now() });
+  if (hit) {
+    owners.set(key, { connectionId: hit.connection.id, project: hit.project, at: Date.now() });
+  }
   return hit;
 });
