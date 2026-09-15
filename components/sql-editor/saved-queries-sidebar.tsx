@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { QuerySection } from "./query-section";
 import { ReferenceSection } from "./reference-section";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * FAVORITES and PRIVATE, and a box to find a query by name.
@@ -81,10 +82,7 @@ export function SavedQueriesSidebar({
         {loading ? (
           <div className="space-y-1 px-3 py-2">
             {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className="block h-5 w-full animate-pulse rounded bg-muted motion-reduce:animate-none"
-              />
+              <Skeleton key={i} className="h-5 w-full" />
             ))}
           </div>
         ) : unavailable ? (

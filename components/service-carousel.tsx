@@ -12,7 +12,7 @@ import { Skeleton } from "./ui/skeleton";
 // page's first load; the placeholder is the same height, so nothing moves when it arrives.
 const StackedBars = dynamic(() => import("./stacked-bars").then((m) => m.StackedBars), {
   ssr: false,
-  loading: () => <div className="h-24 w-full animate-pulse rounded bg-muted/30 motion-reduce:animate-none" />,
+  loading: () => <Skeleton className="h-24 w-full" />,
 });
 
 /**

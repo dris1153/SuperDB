@@ -2,6 +2,7 @@
 
 import type { KeySummary } from "@/lib/project-parts";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
 
 /**
@@ -23,10 +24,7 @@ export function DatabaseApiKeys({ projectRef }: { projectRef: string }) {
       {isWaiting(keys) ? (
         <div className="flex flex-wrap gap-2">
           {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className="h-6 w-32 animate-pulse rounded-full bg-muted motion-reduce:animate-none"
-            />
+            <Skeleton key={i} className="h-6 w-32 rounded-full" />
           ))}
         </div>
       ) : keys.status !== "ready" ? (

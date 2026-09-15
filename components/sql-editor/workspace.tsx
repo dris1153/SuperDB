@@ -11,13 +11,21 @@ import { SqlTabBar } from "./tab-bar";
 import { useRunSql } from "./use-run-sql";
 import { useBuffer, useDirtyTabs, useSqlTabs, writeBuffer } from "./tabs";
 import { EditorToolbar } from "./toolbar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSavedQueries } from "./use-saved-queries";
 
 // Route-scoped on purpose: CodeMirror is the largest thing on this page, and an entire plan exists
 // about this app's latency. `ssr: false` because the editor needs a DOM element to attach to.
 const SqlCodeEditor = dynamic(() => import("./editor"), {
   ssr: false,
-  loading: () => <div className="h-full animate-pulse bg-muted/20" />,
+  // Lines rather than a slab: what lands here is a text editor, and the widths say so.
+  loading: () => (
+    <div className="space-y-2 p-3">
+      {["w-40", "w-64", "w-24", "w-52"].map((width) => (
+        <Skeleton key={width} className={`h-4 ${width}`} />
+      ))}
+    </div>
+  ),
 });
 
 /**

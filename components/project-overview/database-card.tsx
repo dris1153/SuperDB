@@ -6,6 +6,7 @@ import type { Addon, DiskUtil } from "@/lib/mgmt-api";
 import { computeLabel, regionCountry, regionLabel } from "@/lib/regions";
 import { bytes } from "@/lib/format";
 import { RegionFlag } from "@/components/region-flag";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectPart, type PartState } from "@/components/use-project-part";
 
 /**
@@ -95,7 +96,7 @@ function Metric({ label, value, pending }: { label: string; value: string | null
     <span className="whitespace-nowrap">
       {label ? <span className="text-muted-foreground">{label} </span> : null}
       {pending ? (
-        <span className="inline-block h-4 w-10 animate-pulse rounded bg-muted align-middle motion-reduce:animate-none" />
+        <Skeleton className="inline-block h-4 w-10 align-middle" />
       ) : (
         <span className={value === null ? "text-subtle" : "text-foreground"}>{value ?? "—"}</span>
       )}

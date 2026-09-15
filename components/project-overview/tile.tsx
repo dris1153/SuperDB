@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { PartState } from "@/components/use-project-part";
 
 /** One of the five facts across the top of the project page. */
@@ -35,7 +36,7 @@ export function PartValue<T>({
 }) {
   if (state.status === "pending" || state.status === "idle") {
     // The height of the line it replaces, so nothing moves when the answer lands.
-    return <span className="block h-6 w-24 animate-pulse rounded bg-muted motion-reduce:animate-none" />;
+    return <Skeleton className="h-6 w-24" />;
   }
   if (state.status === "refused" || state.status === "failed") {
     // A tooltip rather than a `title`: that attribute is hover-only, so the reason was unreachable

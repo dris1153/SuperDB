@@ -2,6 +2,7 @@
 
 import type { ServiceHealth } from "@/lib/mgmt-api";
 import { ServiceStatus } from "@/components/status";
+import { Skeleton } from "@/components/ui/skeleton";
 import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
 
 /**
@@ -21,10 +22,7 @@ export function DatabaseServices({ projectRef }: { projectRef: string }) {
       {isWaiting(health) ? (
         <div className="flex flex-wrap gap-2">
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <span
-              key={i}
-              className="h-6 w-24 animate-pulse rounded-full bg-muted motion-reduce:animate-none"
-            />
+            <Skeleton key={i} className="h-6 w-24 rounded-full" />
           ))}
         </div>
       ) : health.status !== "ready" ? (

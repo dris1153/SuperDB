@@ -6,6 +6,7 @@ import { asInterval, successRate, type ServiceCard } from "@/lib/logs-sql";
 import { IntervalPicker } from "@/components/interval-picker";
 import { ServiceCarousel, ServiceCarouselSkeleton } from "@/components/service-carousel";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { reasonOf, useProjectPart } from "@/components/use-project-part";
 
 type Usage = { from: number; to: number; cards: ServiceCard[] };
@@ -37,7 +38,7 @@ export function UsagePanel({ projectRef }: { projectRef: string }) {
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
           <div className="flex items-baseline gap-2">
             {usage.status === "pending" ? (
-              <span className="inline-block h-7 w-16 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+              <Skeleton className="inline-block h-7 w-16" />
             ) : usage.status === "ready" ? (
               <span className="text-2xl tabular-nums text-foreground">{compact(total)}</span>
             ) : (

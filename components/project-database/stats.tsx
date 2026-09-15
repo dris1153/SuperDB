@@ -4,6 +4,7 @@ import type { DbOverview, TableRow } from "@/lib/db-introspect";
 import type { DiskUtil } from "@/lib/mgmt-api";
 import { bytes } from "@/lib/format";
 import { Stat } from "@/components/ui/stat";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { isWaiting, useProjectPart, type PartState } from "@/components/use-project-part";
 
@@ -90,7 +91,7 @@ function Reason({ state }: { state: PartState<unknown> }) {
 /** An em dash says the API answered and had nothing; while it is still asking, neither is true. */
 function Figure({ state, children }: { state: PartState<unknown>; children: React.ReactNode }) {
   if (isWaiting(state)) {
-    return <span className="block h-8 w-20 animate-pulse rounded bg-muted motion-reduce:animate-none" />;
+    return <Skeleton className="h-8 w-20" />;
   }
   return <>{children}</>;
 }
