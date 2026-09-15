@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
+import { NAV_MODE_COOKIE, parseNavMode } from "@/lib/nav-mode";
 import { ProjectNav } from "@/components/project-nav";
 import { ProjectTopbar } from "@/components/project-topbar";
 import { QueryProvider } from "@/components/query-provider";
@@ -15,6 +17,10 @@ export default async function ProjectLayout({
   const { ref } = await params;
   const found = await resolveProject(ref);
   if (!found) notFound();
+
+  // Read here so the first paint is already in the right mode. Left to the browser, `expanded` would
+  // arrive as a 240px column appearing after hydration and shoving the content sideways on every load.
+  const mode = parseNavMode((await cookies()).get(NAV_MODE_COOKIE)?.value);
 
   return (
     // Scoped to the project routes, which are the only ones that fetch through it. In the shared
@@ -32,7 +38,7 @@ export default async function ProjectLayout({
         <ProjectTopbar projectName={found.project.name} />
 
         <div className="flex min-h-0 flex-1">
-          <ProjectNav projectRef={ref} />
+          <ProjectNav projectRef={ref} mode={mode} />
           {/* The usage carousel measures this to work out how far it may bleed sideways. */}
           <div data-content-area className="min-h-0 min-w-0 flex-1 overflow-y-auto">
             {children}

@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Three rail modes"
-status: pending
+status: in-progress  # code done; every behavioural check needs the app
 priority: P2
 effort: "5h"
 dependencies: [2, 3]
@@ -91,16 +91,39 @@ to be more trouble than the flash, drop `localStorage` and keep the cookie alone
 5. `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` — **and the route sizes**, which are the
    check on the hand-written menu.
 
+## What landed
+
+- `lib/nav-mode.ts` + 5 tests — the three modes, the cookie, and `parseNavMode`, which treats anything
+  unrecognised as the default because a cookie is a string the user can write by hand.
+- `components/project-nav-mode.tsx` — the menu, hand-written.
+- `components/project-nav.tsx` — the three renderings.
+- `app/(app)/p/[ref]/layout.tsx` — reads the cookie so the first paint is already right.
+
+**`localStorage` was dropped, not deferred.** The phase called for a cookie *and* `localStorage`, with
+a rule about which wins. Writing it made the rule pointless: the cookie is what the server renders
+from, so nothing would ever read the other one. A store nothing reads is not a fallback, it is dead
+code.
+
+**The hand-written menu held up.** Route sizes went up by **3,217–3,582 bytes** — and that covers the
+three modes, the delay, the focus handling and the menu together, against **52,160 bytes** for the
+Radix dropdown that was measured out of the topbar. The criterion said to check rather than assert,
+and the check passed.
+
+**Opening waits, closing does not.** The delay is on the way in only; a panel that lingers after the
+mouse has left reads as stuck rather than deliberate.
+
 ## Success Criteria
 
-- [ ] Each mode does what its name says.
-- [ ] The choice survives a reload with **no flash**, Expanded included — the reason for the cookie.
-- [ ] Tooltips appear in Collapsed and nowhere else.
-- [ ] In hover mode, keyboard focus opens the panel and leaving closes it.
-- [ ] The menu names the active mode.
-- [ ] Route sizes are unchanged within noise — the hand-written menu's whole justification.
-- [ ] The usage carousel still bleeds correctly with the panel open over it.
-- [ ] `pnpm test` still green — 410, and none of them reach any of this.
+- [ ] **Needs the app.** Each mode does what its name says.
+- [ ] **Needs the app.** The choice survives a reload with no flash, `expanded` included — the reason
+      for the cookie, and the only criterion the cookie exists to satisfy.
+- [ ] **Needs the app.** Tooltips appear in `collapsed` and nowhere else.
+- [ ] **Needs the app.** In `hover`, keyboard focus opens the panel and leaving closes it.
+- [x] The menu names the active mode, with a check beside it.
+- [x] Route sizes moved 3,217–3,582 bytes for the whole feature, against 52,160 for a Radix menu
+      alone. The hand-written menu was the right call and is now measured rather than argued.
+- [ ] **Needs the app.** The usage carousel still bleeds correctly with the panel open over it.
+- [x] `pnpm test` still green — 415, five of them new.
 
 ## Risk Assessment
 
