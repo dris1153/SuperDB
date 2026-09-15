@@ -1,5 +1,6 @@
 import "server-only";
 import { recordEvent } from "./audit";
+import { dropProject } from "./part-cache";
 import { createClient } from "./supabase/server";
 import type { Row } from "./sql-write";
 
@@ -24,6 +25,13 @@ export async function recordWrite(
   // passed one of the two would lose the target from the audit line without the compiler noticing.
   ({ schema: string; table: string } | { schema?: undefined; table?: undefined }),
 ) {
+  // Every write path in the app calls this, which is what makes it the place to drop the read cache
+  // — and it runs after the statement has committed, which is when dropping it is correct. Outside
+  // the try: a cache that survived a write would answer the browser's own post-write refetch with
+  // the state from before it, and no audit failure should be able to leave that behind. Dropping on
+  // a failed write too, because "failed" here can still mean committed-then-timed-out.
+  dropProject(entry.ref);
+
   // Never throws. It runs *after* a statement has already committed, so letting it fail would turn a
   // write that succeeded into one the caller reports as failed — and, on a path with no undo, send
   // the user to retry a `drop table` that already happened. `recordEvent` swallows its own errors;

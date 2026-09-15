@@ -23,6 +23,7 @@ import {
   windowMinutes,
   type LogRow,
 } from "./logs-sql";
+import { partKey, PART_TTL_MS, readCached, writeCached } from "./part-cache";
 import type { Part } from "./project-part-names";
 import { memoryUsedPercent, parseMetrics } from "./prometheus";
 import { savedQueries } from "./saved-queries";
@@ -35,6 +36,7 @@ import { clampInt } from "./sql-ident";
 import { highlight } from "./highlight";
 import { getExposedSchemas } from "./mgmt-api";
 import { attempt, type Attempt } from "./safe";
+import { requireUser } from "./supabase/server";
 
 /**
  * What the browser may ask for about a project, and how each one is read.
@@ -231,7 +233,23 @@ export async function readPart(
   const found = await resolveProject(ref);
   if (!found) return null;
 
-  return attempt(() => READERS[part](found.token, ref, search));
+  // After `resolveProject`, never before: the cache is read only once this user is known to own a
+  // connection to this project. Reading it first would answer from memory for a ref the caller has
+  // since lost access to.
+  const { user } = await requireUser();
+  const ttl = PART_TTL_MS[part];
+  const key = partKey(user.id, ref, part, search);
+
+  const hit = readCached(key, ttl);
+  if (hit) return { ok: true, data: hit.value };
+
+  const result = await attempt(() => READERS[part](found.token, ref, search));
+
+  // Successes only. A refusal is usually something the reader can fix — a missing OAuth scope, a
+  // paused project — and a cached one would survive the fix, so re-authorising would appear to
+  // change nothing.
+  if (result.ok) writeCached(key, result.data, ttl);
+  return result;
 }
 
 /** Identity is the one part that needs no upstream call: `resolveProject` already has it. */
