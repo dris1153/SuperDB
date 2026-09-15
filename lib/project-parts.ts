@@ -1,6 +1,7 @@
 import "server-only";
 import { dbOverview } from "./db-introspect";
 import { resolveProject } from "./inventory";
+import type { ApiKey } from "./mgmt-api";
 import {
   getDiskUtil,
   getHealth,
@@ -42,13 +43,26 @@ import { attempt, type Attempt } from "./safe";
  * `ApiKey` type in `mgmt-api.ts` — so the flag is not a boundary and never was. The `api-keys`
  * reader names the four fields the UI shows, and the secret never leaves the server.
  *
- * The rest pass through what the app already models. That is deliberate and it is not the same
- * claim: `branches`, `pooler`, `health`, `backups`, `migrations`, `disk`, `tables` and `overview`
- * return responses whose extra fields are not credentials. `metrics` and `addons` are picked apart
- * because the upstream body is large and the UI reads one number out of it.
+ * The rest pass through what the app already models, which is a weaker claim and worth stating as
+ * one: their bodies were read and none carries a credential the page does not already show. The
+ * pooler's connection string is the closest call — it is on the Get connected panel by design, with
+ * the password left as a placeholder, because Supabase does not return that through its API.
+ * `metrics` and `addons` are picked apart because the upstream body is large and the UI reads one
+ * number out of it.
  */
 
 type Reader = (token: string, ref: string, search: URLSearchParams) => Promise<unknown>;
+
+/**
+ * What an API key looks like once it has left the server.
+ *
+ * `api_key?: never` is the point of the type. Without it, `ApiKey[]` is structurally assignable to a
+ * `Pick<...>[]`, so annotating the reader would not stop someone returning the upstream array
+ * verbatim — and the upstream array carries the real key value even at `reveal=false`. With it, that
+ * mistake does not compile, which is the only thing standing between a service-role secret and a
+ * browser that no test can reach.
+ */
+export type KeySummary = Pick<ApiKey, "id" | "name" | "prefix"> & { api_key?: never };
 
 /**
  * `Record<Exclude<Part, "identity">, Reader>` rather than a loose object: a name in
@@ -76,8 +90,8 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
    * would have put the service-role secret — the one that bypasses RLS — in a plain GET any signed-in
    * browser could issue. The flag was never the boundary; this list is.
    */
-  "api-keys": async (t, ref) =>
-    (await listApiKeys(t, ref)).map(({ id, name, type, prefix }) => ({ id, name, type, prefix })),
+  "api-keys": async (t, ref): Promise<KeySummary[]> =>
+    (await listApiKeys(t, ref)).map(({ id, name, prefix }) => ({ id, name, prefix })),
   metrics: async (t, ref) => ({ memoryPercent: memoryUsedPercent(parseMetrics(await getMetricsText(t, ref))) }),
   logs: async (t, ref, search) => {
     const minutes = windowMinutes(asInterval(search.get("interval")));

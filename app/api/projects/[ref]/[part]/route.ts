@@ -80,8 +80,11 @@ async function read(request: NextRequest, { ref, part }: { ref: string; part: st
 
   // `attempt` has already turned an upstream failure into a reason; `status` is dropped rather than
   // forwarded, because it describes Supabase's answer to the server, not this response.
+  // `?? null` rather than passing it through: not every upstream success carries a body, and
+  // `JSON.stringify` drops an `undefined` value entirely — leaving `{"ok":true}` with no `data` key
+  // at all, which reads as success and then throws in whichever component dereferences it.
   return NextResponse.json(
-    result.ok ? { ok: true, data: result.data } : { ok: false, reason: result.reason },
+    result.ok ? { ok: true, data: result.data ?? null } : { ok: false, reason: result.reason },
     { headers: NO_STORE },
   );
 }

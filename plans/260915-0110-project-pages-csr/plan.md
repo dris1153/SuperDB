@@ -24,7 +24,7 @@ Design, the measurement behind it, and what this gives up:
 | 2 | [The read endpoint family](phase-02-read-endpoints.md) | **in-progress** | ~4h | — |
 | 3 | [Query client and hooks](phase-03-query-client.md) | **in-progress** | ~2h | 2 |
 | 4 | [Project overview page](phase-04-overview-page.md) | **in-progress** | ~1d | 3 |
-| 5 | [Database page](phase-05-database-page.md) | pending | ~4h | 3 |
+| 5 | [Database page](phase-05-database-page.md) | **in-progress** | ~4h | 3 |
 | 6 | [Measure again, and the states nobody looks at](phase-06-verify.md) | pending | ~2h | 4, 5 |
 | 7 | [Table editor](phase-07-table-editor.md) | pending | ~1.5d | 3 |
 | 8 | [SQL editor page](phase-08-sql-editor-page.md) | pending | ~2h | 3 |
