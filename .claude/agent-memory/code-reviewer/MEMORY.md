@@ -11,3 +11,5 @@
 - [Disabled parts now read as idle](project_partstate_collapses_disabled_into_pending.md) — fixed; the live trap is branches on `status === "pending"` alone that drop `idle` into the else
 - [null means error, not loading](project_null_reads_as_error_not_loading.md) — recurring; definition.tsx and sql-editor/results.tsx still print an answer while a query is in flight
 - [Module state splits per Next layer](project_module_state_splits_per_next_layer.md) — a lib/ Map is compiled once per layer; route handlers and server actions never share it
+- [identity has no part cache](project_identity_has_no_part_cache.md) — dropProject cannot invalidate a project name; only the owners memo holds it, and nothing exports a way to clear it
+- [rotateVault covers one table](project_rotatevault_covers_one_table.md) — a master-password change orphans every vault blob outside connection_secrets; seal() returning undefined is the same boundary

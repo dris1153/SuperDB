@@ -1,0 +1,103 @@
+---
+phase: 3
+title: "Settings shell and General (read-only)"
+status: pending
+priority: P1
+effort: "2h"
+dependencies: []
+---
+
+# Phase 3: Settings shell and General (read-only)
+
+## Overview
+
+`/p/[ref]/settings` — the second-level nav, and a General card showing the project's name, ref and
+region with Copy buttons.
+
+Read-only on purpose. Renaming is one line of API call and four caches of invalidation, so it is
+phase 4 and has its own criteria. Splitting them keeps this phase genuinely independent of everything
+else in the plan.
+
+## Requirements
+
+**Functional**
+- The `settings` slug in `components/project-nav.tsx` stops being greyed.
+- A sub-nav inside the settings route, with General live and the rest marked as not built yet.
+- Project name, ID and region are shown, with `CopyButton` on the ref and region.
+- No Save button. A control that does nothing is worse than no control.
+
+**Non-functional**
+- Every greyed row names a real endpoint. `components/project-nav.tsx:22` already set this bar when
+  it refused to list Integrations — *"a permanently greyed row rather than a roadmap"*. A settings
+  sub-nav is where that rule is easiest to break and least obvious when broken.
+
+## The sub-nav, and what earns a row
+
+Verified against `https://api.supabase.com/api/v1-json` on 2026-09-15, not taken from the research
+summary — two paths that report named do not exist.
+
+| Row | Endpoint behind it | State |
+|---|---|---|
+| General | `GET` via the `identity` part; `PATCH /v1/projects/{ref}` in phase 4 | **live, this phase** |
+| Password Manager | `PATCH /v1/projects/{ref}/database/password` | live in phases 5-6 |
+| Infrastructure | `POST .../restart`, `POST .../pause`, `GET,POST .../restore`, `billing/addons` | soon |
+| Database | `config/database/postgres`, `ssl-enforcement`, `network-restrictions` | soon |
+| API | `postgrest` | soon |
+| Auth | `config/auth` | soon |
+| Storage | `config/storage` | soon |
+| Domains | `custom-hostname/initialize` | soon |
+
+**Omitted, not greyed:** Integrations — `integrations/tpa` does not exist, but
+`config/auth/third-party-auth` does, so the honest reason is that nothing in this app consumes
+third-party auth config, not that the API is missing. The row stays out either way; the reason on
+record has to be the true one. Billing, Usage and Team, because they are organization-scoped: this app
+reads an organization name (`lib/inventory.ts:42-50`) but has no membership or billing model.
+
+## Architecture
+
+**The shell is a layout.** `app/(app)/p/[ref]/settings/layout.tsx` holds the sub-nav; each section is
+a route under it. The Password Manager is then a sibling route rather than a tab, which is what phase
+5 needs.
+
+**General reads the `identity` part.** `lib/project-parts.ts` already returns name, ref, region and
+status, and the part endpoint already serves it — no new reader, no new upstream call. The page is a
+shell and the card fetches, like every other project page since the CSR plan.
+
+**The active-state test in the nav is `pathname === href`** (`components/project-nav.tsx:80`), so
+`/p/[ref]/settings/passwords` will not light up "Project Settings". Flipping `ready` is not enough;
+decide whether the main nav highlights on prefix, or the sub-nav carries that job alone.
+
+## Related Code Files
+
+- Create: `app/(app)/p/[ref]/settings/layout.tsx`, `app/(app)/p/[ref]/settings/page.tsx`,
+  `components/project-settings/settings-nav.tsx`, `components/project-settings/general.tsx`
+- Modify: `components/project-nav.tsx` — `ready: true` on the `settings` slug
+- Read for context: `components/project-overview/tiles.tsx` for the part-reading card shape,
+  `components/copy-button.tsx`
+
+## Implementation Steps
+
+1. The sub-nav component and the settings layout. Greyed rows use the same treatment as the main nav
+   so the two read as one system.
+2. `ready: true` on the settings slug.
+3. The General card, reading the `identity` part.
+4. The nav's active state for a nested settings route.
+5. `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
+
+## Success Criteria
+
+- [ ] The settings slug is live and its sub-nav renders.
+- [ ] Every greyed row names a real endpoint; the table above is the record of which.
+- [ ] Project ID and region copy correctly.
+- [ ] "Project Settings" stays highlighted on the nested Password Manager route.
+- [ ] `pnpm test` still green — 396 today. **No component here is covered by it; the suite is `lib`
+      only, so the rows above are manual checks.**
+
+## Risk Assessment
+
+**A sub-nav full of dead rows.** The bar is already set; the risk is that a settings page is exactly
+where it feels harmless to list eight aspirational links. Each row cites an endpoint in the table
+above or it does not appear.
+
+**Scope creep into the greyed rows.** Infrastructure has restart and pause behind it, which are
+tempting and destructive. Not this phase.

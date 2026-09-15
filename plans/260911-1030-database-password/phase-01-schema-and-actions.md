@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Schema and actions"
-status: pending
+status: in-progress  # code shipped, unverified — checked inside phase 5
 priority: P1
 effort: "2h"
 dependencies: []
@@ -92,6 +92,16 @@ rollback;
 ```
 
 `rollback`, so the probe leaves nothing behind.
+
+## What landed, and what did not
+
+**The code shipped on 2026-09-11 in `833d91f`** — `lib/project-secrets.ts` and the `project_secrets`
+table in `supabase/schema.sql`. Nothing imported it until the settings work below.
+
+**None of the criteria below have been checked**, because every one of them is a question about a
+database and `supabase/schema.sql` has never been run for this table. It has never held a row. The
+same is true of `saved_queries` from the SQL editor plan; both are applied together in the settings
+phases.
 
 ## Success Criteria
 
