@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { count as compact } from "@/lib/format";
 import { asInterval, successRate, type ServiceCard } from "@/lib/logs-sql";
 import { IntervalPicker } from "@/components/interval-picker";
-import { ServiceCarousel } from "@/components/service-carousel";
+import { ServiceCarousel, ServiceCarouselSkeleton } from "@/components/service-carousel";
 import { Card } from "@/components/ui/card";
 import { reasonOf, useProjectPart } from "@/components/use-project-part";
 
@@ -58,7 +58,7 @@ export function UsagePanel({ projectRef }: { projectRef: string }) {
       </div>
 
       {usage.status === "pending" || usage.status === "idle" ? (
-        <div className="h-40 animate-pulse rounded-lg border border-border bg-card/50 motion-reduce:animate-none" />
+        <ServiceCarouselSkeleton />
       ) : usage.status !== "ready" ? (
         <Card className="p-6 text-center text-sm text-subtle">{reasonOf(usage)}</Card>
       ) : total === 0 ? (

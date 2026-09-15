@@ -3,7 +3,8 @@ import type { RowCount, RowRecord } from "@/lib/table-rows";
 import type { ColumnInfo, SortKey } from "@/lib/table-view";
 import type { Filter } from "@/lib/table-filter";
 import { Empty } from "@/components/ui/empty-state";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
+import { ROW_HEIGHT, useDensity } from "./column-prefs";
 import { Definition } from "./definition";
 import { TableFooter } from "./footer";
 import { TableGrid } from "./grid";
@@ -57,6 +58,10 @@ export function TableWorkspace({
   /** Only fetched when the definition tab is the one being looked at. */
   definition: { ddl: string; html: string | null; complete: boolean } | null;
 }) {
+  // Read here as well as in the grid so the placeholder's rules land on the same pitch the real rows
+  // will use. A fixed pitch would redraw itself the moment the answer arrived.
+  const { density } = useDensity();
+
   if (view === "definition") {
     return (
       <>
@@ -115,15 +120,30 @@ export function TableWorkspace({
       />
 
       {!rows ? (
-        <div className="p-6">
-          {rowsPending ? (
-            <Skeleton className="h-96 w-full rounded-lg" />
-          ) : (
+        rowsPending ? (
+          // Shaped like the grid it is waiting for, and sized by the same box: a fixed-height block
+          // in a padded box left a 384px placeholder where a grid the height of the window was about
+          // to land, and everything below it jumped when it did.
+          <>
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="h-10 shrink-0 border-b border-border bg-card" />
+              <SkeletonRows rowHeight={ROW_HEIGHT[density]} className="min-h-0 flex-1" />
+            </div>
+            {/* The real footer would print "count unavailable" here, which is a claim about the
+                answer rather than about the wait. Its height is what has to be held. */}
+            <div className="flex shrink-0 items-center gap-3 border-t border-border px-3 py-2">
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="ml-auto h-7 w-36" />
+            </div>
+          </>
+        ) : (
+          <div className="p-6">
             <Empty>
               Could not read {schema}.{entry.name}.
             </Empty>
-          )}
-        </div>
+          </div>
+        )
       ) : (
         <>
           <div className="relative min-h-0 flex-1">

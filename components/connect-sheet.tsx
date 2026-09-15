@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { FrameworkPanel } from "./connect-framework-panel";
 import { OrmPanel } from "./connect-orm-panel";
 import { Copyable, Snippet, Step } from "./connect-primitives";
+import { Skeleton } from "./ui/skeleton";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -209,7 +210,7 @@ function DirectPanel({ info }: { info: ConnectInfo }) {
                 </p>
               </>
             ) : info.poolerPending ? (
-              <div className="h-9 animate-pulse rounded-md border border-border bg-card/50 motion-reduce:animate-none" />
+              <Skeleton className="h-9 border border-border" />
             ) : (
               <p className="text-xs text-subtle">
                 {info.poolerReason ?? "This connection type is unavailable for this project."}
@@ -295,7 +296,14 @@ function ServerPanel({ projectRef }: { projectRef: string }) {
         description="Copy these into your environment so your handler can verify users and call the API."
       >
         {state === null ? (
-          <div className="h-24 animate-pulse rounded-md border border-border bg-card/50" />
+          // The label row and the block it labels, which is what lands here.
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Skeleton className="h-4 w-10" />
+              <Skeleton className="h-7 w-16" />
+            </div>
+            <Skeleton className="h-20 border border-border" />
+          </div>
         ) : state.blocked ? (
           <p className="text-xs text-subtle">{state.reason}</p>
         ) : (

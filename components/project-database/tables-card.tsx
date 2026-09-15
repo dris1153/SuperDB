@@ -19,6 +19,9 @@ import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-pa
 const HEAD = "text-xs font-normal text-subtle";
 const COLUMNS = ["Schema", "Table", "Rows (est.)", "Size", "Columns", "RLS"];
 
+/** Placeholder widths, one per column, so the loading table is the shape of the real one. */
+const CELLS = ["w-14", "w-32", "w-12", "w-16", "w-8", "w-14"];
+
 /**
  * Every user table, with the one fact worth spotting: whether row level security is off on a table
  * in `public` — the schema PostgREST serves.
@@ -34,9 +37,32 @@ export function DatabaseTables({ projectRef }: { projectRef: string }) {
       <h2 className="text-sm text-muted-foreground">Tables</h2>
 
       {isWaiting(tables) ? (
-        // Roughly a header and six rows, which is what an ordinary project fills. A third of that
-        // would move everything below it when the list lands.
-        <Skeleton className="h-72 w-full rounded-lg" />
+        // The real header and six rows, not a block the height of them: the columns are already
+        // laid out when the names arrive, so nothing re-flows. Six is what an ordinary project fills.
+        <div className="overflow-hidden rounded-lg border border-border">
+          <Table className="min-w-2xl">
+            <TableHeader className="bg-card">
+              <TableRow className="hover:bg-transparent">
+                {COLUMNS.map((column) => (
+                  <TableHead key={column} className={HEAD}>
+                    {column}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[0, 1, 2, 3, 4, 5].map((row) => (
+                <TableRow key={row} className="hover:bg-transparent">
+                  {CELLS.map((width, cell) => (
+                    <TableCell key={cell}>
+                      <Skeleton className={`h-4 ${width} ${cell === 5 ? "rounded-full" : ""}`} />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : tables.status !== "ready" ? (
         <Empty>
           Could not query this database. Paused projects and restricted tokens return nothing here.

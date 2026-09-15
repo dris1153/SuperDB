@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { IconCheck, IconCopy } from "@tabler/icons-react";
 import type { GuideStep } from "@/lib/guide-steps";
 import { Button } from "./ui/button";
+import { Skeleton } from "./ui/skeleton";
 
 /** Shared by every Connect panel. Kept out of connect-sheet.tsx so the panels can import it. */
 export function Copyable({
@@ -79,6 +80,32 @@ export function Step({
         </div>
       </div>
       <div className="min-w-0 space-y-2">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * A step with nothing in it yet.
+ *
+ * The same grid as `Step`, in the same file, so the two cannot drift apart. What used to stand here
+ * was a single 160px block for a list of numbered steps beside code — the wrong shape and the wrong
+ * height at once.
+ */
+export function StepSkeleton({ steps = 2 }: { steps?: number }) {
+  return (
+    <div className="space-y-6">
+      {Array.from({ length: steps }, (_, step) => (
+        <div key={step} className="grid gap-3 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
+          <div className="flex gap-2.5">
+            <Skeleton className="size-5 shrink-0 rounded" />
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-full" />
+            </div>
+          </div>
+          <Skeleton className="h-24 min-w-0" />
+        </div>
+      ))}
     </div>
   );
 }
