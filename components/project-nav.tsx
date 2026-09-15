@@ -49,7 +49,7 @@ const SECTIONS: { items: { slug: string; label: string; icon: typeof IconHome; r
     ],
   },
   {
-    items: [{ slug: "settings", label: "Project Settings", icon: IconSettings }],
+    items: [{ slug: "settings", label: "Project Settings", icon: IconSettings, ready: true }],
   },
 ];
 
@@ -77,7 +77,10 @@ export function ProjectNav({ projectRef, name }: { projectRef: string; name: str
           <div key={index} className="space-y-1">
             {section.items.map(({ slug, label, icon: Icon, ready }) => {
               const href = slug ? `${base}/${slug}` : base;
-              const active = slug ? pathname === href : pathname === base;
+              // Prefix, not equality: settings has routes beneath it, and an exact test left
+              // "Project Settings" unlit on every one of them. The other slugs have no children, so
+              // this changes nothing for them.
+              const active = slug ? pathname.startsWith(href) : pathname === base;
 
               if (!ready) {
                 return (

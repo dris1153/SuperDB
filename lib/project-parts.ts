@@ -257,6 +257,9 @@ export async function readPart(
 }
 
 /** Identity is the one part that needs no upstream call: `resolveProject` already has it. */
+/** What the `identity` part answers with. `import type` from here is erased, as `KeySummary` is. */
+export type Identity = NonNullable<Awaited<ReturnType<typeof readIdentity>>>;
+
 export async function readIdentity(ref: string) {
   const found = await resolveProject(ref);
   if (!found) return null;
