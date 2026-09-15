@@ -115,6 +115,11 @@ the summaries.
 
 ## Cross-plan notes
 
+**[260915-2303-icon-rail-and-settings-panel](../260915-2303-icon-rail-and-settings-panel/plan.md)**
+rewrites `app/(app)/p/[ref]/settings/layout.tsx` and `components/project-settings/settings-nav.tsx`,
+both created by phase 3 here, and rebuilds `components/project-nav.tsx` around the row list phase 3
+established. Phases 5-7 here touch none of those files, so the two can proceed in either order.
+
 **[260911-0910-project-drag-ordering](../260911-0910-project-drag-ordering/plan.md)** adds
 `project_order` to `supabase/schema.sql`; phase 1 here adds `project_secrets` to the same file.
 Different tables, no conflict — but whichever lands second means one more run of the file.
