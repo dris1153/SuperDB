@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { ProjectNav } from "@/components/project-nav";
+import { ProjectTopbar } from "@/components/project-topbar";
 import { QueryProvider } from "@/components/query-provider";
 
 // resolveProject is cache()d, so this call and the one inside the page share a single fan-out.
@@ -27,11 +28,15 @@ export default async function ProjectLayout({
         `min-h-0` on the content area is not optional — a flex child defaults to `min-height: auto`
         and refuses to shrink, which pushes the page taller instead of scrolling inside it.
       */}
-      <div className="flex h-dvh">
-        <ProjectNav projectRef={ref} name={found.project.name} />
-        {/* The usage carousel measures this to work out how far it may bleed sideways. */}
-        <div data-content-area className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-          {children}
+      <div className="flex h-dvh flex-col">
+        <ProjectTopbar projectName={found.project.name} />
+
+        <div className="flex min-h-0 flex-1">
+          <ProjectNav projectRef={ref} />
+          {/* The usage carousel measures this to work out how far it may bleed sideways. */}
+          <div data-content-area className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+            {children}
+          </div>
         </div>
       </div>
     </QueryProvider>

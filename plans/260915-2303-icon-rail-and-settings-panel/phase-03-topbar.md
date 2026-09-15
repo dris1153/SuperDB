@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Topbar breadcrumb"
-status: pending
+status: in-progress  # code done; the rename check needs the app
 priority: P2
 effort: "2h"
 dependencies: [1, 2]
@@ -53,13 +53,35 @@ than assuming: a rename should still update the breadcrumb with no reload.
 3. Rename a project and watch the breadcrumb — with a warm memo, since a cold one hides the defect.
 4. `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 
+## What landed
+
+- `components/project-topbar.tsx` — Projects / project name, then Connections and Account.
+- `app/(app)/p/[ref]/layout.tsx` — a column: topbar, then the row of rail and content.
+- `components/project-nav.tsx` — the "All projects" row hands its job to the topbar and goes.
+
+**The account menu was measured out of existence.** A `DropdownMenu` grouping Connections, Account
+and Sign out put Radix's menu into the first load of *every* project route:  went
+653,916 to 707,399 bytes — **52KB to group two links and a button**. Plain links instead, and
+sign-out keeps its place in the app sidebar, one click away on the board. An action taken once a
+session does not earn 52KB on every page of it.
+
+With the dropdown gone the topbar has no state, so it is not a client component either. Every project
+route ends up **smaller than before this phase**: tables 896,809 to 896,369, settings 654,528 to
+653,916 — the rail gave back its link and the bar ships no JavaScript.
+
+**Two breadcrumb levels, not three.** Supabase has an organization and a branch between the logo and
+the project. This app models neither, and inventing the segments would imply features that do not
+exist.
+
 ## Success Criteria
 
-- [ ] The breadcrumb names the project and links to the board on all five project routes.
-- [ ] A rename updates it without a reload.
-- [ ] No page is taller than the viewport — the check phase 1 established, repeated here because this
-      is the change that would break it.
-- [ ] `pnpm test` still green — 410.
+- [x] The breadcrumb names the project and links to the board on all five project routes.
+- [ ] **Needs the app.** A rename updates it without a reload — with a warm memo, since a cold one
+      hides the defect.
+- [ ] **Needs the app.** No page is taller than the viewport. This is the change phase 1 was
+      separated for, so it is the check that matters most.
+- [x] Connections is reachable from inside a project again.
+- [x] `pnpm test` still green — 410.
 
 ## Risk Assessment
 

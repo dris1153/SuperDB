@@ -6,7 +6,6 @@ import {
   IconBinaryTree2,
   IconBolt,
   IconBulb,
-  IconChevronLeft,
   IconCode,
   IconDatabase,
   IconFileText,
@@ -69,29 +68,13 @@ const ROW = "flex size-9 items-center justify-center rounded-md transition-color
  * click and remembers it; the two sit on one screen under different laws, which is fine — sharing a
  * flag between them would not be.
  */
-export function ProjectNav({ projectRef, name }: { projectRef: string; name: string }) {
+export function ProjectNav({ projectRef }: { projectRef: string }) {
   const pathname = usePathname();
   const base = `/p/${projectRef}`;
 
   return (
     <aside className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-border bg-card py-2">
-      {/* The way out, and it stays here until the topbar carries it: this rail can ship before that
-          does, and a project nobody can leave is worse than one without a breadcrumb. */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            href="/"
-            className={cn(ROW, "text-subtle hover:bg-muted hover:text-foreground")}
-            aria-label="All projects"
-          >
-            <IconChevronLeft size={16} stroke={1.5} />
-          </Link>
-        </TooltipTrigger>
-        <TooltipContent side="right">All projects — {name}</TooltipContent>
-      </Tooltip>
-
-      <div className="my-1 h-px w-6 bg-border" />
-
+      {/* The way back to the board is in the topbar, not here. */}
       <nav className="flex flex-col items-center gap-1 overflow-y-auto">
         {SECTIONS.map((section, index) => (
           <div key={index} className="flex flex-col items-center gap-1">
