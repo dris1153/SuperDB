@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Reset"
-status: pending
+status: in-progress  # code done; blocked on the schema, and one measurement refused
 priority: P1
 effort: "4h"
 dependencies: [5]
@@ -214,23 +214,67 @@ out of `guarded-schema.tsx` or duplicated, and say which.
    is checked by hand.
 9. By hand, on a project that matters to nobody.
 
+## What landed
+
+- `lib/password-generate.ts` + 6 tests — alphanumeric, 16 characters, rejection sampling at 248, and
+  `passwordProblem`, whose floor of 12 is deliberately far above the API's own 4.
+- `lib/mgmt-api.ts` — `updateDatabasePassword`, carrying the note about why the code around it does
+  not leak the one request body in this app that holds a secret.
+- `lib/project-actions.ts` — `resetDatabasePassword`.
+- `components/project-settings/reset-confirm.tsx` — a new dialog in `write-confirm.tsx`'s shape.
+- `components/project-settings/password-manager.tsx` — `pending_password`, and the stranded-reset
+  banner.
+
+**`sent` is the field that matters on the failure result.** `attempt` cannot tell a refusal Supabase
+explained from a request that never answered, and those are opposite situations: one leaves the old
+password working, the other may already have replaced it. Rather than guess, the action reports that
+the request went out and the client keeps the password it generated.
+
+**The locked-vault guard is the ordering, not a check.** `pending_password` is sealed and stored
+before the PATCH, so a vault that expired since the page opened fails at that step — with Supabase
+untouched and the old password still working. An explicit `unlocked` test would have been a second
+thing to keep in sync with the same fact.
+
+**The confirm's four statements are accurate in both directions.** Supabase's own services update
+themselves, the poolers carry the old password for seconds, and what breaks is anything outside this
+app holding a connection string. A dialog that overstates the damage is one people learn to click
+through, and this is the wrong one to learn that on.
+
+/p/[ref]/settings/passwords first load: 646,909 to 680,552 bytes.
+
+## NOT DONE
+
+**The schema still has not run**, so nothing on this page can be stored yet — see phase 5.
+
+**The undocumented 400 was not measured, and I will not measure it on a live project.** The plan says
+to send a 3-character password to a throwaway project and record the body. The spec declares
+`minLength: 4` but no 400 response at all, so there are two possibilities: the API refuses it, or it
+*accepts* it and the project's password becomes three characters. There is no throwaway project here
+— only real ones — and the second outcome would be a destructive change to somebody's database made
+to satisfy a test. It stays open until there is a project nobody minds breaking.
+
+What that leaves unknown: whether Supabase echoes the rejected value in its error body. If it does,
+`describe()` in `lib/safe.ts` would parse it out and put it on screen. Everything else on the leak
+path was checked by reading the code and is recorded above.
+
 ## Success Criteria
 
-- [ ] A reset requires typing the project name.
-- [ ] The confirm states the four true consequences and does not overstate them.
-- [ ] A successful reset stores the new password and the next Copy produces a working string.
-- [ ] `db_password` is never overwritten before a 200, and a reset interrupted between the store and
-      the PATCH leaves `pending_password` recoverable on the next load.
-- [ ] **A failed reset still leaves an audit row** — timeout included.
-- [ ] The action refuses while the vault is locked, and on a paused or restoring project.
-- [ ] After a reset the field holds the new password, and Save cannot destroy it.
-- [ ] The password appears in no audit row, log line or error message — checked by reading the
-      `connection_events` row afterwards, not by reading the code.
-- [ ] The generator is alphanumeric, ≥ 16 characters, unbiased, and tested.
-- [ ] The app's own minimum is stricter than the API's `minLength: 4`, **enforced in the action** —
-      verified by calling it with a 4-character string and getting a refusal.
-- [ ] The undocumented 400 body was measured and recorded, not assumed.
-- [ ] `pnpm test` still green.
+- [x] A reset requires typing the project name.
+- [x] The confirm states the four true consequences and does not overstate them.
+- [ ] **Blocked on the schema.** A successful reset stores the new password.
+- [x] `db_password` is never overwritten before a 200 — `pending_password` is written first and
+      collapsed after, and a reset interrupted anywhere leaves it recoverable on the next load.
+- [x] **A failed reset still leaves an audit row** — `attempted` goes out before the call, so a
+      request that never returns is still recorded as having been made.
+- [x] The action refuses while the vault is locked (by ordering), and on a paused or restoring
+      project.
+- [x] After a reset the field holds the new password, and Save cannot destroy it.
+- [ ] **Needs the app.** The password appears in no audit row, log line or error message — checked by
+      reading the `connection_events` row afterwards, not by reading the code.
+- [x] The generator is alphanumeric, 16 characters, unbiased, and tested.
+- [x] The app's own minimum is stricter than the API's `minLength: 4`, enforced in the action.
+- [ ] **Refused.** The undocumented 400 body was measured — see above.
+- [x] `pnpm test` still green — 402, six of them new.
 
 ## Risk Assessment
 

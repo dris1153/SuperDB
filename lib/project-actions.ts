@@ -2,11 +2,72 @@
 
 import { revalidatePath } from "next/cache";
 import { renameRemembered, resolveProject } from "./inventory";
-import { restoreProject, updateProjectName } from "./mgmt-api";
+import { restoreProject, updateDatabasePassword, updateProjectName } from "./mgmt-api";
+import { passwordProblem } from "./password-generate";
+import { isMoving, isPaused } from "./project-status";
+import { recordWrite } from "./write-audit";
 import { dropProject } from "./part-cache";
 import { attempt } from "./safe";
 
 export type ResumeResult = { ok: true } | { ok: false; reason: string };
+export type ResetResult = { ok: true } | { ok: false; reason: string; sent: boolean };
+
+/**
+ * Sets a new database password.
+ *
+ * **The password crosses this server in the clear**, because Supabase is the party setting it. That
+ * is the only place in the vault where this happens, and `updateDatabasePassword` carries the note
+ * about why the surrounding code does not leak it. It is forwarded and never stored here.
+ *
+ * It must never reach the audit detail either. `connection_events` is append-only by policy — it has
+ * `select` and `insert` and nothing else, so there is no way to delete a row — and the settings page
+ * renders `detail` verbatim. A password that lands there can never be removed. `lib/sql-redact.ts`
+ * exists for the same reason on the SQL editor's path.
+ *
+ * `sent` on the failure result is the important field: false means Supabase was never asked, so the
+ * old password certainly still works. True means the request went out and its outcome is unknown —
+ * the caller must not discard the password it generated, because it may already be the live one.
+ */
+export async function resetDatabasePassword(
+  projectRef: string,
+  password: string,
+): Promise<ResetResult> {
+  const problem = passwordProblem(password);
+  // Checked here, not only in the generator: this module is `"use server"`, so every export is an
+  // endpoint any signed-in browser can call with any string it likes. A rule that lives only in the
+  // client is a convenience, not a boundary.
+  if (problem) return { ok: false, reason: problem, sent: false };
+
+  const found = await resolveProject(projectRef);
+  if (!found) return { ok: false, reason: "Project not found.", sent: false };
+
+  // A paused project has no database to change the password of, and the spec documents no answer for
+  // that case. The overview page already refuses to render for these states; this refuses to act.
+  if (isPaused(found.project.status) || isMoving(found.project.status)) {
+    return { ok: false, reason: "This project is not running.", sent: false };
+  }
+
+  // Before the call, so a request that never comes back still leaves evidence that it went out. The
+  // audit's own contract is that every attempt is recorded, including the ones that failed, because
+  // a request can time out after the server has committed.
+  await recordWrite({ ref: projectRef, what: "database password", outcome: "attempted" });
+
+  const result = await attempt(() => updateDatabasePassword(found.token, projectRef, password));
+  if (!result.ok) {
+    // `attempt` reaches here both for a refusal Supabase explained and for a request that never
+    // answered. They are not the same — one is safe, one may have committed — and nothing available
+    // here can tell them apart, so the caller is told the request was sent and keeps the password.
+    await recordWrite({
+      ref: projectRef,
+      what: "database password",
+      outcome: `reset failed: ${result.reason.slice(0, 200)}`,
+    });
+    return { ok: false, reason: result.reason, sent: true };
+  }
+
+  await recordWrite({ ref: projectRef, what: "database password", outcome: "reset" });
+  return { ok: true };
+}
 export type RenameResult = { ok: true; name: string } | { ok: false; reason: string };
 
 /** The API's own bounds, and the app is not more permissive than they are. */

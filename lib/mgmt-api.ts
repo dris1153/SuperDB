@@ -127,6 +127,22 @@ export const listBranches = (t: string, ref: string) =>
   call<Branch[]>(t, `/v1/projects/${ref}/branches`);
 export const listMigrations = (t: string, ref: string) =>
   call<Migration[]>(t, `/v1/projects/${ref}/database/migrations`);
+/**
+ * Sets the project's database password. **The one call in this app that carries a secret in its
+ * request body** — everywhere else the vault hands this server ciphertext it cannot read.
+ *
+ * Safe here by structure rather than by intent, and worth knowing before changing any of it: the
+ * error thrown below is built from the URL path and the *response* body, never the request; the
+ * `SUPERDB_TIMING` line logs milliseconds, status and path; and this repo has no `middleware.ts` or
+ * `instrumentation.ts`, so there is no `onRequestError` and no proxy-layer body logging. Adding
+ * either re-opens the question.
+ */
+export const updateDatabasePassword = (t: string, ref: string, password: string) =>
+  call<void>(t, `/v1/projects/${ref}/database/password`, {
+    method: "PATCH",
+    body: JSON.stringify({ password }),
+  });
+
 /** The only field this endpoint accepts. Spec: `name` required, 1-256 characters. */
 export const updateProjectName = (t: string, ref: string, name: string) =>
   call<Project>(t, `/v1/projects/${ref}`, { method: "PATCH", body: JSON.stringify({ name }) });

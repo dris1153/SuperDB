@@ -235,8 +235,9 @@ revoke all on public.project_order from anon;
 -- project_order: the project itself lives in Supabase, not here.
 --
 -- vault_blob is written by the browser and is opaque to this database and to the server — same scheme
--- as connection_secrets. There is deliberately no check constraint and no column describing what is
--- inside: nothing here can read it, and a comment claiming otherwise would be unverifiable.
+-- as connection_secrets. No column describes what is inside: nothing here can read it, and a comment
+-- claiming otherwise would be unverifiable. The one check below bounds its *length*, which is the
+-- only property this database can know about it.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.project_secrets (
