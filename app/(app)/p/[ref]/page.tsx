@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
+import { projectSecret } from "@/lib/project-secrets";
 import { isMoving, isPaused } from "@/lib/project-status";
 import { PausedProject } from "@/components/paused-project";
 import { CopyButton } from "@/components/copy-button";
@@ -60,7 +61,15 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
         <DatabaseCard projectRef={ref} region={project.region} />
       </div>
 
-      <ConnectPanel projectRef={ref} dbHost={project.database?.host ?? null} />
+      {/* Ciphertext the server cannot read, so handing it to a client component exposes nothing
+          that was not already in this app's database. It costs this shell one read of that
+          database — the only thing it waits on besides resolveProject — which is the price of the
+          Copy button being able to appear at all. */}
+      <ConnectPanel
+        projectRef={ref}
+        dbHost={project.database?.host ?? null}
+        secret={await projectSecret(ref)}
+      />
       <UsagePanel projectRef={ref} />
     </div>
   );

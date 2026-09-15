@@ -43,9 +43,12 @@ prompt button. Direct, Server, MCP and ORM (Prisma, Drizzle) are built too.
 
 ![The Connect sheet open on the Direct tab, offering direct connection, transaction pooler and session pooler, with a connection string and a field-by-field parameter table](docs/images/connect.png)
 
-The connection string keeps Supabase's `[YOUR-PASSWORD]` placeholder: the Management API does not
-return a database password, and resetting one is destructive, so that stays in Supabase's own
-dashboard.
+The connection string on screen keeps Supabase's `[YOUR-PASSWORD]` placeholder — the Management API
+never returns a database password, so there is nothing to fill it with. Store your own under
+**Project Settings → Password Manager** and a second Copy button appears, putting a working string on
+the clipboard without ever showing the password. Supabase reveals that password once, when the
+project is created, so the same page can set a new one: generated in your browser, confirmed by
+typing the project name, and audited like every other write.
 
 **Credential vault** — store the Supabase account's sign-in method and email, plus the passwords for
 that account and the mailbox behind it. Encrypted in your browser, never in plaintext on the server.

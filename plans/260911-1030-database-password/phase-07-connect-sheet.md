@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Connect sheet"
-status: pending
+status: in-progress  # code done; blocked on the schema for end-to-end proof
 priority: P2
 effort: "3h"
 dependencies: [5]
@@ -110,17 +110,42 @@ someone who only wanted to read a hostname.
    by this plan's own argument, most people only have after phase 6. Do not tick this with a made-up
    string.
 
+## What landed
+
+- `lib/connection-string.ts` + 8 tests — `withPassword`, structural and encoded.
+- `app/(app)/p/[ref]/page.tsx` reads the blob; `connect-panel.tsx` carries it into `ConnectInfo`;
+  `connect-sheet.tsx` decrypts it in the browser and offers the second Copy button.
+- `README.md` — the claim that resetting "stays in Supabase's own dashboard" is no longer true.
+
+**The substitution is placeholder-independent.** The two pooler strings come back verbatim from the
+Management API and what they write where the password goes is not knowable here — the only literal
+`[YOUR-PASSWORD]` in the repo is the one this app writes for the direct string. Matching on it would
+have been a guess about the other two. Replacing whatever sits between the last colon of the userinfo
+and the `@` works whatever it says, and the test that proves it uses a deliberately odd placeholder.
+
+**The pooler's username is why a naive pattern fails.** It is `postgres.{ref}` — a dot inside the
+userinfo — so splitting on the first colon would eat it. There is a test for that shape specifically.
+
+**`#` is the character that matters.** It opens a URI fragment, so an unencoded one silently truncates
+the connection string and the failure looks like a wrong password rather than a mis-encoded one.
+Phase 6's generator avoids the whole class by being alphanumeric; this covers typed passwords, which
+can be anything.
+
+/p/[ref] first load: 829,707 to 830,755 bytes.
+
 ## Success Criteria
 
-- [ ] With the vault unlocked and a password stored, the second button copies a working string for
-      all three connection types.
-- [ ] **The real password never appears on screen** — the visible strings are unchanged from today.
-- [ ] Vault locked, or nothing stored: the button is absent and the sheet is untouched.
-- [ ] A password containing `@`, `:`, `/` or `#` produces a valid URI — `#` especially, because it
-      opens a URI fragment and fails while looking correct.
-- [ ] **The server never receives plaintext** — confirmed in the network tab, not by reading the code.
-- [ ] The substitution has tests covering encoding and the no-userinfo case.
-- [ ] `pnpm test` still green.
+- [ ] **Blocked on the schema.** With the vault unlocked and a password stored, the second button
+      copies a working string for all three connection types.
+- [x] The real password never appears on screen — the visible strings are unchanged, and the button
+      renders only when a decrypted password exists.
+- [x] Vault locked, or nothing stored: the button is absent and the sheet is untouched. Both reduce
+      to the same condition — `useVaultSecret` yields nothing without a key.
+- [x] A password containing `@`, `:`, `/` or `#` produces a valid URI — tested, `#` included.
+- [ ] **Needs the app.** The server never receives plaintext — confirmed in the network tab.
+- [x] The substitution has tests covering encoding, the pooler's dotted username, the port-swapped
+      session string, an unknown placeholder and the no-userinfo case.
+- [x] `pnpm test` still green — 410, eight of them new.
 
 ## Risk Assessment
 

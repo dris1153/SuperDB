@@ -34,7 +34,7 @@ Design, the constraint that made it possible, and what was settled without askin
 | 4 | [Rename a project](phase-04-rename.md) | **done** | ~3h | 3 |
 | 5 | [Password Manager: store](phase-05-password-manager-store.md) | **in-progress** | ~4h | 1, 2, 3 |
 | 6 | [Reset](phase-06-reset.md) | **in-progress** | ~4h | 5 |
-| 7 | [Connect sheet](phase-07-connect-sheet.md) | pending | ~3h | 5 |
+| 7 | [Connect sheet](phase-07-connect-sheet.md) | **in-progress** | ~3h | 5 |
 
 Phase 1 shipped its code in `833d91f` but **not one of its criteria has been checked**: every one is
 a question about a database, and `supabase/schema.sql` has never been run for `project_secrets`. It

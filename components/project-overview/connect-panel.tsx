@@ -12,7 +12,16 @@ import { useProjectPart } from "@/components/use-project-part";
  * genuinely unavailable: "this project does not offer it" is a claim, and making it while the
  * request is still going is the kind of confident wrong answer this page keeps avoiding.
  */
-export function ConnectPanel({ projectRef, dbHost }: { projectRef: string; dbHost: string | null }) {
+export function ConnectPanel({
+  projectRef,
+  dbHost,
+  secret,
+}: {
+  projectRef: string;
+  dbHost: string | null;
+  /** The vault blob holding this project's database password, or null when none is stored. */
+  secret: string | null;
+}) {
   const pooler = useProjectPart<PoolerConfig[]>(projectRef, "pooler");
   const config = pooler.status === "ready" ? pooler.data : null;
 
@@ -38,6 +47,7 @@ export function ConnectPanel({ projectRef, dbHost }: { projectRef: string; dbHos
         // So the sheet can say "still loading" instead of "this project does not offer it".
         poolerPending: pooler.status === "pending",
         poolerReason: pooler.status === "refused" || pooler.status === "failed" ? pooler.reason : null,
+        secret,
       }}
     />
   );
