@@ -20,10 +20,17 @@ export default async function ProjectLayout({
     // (app) layout it measured +24,401 bytes on /connections, /settings and the project board too,
     // none of which use it.
     <QueryProvider>
-      <div className="flex min-h-screen">
+      {/*
+        The layout owns the height, and the pages beneath it fill what they are given.
+        `h-dvh` rather than `h-screen`: on mobile browsers 100vh includes the retracting address
+        bar, so a full-height editor is taller than the visible area for as long as that bar shows.
+        `min-h-0` on the content area is not optional — a flex child defaults to `min-height: auto`
+        and refuses to shrink, which pushes the page taller instead of scrolling inside it.
+      */}
+      <div className="flex h-dvh">
         <ProjectNav projectRef={ref} name={found.project.name} />
         {/* The usage carousel measures this to work out how far it may bleed sideways. */}
-        <div data-content-area className="min-w-0 flex-1">
+        <div data-content-area className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           {children}
         </div>
       </div>

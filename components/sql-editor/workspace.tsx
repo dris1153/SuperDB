@@ -72,7 +72,7 @@ export function SqlWorkspace({
   const unresolved = saved.loading && activeTab.queryId !== null && active === null;
 
   return (
-    <div className="flex h-screen min-w-0">
+    <div className="flex h-full min-w-0">
       <SavedQueriesSidebar
         queries={saved.queries}
         loading={saved.loading}

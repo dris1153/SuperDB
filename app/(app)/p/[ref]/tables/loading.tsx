@@ -6,7 +6,7 @@ import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
  */
 export default function Loading() {
   return (
-    <div className="flex h-screen">
+    <div className="flex h-full">
       <div className="w-64 shrink-0 space-y-3 border-r border-border p-3">
         <Skeleton className="h-8 rounded" />
         <Skeleton className="h-8 rounded" />

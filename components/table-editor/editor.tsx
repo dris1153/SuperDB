@@ -137,7 +137,7 @@ export function TableEditor({ projectRef, projectName }: { projectRef: string; p
 
   return (
     <TableUrlProvider current={query} pending={busy}>
-      <div className="flex h-screen">
+      <div className="flex h-full">
         <TablesSidebar
           schemas={schemas}
           schema={schema}

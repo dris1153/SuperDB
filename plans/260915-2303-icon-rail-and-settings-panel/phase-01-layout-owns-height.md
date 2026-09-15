@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "The layout owns the height"
-status: pending
+status: in-progress  # code done; every criterion needs the app
 priority: P1
 effort: "2h"
 dependencies: []
@@ -60,14 +60,27 @@ error anywhere.
 3. Scroll to the bottom of a table with more rows than fit, and to the bottom of a long query result.
 4. `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`.
 
+## What landed
+
+- `app/(app)/p/[ref]/layout.tsx` — `flex h-dvh`, content area `min-h-0 min-w-0 flex-1 overflow-y-auto`,
+  `data-content-area` kept where the carousel expects it.
+- `components/sql-editor/workspace.tsx`, `components/table-editor/editor.tsx`,
+  `app/(app)/p/[ref]/tables/loading.tsx` — `h-screen` to `h-full`.
+
+`h-screen` now appears nowhere outside a comment explaining why.
+
+The scroll moves from the document to the content area, which is what lets the rail and a future
+topbar stay put while a long overview scrolls beside them.
+
 ## Success Criteria
 
-- [ ] No project page scrolls vertically at the document level.
-- [ ] The grid reaches its last row, and the SQL result grid reaches its last row.
-- [ ] The usage carousel still bleeds the same distance past its container.
-- [ ] The tables loading state is the same height as the editor that replaces it — checked by
-      watching a cold navigation, which is the only place it appears.
-- [ ] `pnpm test` still green — 410.
+- [ ] **Needs the app.** No project page scrolls vertically at the document level.
+- [ ] **Needs the app.** The grid reaches its last row, and the SQL result grid reaches its last row.
+- [ ] **Needs the app.** The usage carousel still bleeds the same distance past its container.
+- [ ] **Needs the app.** The tables loading state is the same height as the editor that replaces it.
+- [x] `pnpm test` still green — 410, **and none of them touch this**. The suite is `lib` only with no
+      DOM harness, so this row is the absence of a regression elsewhere, not evidence about this
+      phase.
 
 ## Risk Assessment
 
