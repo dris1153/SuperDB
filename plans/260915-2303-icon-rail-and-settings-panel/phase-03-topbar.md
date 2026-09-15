@@ -60,7 +60,7 @@ than assuming: a rename should still update the breadcrumb with no reload.
 - `components/project-nav.tsx` — the "All projects" row hands its job to the topbar and goes.
 
 **The account menu was measured out of existence.** A `DropdownMenu` grouping Connections, Account
-and Sign out put Radix's menu into the first load of *every* project route:  went
+and Sign out put Radix's menu into the first load of *every* project route: /p/[ref]/settings went
 653,916 to 707,399 bytes — **52KB to group two links and a button**. Plain links instead, and
 sign-out keeps its place in the app sidebar, one click away on the board. An action taken once a
 session does not earn 52KB on every page of it.
