@@ -69,5 +69,30 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const isAddressableById = (id: string | null | undefined): boolean => UUID.test(id ?? "");
 
+/**
+ * What the API will accept as a key name, measured rather than read.
+ *
+ * The OpenAPI document declares **no 400 at all** for these endpoints. The API returns them, and
+ * these are its own words, from 2026-09-25:
+ *
+ * - `name: Too small: expected string to have >=4 characters`
+ * - `name: Too big: expected string to have <=64 characters`
+ * - `name: Name must start with a lowercase letter or an underscore, followed only by lowercase
+ *   alphanumeric characters or underscore`
+ *
+ * Checked here so a typo costs nothing, **not** as a boundary: this is a snapshot of one day's
+ * behaviour, and when the two disagree the API's own message is what the user should see.
+ */
+const NAME = /^[a-z_][a-z0-9_]*$/;
+
+export function nameProblem(name: string): string | null {
+  if (name.length < 4) return "At least 4 characters.";
+  if (name.length > 64) return "At most 64 characters.";
+  if (!NAME.test(name)) {
+    return "Lowercase letters, numbers and underscores only, starting with a letter or underscore.";
+  }
+  return null;
+}
+
 /** Which tab a key belongs to. The screenshot's two tabs are one list, split by type. */
 export const isLegacy = (key: Pick<KeyRow, "type">) => key.type === "legacy";

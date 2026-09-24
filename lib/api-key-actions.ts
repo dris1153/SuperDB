@@ -1,8 +1,15 @@
 "use server";
 
-import { isAddressableById, isMasked } from "./api-keys";
+import { isAddressableById, isMasked, nameProblem } from "./api-keys";
 import { resolveProject } from "./inventory";
-import { getApiKey, listApiKeys, type ApiKey } from "./mgmt-api";
+import {
+  createApiKey,
+  deleteApiKey,
+  getApiKey,
+  listApiKeys,
+  updateApiKey,
+  type ApiKey,
+} from "./mgmt-api";
 import { attempt, type Attempt } from "./safe";
 
 export type RevealResult =
@@ -73,4 +80,73 @@ export async function revealApiKey(projectRef: string, id: string): Promise<Reve
       : revealed.reason,
     permission: denied,
   };
+}
+
+
+export type KeyResult = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Creating a key.
+ *
+ * The name is checked here as well as in the form, because this module is `"use server"` — every
+ * export is an endpoint any signed-in browser can call with any string. The client check is a
+ * convenience; this one is the boundary. Neither is the authority: when the API disagrees with both,
+ * its own message is what gets shown, since the rule is a snapshot of one day's behaviour.
+ */
+export async function createKey(
+  projectRef: string,
+  type: "publishable" | "secret",
+  name: string,
+  description: string,
+): Promise<KeyResult> {
+  const trimmed = name.trim();
+  const problem = nameProblem(trimmed);
+  if (problem) return { ok: false, reason: problem };
+
+  const found = await resolveProject(projectRef);
+  if (!found) return { ok: false, reason: "Project not found." };
+
+  const body = { type, name: trimmed, ...(description.trim() ? { description: description.trim() } : {}) };
+  const result = await attempt(() => createApiKey(found.token, projectRef, body));
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+}
+
+/** `type` is not here because it cannot be changed after creation. */
+export async function renameKey(
+  projectRef: string,
+  id: string,
+  name: string,
+  description: string,
+): Promise<KeyResult> {
+  const trimmed = name.trim();
+  const problem = nameProblem(trimmed);
+  if (problem) return { ok: false, reason: problem };
+
+  if (!isAddressableById(id)) {
+    // Legacy keys have no id to PATCH — theirs is their own name — and nothing about them is
+    // editable anyway.
+    return { ok: false, reason: "Legacy keys cannot be renamed." };
+  }
+
+  const found = await resolveProject(projectRef);
+  if (!found) return { ok: false, reason: "Project not found." };
+
+  const result = await attempt(() =>
+    updateApiKey(found.token, projectRef, id, { name: trimmed, description: description.trim() }),
+  );
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+}
+
+/**
+ * Deleting a key. Whatever authenticates with it stops working immediately, and there is no undo —
+ * the confirm in front of this is where that is said.
+ */
+export async function removeKey(projectRef: string, id: string): Promise<KeyResult> {
+  if (!isAddressableById(id)) return { ok: false, reason: "Legacy keys cannot be deleted here." };
+
+  const found = await resolveProject(projectRef);
+  if (!found) return { ok: false, reason: "Project not found." };
+
+  const result = await attempt(() => deleteApiKey(found.token, projectRef, id));
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason };
 }

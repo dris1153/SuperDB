@@ -22,7 +22,7 @@ Design and the measurements behind it:
 | 1 | [Settle the reveal scope](phase-01-settle-reveal-scope.md) | **done** | ~1h | — |
 | 2 | [The list, and the Server tab bug](phase-02-list-and-server-fix.md) | **in-progress** | ~4h | — |
 | 3 | [Reveal](phase-03-reveal.md) | **in-progress** | ~3h | 2 |
-| 4 | [Create, rename, delete](phase-04-crud.md) | pending | ~5h | 2 |
+| 4 | [Create, rename, delete](phase-04-crud.md) | **in-progress** | ~5h | 2 |
 | 5 | [The legacy switch](phase-05-legacy-switch.md) | pending | ~3h | 2 |
 
 **Phase 1 is done, and it answered yes.** `reveal=true` returns the secret complete where
@@ -46,6 +46,10 @@ Do not re-open these during implementation:
 - **`KeySummary` does not change.** `service_role` comes back complete at `reveal=false` and bypasses
   RLS, so the picked-fields guard in `lib/project-parts.ts` stays. Its comment needs rewriting — the
   guard does not.
+- **Writes have a burst limit the headers do not describe.** Three writes inside a second gave 201,
+  429, 429 while the next read reported 117 of 120 remaining; spaced five seconds apart all three
+  succeeded. A 429 on a write means "too fast", not "quota exhausted", and nothing here may batch
+  writes without spacing them.
 - **Legacy keys are not addressable by id.** `anon` and `service_role` carry an `id` of their own
   name; `GET /api-keys/{id}` answers `400 "id: Invalid UUID"` for them, so they can only be found in
   the list. Nothing in the spec says this, and getting it wrong makes Reveal silently never work for

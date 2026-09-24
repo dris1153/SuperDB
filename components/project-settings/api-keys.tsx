@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { IconEye, IconEyeOff } from "@tabler/icons-react";
-import { revealApiKey } from "@/lib/api-key-actions";
+import { IconEye, IconEyeOff, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import { createKey, removeKey, renameKey, revealApiKey } from "@/lib/api-key-actions";
 import type { KeyRow } from "@/lib/api-keys";
 import { CopyButton } from "@/components/copy-button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
+import { isWaiting, reasonOf, useProjectPart, useRefetchPart } from "@/components/use-project-part";
+import { DeleteKeyConfirm, KeyForm } from "./key-dialogs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,7 +23,9 @@ import { cn } from "@/lib/utils";
  */
 export function ApiKeys({ projectRef }: { projectRef: string }) {
   const keys = useProjectPart<KeyRow[]>(projectRef, "api-key-rows");
+  const refetch = useRefetchPart(projectRef, "api-key-rows");
   const [tab, setTab] = useState<"current" | "legacy">("current");
+  const [creating, setCreating] = useState<"publishable" | "secret" | null>(null);
 
   const all = keys.status === "ready" && Array.isArray(keys.data) ? keys.data : [];
   const shown = all.filter((k) => (tab === "legacy" ? k.type === "legacy" : k.type !== "legacy"));
@@ -37,6 +40,19 @@ export function ApiKeys({ projectRef }: { projectRef: string }) {
           Legacy anon, service_role API keys
         </Tab>
       </div>
+
+      {tab === "current" ? (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => setCreating("publishable")}>
+            <IconPlus size={13} stroke={1.5} />
+            New publishable key
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCreating("secret")}>
+            <IconPlus size={13} stroke={1.5} />
+            New secret key
+          </Button>
+        </div>
+      ) : null}
 
       {isWaiting(keys) ? (
         <Card className="space-y-3 p-4">
@@ -58,10 +74,24 @@ export function ApiKeys({ projectRef }: { projectRef: string }) {
       ) : (
         <Card className="divide-y divide-border p-0">
           {shown.map((key) => (
-            <Row key={key.id ?? key.name} row={key} projectRef={projectRef} />
+            <Row key={key.id ?? key.name} row={key} projectRef={projectRef} onChanged={refetch} />
           ))}
         </Card>
       )}
+
+      <KeyForm
+        open={creating !== null}
+        onOpenChange={(next) => setCreating(next ? creating : null)}
+        title={creating === "secret" ? "New secret key" : "New publishable key"}
+        submitLabel="Create key"
+        onSubmit={async (name, description) => {
+          const result = await createKey(projectRef, creating ?? "publishable", name, description);
+          // The list is refetched rather than patched: the API assigns the id, the prefix and the
+          // mask, and guessing any of them here would put a row on screen that is not the row.
+          if (result.ok) await refetch();
+          return result;
+        }}
+      />
     </section>
   );
 }
@@ -97,8 +127,20 @@ function Tab({
  * the two that are not. This component never sees a `service_role` or `secret` value, which is why
  * it cannot leak one by accident — the decision is upstream and tested, not repeated here.
  */
-function Row({ row, projectRef }: { row: KeyRow; projectRef: string }) {
+function Row({
+  row,
+  projectRef,
+  onChanged,
+}: {
+  row: KeyRow;
+  projectRef: string;
+  onChanged: () => Promise<unknown>;
+}) {
   const dangerous = row.type === "secret" || row.name === "service_role";
+  // The legacy pair are not editable: their id is their own name, and the API has no PATCH for them.
+  const editable = row.type !== "legacy";
+  const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   /**
    * Local state, deliberately — not a query cache.
@@ -165,6 +207,28 @@ function Row({ row, projectRef }: { row: KeyRow; projectRef: string }) {
           )}
 
           {shown ? <CopyButton value={shown} /> : null}
+
+          {editable ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setRenaming(true)}
+                aria-label={`Rename ${row.name}`}
+              >
+                <IconPencil size={13} stroke={1.5} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setDeleting(true)}
+                aria-label={`Delete ${row.name}`}
+                className="text-subtle hover:text-destructive"
+              >
+                <IconTrash size={13} stroke={1.5} />
+              </Button>
+            </>
+          ) : null}
         </div>
 
         {problem ? (
@@ -177,6 +241,38 @@ function Row({ row, projectRef }: { row: KeyRow; projectRef: string }) {
           <p className="text-xs text-subtle">Bypasses Row Level Security. Never put it in a browser.</p>
         ) : null}
       </div>
+
+      <KeyForm
+        open={renaming}
+        onOpenChange={setRenaming}
+        title={`Rename ${row.name}`}
+        submitLabel="Save"
+        initialName={row.name}
+        initialDescription={row.description ?? ""}
+        onSubmit={async (name, description) => {
+          const result = await renameKey(projectRef, row.id ?? "", name, description);
+          if (result.ok) await onChanged();
+          return result;
+        }}
+      />
+
+      <DeleteKeyConfirm
+        open={deleting}
+        onOpenChange={setDeleting}
+        name={row.name}
+        onConfirm={() =>
+          startTransition(async () => {
+            const result = await removeKey(projectRef, row.id ?? "");
+            if (result.ok) {
+              await onChanged();
+              setDeleting(false);
+            } else {
+              setProblem(result.reason);
+              setDeleting(false);
+            }
+          })
+        }
+      />
     </div>
   );
 }

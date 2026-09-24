@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isAddressableById, isLegacy, isMasked, toRow } from "./api-keys.ts";
+import { isAddressableById, isLegacy, isMasked, nameProblem, toRow } from "./api-keys.ts";
 import type { ApiKey } from "./mgmt-api.ts";
 
 const key = (over: Partial<ApiKey> = {}): ApiKey => ({
@@ -89,4 +89,25 @@ test("the newer key types are addressable by id", () => {
 test("a nearly-uuid is not a uuid", () => {
   assert.equal(isAddressableById("628f43c8-1c9f-4d28-b64f-1f32cc4bc54"), false, "too short");
   assert.equal(isAddressableById("628f43c8_1c9f_4d28_b64f_1f32cc4bc546"), false, "wrong separators");
+});
+
+test("a name the API accepts is accepted here", () => {
+  for (const name of ["prod", "web_app", "_internal", "key_2", "a".repeat(64)]) {
+    assert.equal(nameProblem(name), null, `for ${name}`);
+  }
+});
+
+test("the three rules the API stated, in its own order", () => {
+  // Measured 2026-09-25; the spec declares no 400 for this endpoint at all.
+  assert.match(nameProblem("abc") ?? "", /4 characters/);
+  assert.match(nameProblem("a".repeat(65)) ?? "", /64 characters/);
+  assert.match(nameProblem("Bad-Name") ?? "", /Lowercase/);
+});
+
+test("the cases that look fine and are not", () => {
+  assert.notEqual(nameProblem("2fast"), null, "cannot start with a digit");
+  assert.notEqual(nameProblem("web-app"), null, "hyphen is not an underscore");
+  assert.notEqual(nameProblem("Web_App"), null, "uppercase anywhere");
+  assert.notEqual(nameProblem("web app"), null, "a space");
+  assert.notEqual(nameProblem(""), null, "empty");
 });

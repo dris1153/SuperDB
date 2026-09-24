@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Create, rename, delete"
-status: pending
+status: in-progress  # code done and verified against the API; the UI needs the app
 priority: P2
 effort: "5h"
 dependencies: [2]
@@ -45,15 +45,55 @@ Whether the *dashboard* shows it once is a question for phase 1's note, not an a
 `reason` query parameters. Deleting a key breaks whatever is using it, with no undo — it gets a
 confirm naming the key, in the shape the rest of this app uses.
 
+## What landed
+
+- `lib/api-keys.ts` — `nameProblem`, the measured rule, with 3 tests including the cases that look
+  fine and are not: a leading digit, a hyphen, an uppercase letter, a space.
+- `lib/mgmt-api.ts` — `createApiKey`, `updateApiKey`, `deleteApiKey`.
+- `lib/api-key-actions.ts` — `createKey`, `renameKey`, `removeKey`.
+- `components/project-settings/key-dialogs.tsx` — the form and the delete confirm.
+- The two create buttons, and pencil/trash on each editable row.
+
+**The name is checked in three places and only one of them is the boundary.** The form checks as you
+type, because the rule is not guessable and the API states it only after a round trip. The action
+checks again, because it is a `"use server"` export and every one of those is an endpoint any
+signed-in browser can call. And when the API disagrees with both, **its message is what the user
+sees** — the rule here is a snapshot of one day's behaviour, not a law.
+
+**Legacy keys are not editable, and the code says why rather than hiding the buttons on a hunch.**
+Their id is their own name, the API has no `PATCH` for them, and the actions refuse before reaching
+the network.
+
+**After a write the list is refetched, not patched.** The API assigns the id, the prefix and the
+mask; constructing a row locally would put something on screen that is not the row.
+
+**Verified against the live API**, create → rename → delete, on a real project, and the list returned
+to its original four keys.
+
+## A limit the headers do not describe
+
+Those three calls fired back to back inside a second gave `201`, **`429`**, **`429`** — while the next
+`GET` reported 117 of 120 remaining. Spaced five seconds apart, all three succeeded.
+
+So there is a burst limit on the write path that the rate-limit headers do not reflect, and nothing in
+the spec mentions it. **A 429 on a write here means "too fast", not "quota exhausted".** The first
+attempt also left a key behind — the rename and delete both failed after the create succeeded — which
+is exactly the state a retry loop would produce, and the page must not batch writes without spacing
+them.
+
+/p/[ref]/settings/api-keys 659,813 to 694,219 bytes.
+
 ## Success Criteria
 
-- [ ] Creating a key with a bad name is refused before the request, with the measured rule stated in
+- [x] Creating a key with a bad name is refused before the request, with the measured rule stated in
       plain words rather than a regex.
-- [ ] An API refusal shows the API's own message.
-- [ ] The created key's row appears without a reload, and nothing claims to show a full secret.
-- [ ] Deleting requires a confirm that names the key.
-- [ ] `type` is offered at creation and nowhere else.
-- [ ] `pnpm test` still green.
+- [x] An API refusal shows the API's own message.
+- [ ] **Needs the app.** The created key's row appears without a reload.
+- [x] Nothing claims to show a full secret — `POST` returns it already masked, so there is no
+      "copy it now" moment to build.
+- [x] Deleting requires a confirm that names the key.
+- [x] `type` is offered at creation and nowhere else.
+- [x] `pnpm test` still green — 430, three of them new.
 
 ## Risk Assessment
 

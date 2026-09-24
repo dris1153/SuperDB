@@ -152,3 +152,42 @@ seen earlier are consistent with a token simply not reaching those projects.
 
 **Unchanged by this:** `service_role` comes back complete at `reveal=false` with no special
 permission, on every project measured. The guard in `lib/project-parts.ts` stays exactly as it is.
+
+
+---
+
+# Writes are rate limited harder than the headers admit
+
+Measured while verifying create / rename / delete end to end.
+
+`POST` → `PATCH` → `DELETE` fired back to back, inside a second, on a key that had just been created:
+
+```
+create -> 201
+rename -> 429
+delete -> 429
+```
+
+Yet the very next `GET` reported `x-ratelimit-limit: 120, remaining: 117`. The same three calls spaced
+five seconds apart all succeeded:
+
+```
+create -> 201 superdb_probe
+rename -> 200 superdb_probe2 | "renamed"
+delete -> 200
+```
+
+So there is a burst limit on the write path that **the rate-limit headers do not describe** — they
+keep reporting the ordinary 120/60s read budget while the write is refused. Nothing in the spec
+mentions it either.
+
+**What this means for the page.** A UI that fires writes in quick succession — a create followed by
+an immediate rename, or a delete loop over several rows — will be refused, and the refusal arrives as
+429 with headers that say there was plenty of budget left. Treat 429 on a write as "too fast", not as
+"quota exhausted", and do not build anything that batches writes without spacing them.
+
+**A key was left behind by the first attempt** — the rename and delete both failed, so `superdb_probe`
+survived and the list showed five keys. It was deleted a minute later and the list is back to the
+original four: `anon`, `service_role`, and the two `default`s. Worth recording because a half-finished
+sequence against a live project is exactly the state a retry loop would leave, and the UI has to
+assume it can happen.

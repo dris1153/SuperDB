@@ -96,6 +96,34 @@ export const listApiKeys = (t: string, ref: string, reveal = false) =>
 export const getApiKey = (t: string, ref: string, id: string, reveal: boolean) =>
   call<ApiKey>(t, `/v1/projects/${ref}/api-keys/${id}?reveal=${reveal}`);
 
+/**
+ * Creating a key. `type` is fixed at creation — `PATCH` accepts only the other three fields.
+ *
+ * The 201 carries the new key already masked, measured 2026-09-25, so there is no one-time reveal at
+ * creation the way some platforms do it. A "copy it now, you will not see it again" flow would be a
+ * lie here.
+ */
+export const createApiKey = (
+  t: string,
+  ref: string,
+  body: { type: "publishable" | "secret"; name: string; description?: string },
+) => call<ApiKey>(t, `/v1/projects/${ref}/api-keys`, { method: "POST", body: JSON.stringify(body) });
+
+export const updateApiKey = (
+  t: string,
+  ref: string,
+  id: string,
+  body: { name?: string; description?: string },
+) =>
+  call<ApiKey>(t, `/v1/projects/${ref}/api-keys/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+
+/** Answers 200 with the deleted key, masked. `was_compromised` and `reason` are optional. */
+export const deleteApiKey = (t: string, ref: string, id: string) =>
+  call<ApiKey>(t, `/v1/projects/${ref}/api-keys/${id}`, { method: "DELETE" });
+
 const SERVICES = ["auth", "db", "pooler", "realtime", "rest", "storage"] as const;
 // No timeout_ms: the API validates it as a number and rejects the query string with a 400.
 export const getHealth = (t: string, ref: string) =>
