@@ -37,6 +37,8 @@ export const PART_NAMES = [
   // The API keys settings page. Wider than `api-keys`, which is the four fields the database page
   // shows — and deliberately a separate name so the two shapes cannot be confused for each other.
   "api-key-rows",
+  // Whether this project still issues the legacy anon and service_role JWTs. One flag, both keys.
+  "legacy-api-keys",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

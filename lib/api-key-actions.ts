@@ -7,9 +7,11 @@ import {
   deleteApiKey,
   getApiKey,
   listApiKeys,
+  setLegacyKeys,
   updateApiKey,
   type ApiKey,
 } from "./mgmt-api";
+import { recordWrite } from "./write-audit";
 import { attempt, type Attempt } from "./safe";
 
 export type RevealResult =
@@ -148,5 +150,46 @@ export async function removeKey(projectRef: string, id: string): Promise<KeyResu
   if (!found) return { ok: false, reason: "Project not found." };
 
   const result = await attempt(() => deleteApiKey(found.token, projectRef, id));
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+}
+
+
+/**
+ * Turning the legacy `anon` and `service_role` keys off, or back on.
+ *
+ * **One flag, both keys** — there is no per-key switch. `anon` is what nearly every client
+ * application in the wild authenticates with, so disabling this does not degrade anything: it stops
+ * those clients dead, immediately.
+ *
+ * **Re-enabling is one call and that is not the same as undo.** It restores the flag; it does not
+ * restore the requests that failed in between, and it does not tell anyone whose application broke
+ * that it is safe again. The confirm in front of this should not soften the decision by pointing at
+ * how easily it reverses.
+ *
+ * **Not measured.** Every other claim on this page was checked against the live API; this one was
+ * not, because the only way to learn what disabling does to a project is to disable it on a real
+ * one. What is written here comes from the endpoint's shape and Supabase's documentation.
+ */
+export async function setLegacyKeysEnabled(
+  projectRef: string,
+  enabled: boolean,
+): Promise<KeyResult> {
+  const found = await resolveProject(projectRef);
+  if (!found) return { ok: false, reason: "Project not found." };
+
+  const result = await attempt(() => setLegacyKeys(found.token, projectRef, enabled));
+
+  // Audited either way, and before the outcome is returned. This is the widest-reaching switch on
+  // the page, and a change nobody can find afterwards is worse than one that failed.
+  await recordWrite({
+    ref: projectRef,
+    what: "legacy API keys",
+    outcome: result.ok
+      ? enabled
+        ? "enabled"
+        : "disabled"
+      : `${enabled ? "enable" : "disable"} failed: ${result.reason.slice(0, 200)}`,
+  });
+
   return result.ok ? { ok: true } : { ok: false, reason: result.reason };
 }

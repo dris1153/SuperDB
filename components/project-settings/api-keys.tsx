@@ -12,6 +12,7 @@ import { Empty } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isWaiting, reasonOf, useProjectPart, useRefetchPart } from "@/components/use-project-part";
 import { DeleteKeyConfirm, KeyForm } from "./key-dialogs";
+import { LegacyKeysSwitch } from "./legacy-keys";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,7 +22,13 @@ import { cn } from "@/lib/utils";
  * over that one list. `/api-keys/legacy` holds nothing but an `{enabled}` flag, which is the switch
  * in a later phase rather than a second source of keys.
  */
-export function ApiKeys({ projectRef }: { projectRef: string }) {
+export function ApiKeys({
+  projectRef,
+  projectName,
+}: {
+  projectRef: string;
+  projectName: string;
+}) {
   const keys = useProjectPart<KeyRow[]>(projectRef, "api-key-rows");
   const refetch = useRefetchPart(projectRef, "api-key-rows");
   const [tab, setTab] = useState<"current" | "legacy">("current");
@@ -78,6 +85,10 @@ export function ApiKeys({ projectRef }: { projectRef: string }) {
           ))}
         </Card>
       )}
+
+      {tab === "legacy" ? (
+        <LegacyKeysSwitch projectRef={projectRef} projectName={projectName} />
+      ) : null}
 
       <KeyForm
         open={creating !== null}

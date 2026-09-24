@@ -120,6 +120,20 @@ export const updateApiKey = (
     body: JSON.stringify(body),
   });
 
+/**
+ * Whether this project still issues the legacy `anon` and `service_role` JWTs.
+ *
+ * One flag for both — there is no per-key switch. Measured 2026-09-25: `GET` answers
+ * `{"enabled": true}`, and `PUT` takes `enabled` as a **required query parameter**, not a body.
+ */
+export const getLegacyKeys = (t: string, ref: string) =>
+  call<{ enabled: boolean }>(t, `/v1/projects/${ref}/api-keys/legacy`);
+
+export const setLegacyKeys = (t: string, ref: string, enabled: boolean) =>
+  call<{ enabled: boolean }>(t, `/v1/projects/${ref}/api-keys/legacy?enabled=${enabled}`, {
+    method: "PUT",
+  });
+
 /** Answers 200 with the deleted key, masked. `was_compromised` and `reason` are optional. */
 export const deleteApiKey = (t: string, ref: string, id: string) =>
   call<ApiKey>(t, `/v1/projects/${ref}/api-keys/${id}`, { method: "DELETE" });

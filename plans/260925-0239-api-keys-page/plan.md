@@ -23,7 +23,7 @@ Design and the measurements behind it:
 | 2 | [The list, and the Server tab bug](phase-02-list-and-server-fix.md) | **in-progress** | ~4h | — |
 | 3 | [Reveal](phase-03-reveal.md) | **in-progress** | ~3h | 2 |
 | 4 | [Create, rename, delete](phase-04-crud.md) | **in-progress** | ~5h | 2 |
-| 5 | [The legacy switch](phase-05-legacy-switch.md) | pending | ~3h | 2 |
+| 5 | [The legacy switch](phase-05-legacy-switch.md) | **in-progress** | ~3h | 2 |
 
 **Phase 1 is done, and it answered yes.** `reveal=true` returns the secret complete where
 `reveal=false` masks it; the 403s that prompted the question were a token scoped to a different

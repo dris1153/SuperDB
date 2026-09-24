@@ -54,6 +54,9 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   // Carries real key values for the public key types. Sixty seconds of a credential sitting in this
   // process buys nothing on a page somebody opens to read one thing.
   "api-key-rows": 0,
+  // A flag, not a credential — but it is toggled from this page and a stale copy would show the
+  // switch in the position it was in before the click.
+  "legacy-api-keys": 0,
   definition: 0,
   "saved-queries": 0,
 };

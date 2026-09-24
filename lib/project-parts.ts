@@ -3,6 +3,7 @@ import { dbOverview } from "./db-introspect";
 import { resolveProject } from "./inventory";
 import type { ApiKey } from "./mgmt-api";
 import {
+  getLegacyKeys,
   getDiskUtil,
   getHealth,
   getMetricsText,
@@ -114,6 +115,9 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
    * with. `toRow` is where the line is drawn, and it has tests.
    */
   "api-key-rows": async (t, ref): Promise<KeyRow[]> => (await listApiKeys(t, ref)).map(toRow),
+
+  /** A single boolean, and the only thing this endpoint holds. */
+  "legacy-api-keys": (t, ref) => getLegacyKeys(t, ref),
   metrics: async (t, ref) => ({ memoryPercent: memoryUsedPercent(parseMetrics(await getMetricsText(t, ref))) }),
   /** What the sidebar lists, and whether PostgREST serves the schema the user is looking at. */
   schemas: async (t, ref) => {

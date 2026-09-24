@@ -11,7 +11,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function ApiKeysPage({ params }: { params: Promise<{ ref: string }> }) {
   const { ref } = await params;
-  if (!(await resolveProject(ref))) notFound();
+  const found = await resolveProject(ref);
+  if (!found) notFound();
 
-  return <ApiKeys projectRef={ref} />;
+  // The name is what the disable confirm asks the user to type, so it comes from the same resolve
+  // that proved they own the project rather than from anything the browser could supply.
+  return <ApiKeys projectRef={ref} projectName={found.project.name} />;
 }
