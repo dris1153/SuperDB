@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { IconEye, IconEyeOff } from "@tabler/icons-react";
+import { revealApiKey } from "@/lib/api-key-actions";
 import type { KeyRow } from "@/lib/api-keys";
 import { CopyButton } from "@/components/copy-button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,7 +58,7 @@ export function ApiKeys({ projectRef }: { projectRef: string }) {
       ) : (
         <Card className="divide-y divide-border p-0">
           {shown.map((key) => (
-            <Row key={key.id ?? key.name} row={key} />
+            <Row key={key.id ?? key.name} row={key} projectRef={projectRef} />
           ))}
         </Card>
       )}
@@ -94,8 +97,40 @@ function Tab({
  * the two that are not. This component never sees a `service_role` or `secret` value, which is why
  * it cannot leak one by accident — the decision is upstream and tested, not repeated here.
  */
-function Row({ row }: { row: KeyRow }) {
+function Row({ row, projectRef }: { row: KeyRow; projectRef: string }) {
   const dangerous = row.type === "secret" || row.name === "service_role";
+
+  /**
+   * Local state, deliberately — not a query cache.
+   *
+   * A revealed key in TanStack's cache would outlive the click that asked for it, survive navigating
+   * away and back, and be readable by anything else holding the client. Here, hiding it discards it
+   * and a remount starts from nothing.
+   */
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const shown = row.value ?? revealed;
+
+  const toggle = () => {
+    if (revealed) {
+      setRevealed(null);
+      setProblem(null);
+      return;
+    }
+
+    startTransition(async () => {
+      setProblem(null);
+      try {
+        const result = await revealApiKey(projectRef, row.id ?? "");
+        if (result.ok) setRevealed(result.value);
+        else setProblem(result.reason);
+      } catch {
+        setProblem("Could not reach the server.");
+      }
+    });
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 sm:flex-nowrap">
@@ -108,25 +143,40 @@ function Row({ row }: { row: KeyRow }) {
             </Badge>
           ) : null}
         </div>
-        <p className="mt-0.5 truncate text-xs text-subtle">
-          {row.description ?? "No description"}
-        </p>
+        <p className="mt-0.5 truncate text-xs text-subtle">{row.description ?? "No description"}</p>
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
-          {row.value ?? row.prefix ?? "—"}
-        </code>
-        {row.value ? <CopyButton value={row.value} /> : null}
-      </div>
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
+            {shown ?? row.prefix ?? "—"}
+          </code>
 
-      {row.value ? null : (
-        <p className="w-full text-xs text-subtle sm:w-52">
-          {row.name === "service_role"
-            ? "Bypasses Row Level Security. Never put it in a browser."
-            : "Only the prefix is shown here."}
-        </p>
-      )}
+          {row.value ? null : (
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={toggle}
+              disabled={pending || !row.id}
+              aria-label={revealed ? `Hide ${row.name}` : `Reveal ${row.name}`}
+            >
+              {revealed ? <IconEyeOff size={13} stroke={1.5} /> : <IconEye size={13} stroke={1.5} />}
+            </Button>
+          )}
+
+          {shown ? <CopyButton value={shown} /> : null}
+        </div>
+
+        {problem ? (
+          // Not styled as an error: a connection that may not read secrets is a fact about the
+          // connection, and the sentence says what to change rather than that something broke.
+          <p className="text-xs text-subtle">{problem}</p>
+        ) : null}
+
+        {!shown && !problem && row.name === "service_role" ? (
+          <p className="text-xs text-subtle">Bypasses Row Level Security. Never put it in a browser.</p>
+        ) : null}
+      </div>
     </div>
   );
 }

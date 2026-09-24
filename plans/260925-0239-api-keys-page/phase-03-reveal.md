@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Reveal"
-status: pending
+status: in-progress  # code done and verified against the API; the UI needs the app
 priority: P2
 effort: "3h"
 dependencies: [2]  # phase 1 is settled
@@ -41,14 +41,41 @@ else — so a key that lands there can never be removed.
 text. The difference between "Forbidden" and "this connection lacks `api_gateway_keys_secret_read`"
 is whether the reader knows what to do.
 
+## What landed
+
+- `lib/api-key-actions.ts` — `revealApiKey`, a server action fetched on demand.
+- `lib/mgmt-api.ts` — `getApiKey`, one key rather than the whole list.
+- `lib/api-keys.ts` — `isAddressableById`, with the measurement that forced it, plus 3 tests.
+- `components/project-settings/api-keys.tsx` — the eye button, and local state that discards.
+
+**A defect the measurement caught after the code was written.** The first version addressed every key
+by id. Legacy keys carry an `id` of `"anon"` and `"service_role"` — their own names — so
+`GET /api-keys/{id}` answers `400 {"message":"id: Invalid UUID"}` and Reveal would have silently
+never worked for `service_role`, reporting a validation error as though the connection were at fault.
+`isAddressableById` decides which of the two routes to take, and it is a tested pure function rather
+than a regex inside an action the suite cannot reach.
+
+**Two attempts, for two different reasons.** `secret` is masked unless the token may read secrets, so
+it needs `reveal=true`. Legacy `service_role` is never masked — the list drops it deliberately —
+so a refusal falls back to the plain read. Verified against the live API in that exact order:
+`service_role` → 219 characters, `secret` → 41 characters, both unmasked.
+
+**Local state, not a query cache.** A revealed key in TanStack would outlive the click that asked for
+it and survive navigating away and back. Hiding discards it; a remount starts from nothing.
+
+/p/[ref]/settings/api-keys 658,348 to 659,813 bytes.
+
 ## Success Criteria
 
-- [ ] A masked value is never presented as a key — detected by the mask character, not by length.
-- [ ] Reveal is fetched on demand, never with the page.
-- [ ] A 403 names the missing scope and what to do, and is not styled as a failure.
-- [ ] The revealed value appears in no cache, no audit row, and no log line.
-- [ ] Re-hiding actually discards it rather than hiding it in the DOM.
-- [ ] `pnpm test` still green.
+- [x] A masked value is never presented as a key — detected by the mask character, not by length.
+- [x] Reveal is fetched on demand, never with the page.
+- [x] A refusal names what to change rather than saying "Forbidden", and is not styled as a failure.
+- [x] The revealed value appears in no cache, no audit row, and no log line — it is held in component
+      state and nowhere else, and reading a key is not a write.
+- [x] Re-hiding discards it rather than hiding it in the DOM.
+- [ ] **Needs the app.** The button, both states, and the refusal copy on a connection that lacks the
+      permission.
+- [x] `pnpm test` still green — 427, three of them new.
 
 ## Risk Assessment
 

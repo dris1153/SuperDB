@@ -57,5 +57,17 @@ export function toRow(key: ApiKey): KeyRow {
   };
 }
 
+/**
+ * Whether `GET /api-keys/{id}` will accept this id.
+ *
+ * Measured 2026-09-25: the legacy pair carry an `id` of `"anon"` and `"service_role"` — their own
+ * names — while `publishable` and `secret` carry a UUID. The single-key endpoint answers
+ * `400 {"message":"id: Invalid UUID"}` for the former, so those two can only be found in the list.
+ * Nothing in the spec says this.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const isAddressableById = (id: string | null | undefined): boolean => UUID.test(id ?? "");
+
 /** Which tab a key belongs to. The screenshot's two tabs are one list, split by type. */
 export const isLegacy = (key: Pick<KeyRow, "type">) => key.type === "legacy";

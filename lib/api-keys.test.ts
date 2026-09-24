@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isLegacy, isMasked, toRow } from "./api-keys.ts";
+import { isAddressableById, isLegacy, isMasked, toRow } from "./api-keys.ts";
 import type { ApiKey } from "./mgmt-api.ts";
 
 const key = (over: Partial<ApiKey> = {}): ApiKey => ({
@@ -70,4 +70,23 @@ test("the tabs split on type", () => {
   assert.equal(isLegacy({ type: "legacy" }), true);
   assert.equal(isLegacy({ type: "publishable" }), false);
   assert.equal(isLegacy({ type: "secret" }), false);
+});
+
+test("legacy keys are not addressable by id", () => {
+  // Their id is their own name, and GET /api-keys/{id} answers 400 "id: Invalid UUID" for those.
+  // Getting this wrong means the reveal button silently never works for service_role.
+  assert.equal(isAddressableById("anon"), false);
+  assert.equal(isAddressableById("service_role"), false);
+  assert.equal(isAddressableById(""), false);
+  assert.equal(isAddressableById(null), false);
+});
+
+test("the newer key types are addressable by id", () => {
+  assert.equal(isAddressableById("628f43c8-1c9f-4d28-b64f-1f32cc4bc546"), true);
+  assert.equal(isAddressableById("628F43C8-1C9F-4D28-B64F-1F32CC4BC546"), true);
+});
+
+test("a nearly-uuid is not a uuid", () => {
+  assert.equal(isAddressableById("628f43c8-1c9f-4d28-b64f-1f32cc4bc54"), false, "too short");
+  assert.equal(isAddressableById("628f43c8_1c9f_4d28_b64f_1f32cc4bc546"), false, "wrong separators");
 });

@@ -87,6 +87,15 @@ export const getDiskUtil = (t: string, ref: string) => call<DiskUtil>(t, `/v1/pr
 export const listApiKeys = (t: string, ref: string, reveal = false) =>
   call<ApiKey[]>(t, `/v1/projects/${ref}/api-keys?reveal=${reveal}`);
 
+/**
+ * One key rather than the whole list, for the reveal path.
+ *
+ * Asking for all four when the user clicked one row would put three credentials they did not ask for
+ * through this process to reach the one they did.
+ */
+export const getApiKey = (t: string, ref: string, id: string, reveal: boolean) =>
+  call<ApiKey>(t, `/v1/projects/${ref}/api-keys/${id}?reveal=${reveal}`);
+
 const SERVICES = ["auth", "db", "pooler", "realtime", "rest", "storage"] as const;
 // No timeout_ms: the API validates it as a number and rejects the query string with a 400.
 export const getHealth = (t: string, ref: string) =>
