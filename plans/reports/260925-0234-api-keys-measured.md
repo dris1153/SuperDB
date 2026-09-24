@@ -110,3 +110,45 @@ an unmasked key when fully authorised remains unmeasured.
 
 Both tokens are `sbp_…` personal access tokens, so the difference is scope selection at creation time,
 not token kind.
+
+
+---
+
+# Settled: `reveal=true` works, and the 403 was scope, not the API
+
+2026-09-25, a third personal access token — scoped, **preset "Full access"**, resource access set to
+an *organization*. It sees two projects, neither of them the ones the first two tokens saw: this
+account has more than one organization, and a token scoped to one cannot reach the others. That alone
+explains the 403s above, which had looked like a missing permission on the endpoint.
+
+On a project inside its own organization:
+
+| Key | `reveal=false` | `reveal=true` |
+|---|---|---|
+| `anon` (legacy) | complete | complete |
+| `service_role` (legacy) | complete | complete |
+| `publishable` | complete | complete |
+| **`secret`** | **41 chars, 26 of them `·`** | **41 chars, complete** |
+
+So the reveal path is real and a Reveal button is buildable. What gates it is the token's reach —
+organization scope and the api-keys permissions together — not a platform decision to withhold
+secrets from everyone.
+
+## The trap this leaves behind
+
+**A masked secret and a complete one are the same length.** 41 characters either way. Any code that
+decides "is this the real key" by measuring the string is wrong on both sides: it will treat a mask as
+a key, and offer to copy 26 dots.
+
+The test is the mask character `·` (U+00B7), not the length. That belongs in whatever parses this
+response, with this measurement as the reason.
+
+## What is now known about the earlier 403s
+
+The first token listed keys but was refused `reveal=true`; the second was refused everything; the
+third succeeds at both. All three are `sbp_…` tokens on the same account. The variables are the
+organization a token is scoped to and the permissions preset chosen at creation — and the failures
+seen earlier are consistent with a token simply not reaching those projects.
+
+**Unchanged by this:** `service_role` comes back complete at `reveal=false` with no special
+permission, on every project measured. The guard in `lib/project-parts.ts` stays exactly as it is.

@@ -4,7 +4,7 @@ title: "Reveal"
 status: pending
 priority: P2
 effort: "3h"
-dependencies: [1, 2]
+dependencies: [2]  # phase 1 is settled
 ---
 
 # Phase 3: Reveal
@@ -13,21 +13,19 @@ dependencies: [1, 2]
 
 The eye icon on a secret row, and the sentence it prints when the API says no.
 
-## What this phase can promise depends on phase 1
+## Phase 1 settled this: the button works
 
-Measured: `reveal=true` → **403**, *"Your account does not have the necessary privileges"*, on a
-healthy project with a PAT, for every truthy spelling and on both endpoints. Research names the gate:
-`api_gateway_keys_read` **and** `api_gateway_keys_secret_read`.
+`reveal=true` returns the secret complete where `reveal=false` returns it masked — measured on a
+project inside the token's own organization. The 403s seen earlier were a token that could not reach
+those projects, not a platform decision to withhold secrets.
 
-Phase 1 settles which of these the copy says:
+So this is an ordinary feature with an ordinary failure path: a refusal means *this connection cannot
+reach or is not permitted*, and the copy says that rather than "Forbidden".
 
-- **A full-access PAT succeeds** → the button works for connections that carry the scope, and the 403
-  path names the missing scope and how to add it.
-- **It still fails** → the button reports an upstream limitation with a link, and says so plainly
-  rather than implying the user did something wrong.
-
-Either way **the button exists and calls the API**. A permanently disabled control would turn a token
-problem into what looks like a missing feature.
+**The length trap, which would otherwise ship.** A masked secret and a complete one are **both 41
+characters**. Deciding "did we get the real key" by measuring the string is wrong in both directions:
+it treats a mask as a key, and offers to copy 26 dots. Test for the mask character `·` (U+00B7), and
+say why in a comment — the next person will reach for `.length` exactly as readily.
 
 ## Architecture
 
@@ -45,6 +43,7 @@ is whether the reader knows what to do.
 
 ## Success Criteria
 
+- [ ] A masked value is never presented as a key — detected by the mask character, not by length.
 - [ ] Reveal is fetched on demand, never with the page.
 - [ ] A 403 names the missing scope and what to do, and is not styled as a failure.
 - [ ] The revealed value appears in no cache, no audit row, and no log line.

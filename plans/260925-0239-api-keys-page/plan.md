@@ -19,14 +19,17 @@ Design and the measurements behind it:
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [Settle the reveal scope](phase-01-settle-reveal-scope.md) | pending | ~1h | — |
+| 1 | [Settle the reveal scope](phase-01-settle-reveal-scope.md) | **done** | ~1h | — |
 | 2 | [The list, and the Server tab bug](phase-02-list-and-server-fix.md) | pending | ~4h | — |
-| 3 | [Reveal](phase-03-reveal.md) | pending | ~3h | 1, 2 |
+| 3 | [Reveal](phase-03-reveal.md) | pending | ~3h | 2 |
 | 4 | [Create, rename, delete](phase-04-crud.md) | pending | ~5h | 2 |
 | 5 | [The legacy switch](phase-05-legacy-switch.md) | pending | ~3h | 2 |
 
-Phase 1 is an hour of measurement with no code, and it decides what phase 3 can promise. Phase 2 is
-independent of it and carries a bug fix that stands on its own.
+**Phase 1 is done, and it answered yes.** `reveal=true` returns the secret complete where
+`reveal=false` masks it; the 403s that prompted the question were a token scoped to a different
+organization, not a platform limit. Phase 3 is an ordinary feature now, and no longer depends on it.
+
+Phase 2 is independent of everything and carries a bug fix that stands on its own.
 
 ## Settled decisions
 
@@ -43,6 +46,8 @@ Do not re-open these during implementation:
 - **`KeySummary` does not change.** `service_role` comes back complete at `reveal=false` and bypasses
   RLS, so the picked-fields guard in `lib/project-parts.ts` stays. Its comment needs rewriting — the
   guard does not.
+- **A masked secret and a complete one are the same length** — 41 characters either way. Detect the
+  mask by its character `·` (U+00B7), never by `.length`. Measured; it would otherwise have shipped.
 - **The name rule comes from measurement, not the spec.** 4–64 characters, `^[a-z_][a-z0-9_]*$`. The
   spec declares no 400 at all for these endpoints; the API returns them with precise messages.
 

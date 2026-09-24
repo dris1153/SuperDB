@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Settle the reveal scope"
-status: pending
+status: completed
 priority: P1
 effort: "1h"
 dependencies: []
@@ -37,12 +37,36 @@ scoped connections. If it does not, Reveal is a button that explains an upstream
    answer to "can a user fix this themselves" and it belongs in the page's copy.
 4. Write the result into `plans/reports/260925-0234-api-keys-measured.md`, beside the 403.
 
+## Settled, 2026-09-25
+
+**`reveal=true` works.** A third personal access token — scoped, preset "Full access", resource
+access set to an *organization* — returns the secret key complete where `reveal=false` returns it
+masked.
+
+The earlier 403s were **reach, not a platform limit**. That token sees two projects, neither of them
+the ones the first two tokens saw: this account has several organizations, and a token scoped to one
+cannot touch the others. The refusals looked like a missing endpoint permission and were a token that
+simply could not get to those projects.
+
+So phase 3 builds the button for real, and its 403 path is about a connection that cannot reach or is
+not permitted — a sentence the reader can act on, which is what the plan already required.
+
+**One trap to carry forward, and it would have shipped:** a masked secret and a complete one are
+**both 41 characters**. Anything deciding "is this the real key" by length is wrong in both
+directions — it will treat a mask as a key and offer to copy 26 dots. The test is the mask character
+`·` (U+00B7).
+
+**Unchanged:** `service_role` comes back complete at `reveal=false` with no special permission, on
+every project measured. The guard in `lib/project-parts.ts` stays.
+
 ## Success Criteria
 
-- [ ] The result is recorded as a measurement, with the date and the token kind.
-- [ ] Phase 3's copy is decided by it: either "this connection lacks a scope" or "the API does not
-      currently return this to anyone".
-- [ ] If 200, the reveal path is confirmed end to end rather than assumed from a status code.
+- [x] The result is recorded as a measurement, with the date and the token kind — in
+      `plans/reports/260925-0234-api-keys-measured.md`.
+- [x] Phase 3's copy is decided: the button works, and a refusal is about this connection's reach or
+      permissions rather than about the API.
+- [x] The reveal path is confirmed by the **content** of the response, not by its status — a 200 with
+      a masked key would have looked identical at the status line.
 
 ## Risk Assessment
 
