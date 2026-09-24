@@ -115,6 +115,12 @@ the summaries.
 
 ## Cross-plan notes
 
+**[260925-0239-api-keys-page](../260925-0239-api-keys-page/plan.md)** adds an API Keys row to
+`components/project-settings/settings-nav.tsx` and a route beside the two this plan created. It also
+rewrites the comment on `KeySummary` in `lib/project-parts.ts`: measured 2026-09-25, `reveal=false`
+masks the *new* secret key but leaves the legacy `service_role` JWT complete, so the guard is right
+and the reason recorded for it was only half right.
+
 **[260915-2303-icon-rail-and-settings-panel](../260915-2303-icon-rail-and-settings-panel/plan.md)**
 rewrites `app/(app)/p/[ref]/settings/layout.tsx` and `components/project-settings/settings-nav.tsx`,
 both created by phase 3 here, and rebuilds `components/project-nav.tsx` around the row list phase 3
