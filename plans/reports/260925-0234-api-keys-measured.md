@@ -84,3 +84,29 @@ right about that and the earlier research summary was not.
 **Not measured, deliberately.** Turning it off disables the anon key, which is what nearly every
 client application in the wild authenticates with. That is not something to try on a real project to
 see what happens.
+
+
+---
+
+# A second token, and what it proves
+
+2026-09-25, a freshly created personal access token replacing the first.
+
+| Call | first token | second token |
+|---|---|---|
+| `GET /v1/projects` | 200 | 200 |
+| `GET /api-keys` | **200**, four keys | **403** |
+| `GET /api-keys?reveal=true` | 403 | 403 |
+| `GET /api-keys/legacy` | **200** `{"enabled":true}` | **403** |
+
+The second token is *less* capable: it cannot even list. So it lacks `api_gateway_keys_read`, while
+the first had that and lacked `api_gateway_keys_secret_read`.
+
+**That is the useful result.** Two tokens on the same account, differing only in scopes, produce three
+different outcomes on the same endpoint — which confirms the permission model the research described
+is real and enforced, and that `reveal=true` is gated by a scope rather than switched off for
+everyone. What has still not been produced is a token holding *both* scopes, so whether reveal returns
+an unmasked key when fully authorised remains unmeasured.
+
+Both tokens are `sbp_…` personal access tokens, so the difference is scope selection at creation time,
+not token kind.
