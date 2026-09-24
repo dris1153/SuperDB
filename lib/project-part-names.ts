@@ -34,6 +34,9 @@ export const PART_NAMES = [
   "definition",
   // The SQL editor's sidebar. Its own table in this app's database, not the project's.
   "saved-queries",
+  // The API keys settings page. Wider than `api-keys`, which is the four fields the database page
+  // shows — and deliberately a separate name so the two shapes cannot be confused for each other.
+  "api-key-rows",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

@@ -24,6 +24,7 @@ import {
   type LogRow,
 } from "./logs-sql";
 import { generationOf, partKey, PART_TTL_MS, readCached, writeCached } from "./part-cache";
+import { toRow, type KeyRow } from "./api-keys";
 import type { Part } from "./project-part-names";
 import { memoryUsedPercent, parseMetrics } from "./prometheus";
 import { savedQueries } from "./saved-queries";
@@ -96,13 +97,23 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   /**
    * The four fields the UI shows, picked by hand.
    *
-   * `reveal=false` does **not** hide the key: `mgmt-api.ts` records that the API returns `api_key`
-   * either way, and `framework-actions.ts` depends on exactly that. Passing this response through
-   * would have put the service-role secret — the one that bypasses RLS — in a plain GET any signed-in
-   * browser could issue. The flag was never the boundary; this list is.
+   * **What `reveal=false` actually does, measured 2026-09-25:** it masks the *new* `secret` key and
+   * leaves the legacy `service_role` JWT complete — the one that bypasses RLS. So the flag is a
+   * boundary for one key type and not for the other, which is another way of saying it was never
+   * the boundary here. This list is.
    */
   "api-keys": async (t, ref): Promise<KeySummary[]> =>
     (await listApiKeys(t, ref)).map(({ id, name, prefix }) => ({ id, name, prefix })),
+
+  /**
+   * The settings page's wider shape: type, description and prefix for every key, plus the value of
+   * the two that are meant to be public.
+   *
+   * A second name rather than a wider `api-keys`, because the narrow one is what four other places
+   * already rely on and widening it in place would hand them fields they never asked to be trusted
+   * with. `toRow` is where the line is drawn, and it has tests.
+   */
+  "api-key-rows": async (t, ref): Promise<KeyRow[]> => (await listApiKeys(t, ref)).map(toRow),
   metrics: async (t, ref) => ({ memoryPercent: memoryUsedPercent(parseMetrics(await getMetricsText(t, ref))) }),
   /** What the sidebar lists, and whether PostgREST serves the schema the user is looking at. */
   schemas: async (t, ref) => {

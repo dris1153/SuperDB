@@ -42,6 +42,12 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         endpoint: "GET,PUT /v1/projects/{ref}/config/database/postgres",
       },
       { slug: "api", label: "API", endpoint: "GET,PATCH /v1/projects/{ref}/postgrest" },
+      {
+        slug: "api-keys",
+        label: "API Keys",
+        endpoint: "GET,POST /v1/projects/{ref}/api-keys",
+        ready: true,
+      },
       { slug: "auth", label: "Authentication", endpoint: "GET,PATCH /v1/projects/{ref}/config/auth" },
       { slug: "storage", label: "Storage", endpoint: "GET,PATCH /v1/projects/{ref}/config/storage" },
       {

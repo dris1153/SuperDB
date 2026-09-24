@@ -27,8 +27,9 @@ test("every part except identity has a TTL decision", () => {
 test("the parts that must never be cached are not cached", () => {
   // Rows change under the reader; a log window is the question, not the answer; saved queries are
   // written into the browser's cache by their own mutations; a definition is the largest value here
-  // and is read when one tab is opened rather than on every load.
-  for (const part of ["rows", "logs", "saved-queries", "definition"] as const) {
+  // and is read when one tab is opened rather than on every load; and api-key-rows carries real key
+  // values, which have no business sitting in this process for a minute.
+  for (const part of ["rows", "logs", "saved-queries", "definition", "api-key-rows"] as const) {
     assert.equal(PART_TTL_MS[part], 0, `${part} must not be cached`);
   }
 });

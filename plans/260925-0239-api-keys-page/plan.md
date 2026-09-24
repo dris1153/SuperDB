@@ -20,7 +20,7 @@ Design and the measurements behind it:
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
 | 1 | [Settle the reveal scope](phase-01-settle-reveal-scope.md) | **done** | ~1h | — |
-| 2 | [The list, and the Server tab bug](phase-02-list-and-server-fix.md) | pending | ~4h | — |
+| 2 | [The list, and the Server tab bug](phase-02-list-and-server-fix.md) | **in-progress** | ~4h | — |
 | 3 | [Reveal](phase-03-reveal.md) | pending | ~3h | 2 |
 | 4 | [Create, rename, delete](phase-04-crud.md) | pending | ~5h | 2 |
 | 5 | [The legacy switch](phase-05-legacy-switch.md) | pending | ~3h | 2 |

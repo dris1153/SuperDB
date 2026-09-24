@@ -1,0 +1,61 @@
+import type { ApiKey } from "./mgmt-api";
+
+/**
+ * The mask Supabase puts over a secret key it will not show you.
+ *
+ * **A masked secret and a complete one are the same length** — 41 characters either way, measured
+ * 2026-09-25. So the obvious test, `value.length < something`, is wrong in both directions: it reads
+ * a mask as a key and offers to copy twenty-six dots. The character is the only thing that differs.
+ */
+const MASK = "·";
+
+export const isMasked = (value: string | null | undefined): boolean => !!value?.includes(MASK);
+
+/**
+ * What a key row may show without anyone asking.
+ *
+ * Two of the four types are meant to be public — `publishable` and the legacy `anon` — and are what
+ * a client application embeds. The other two are not: the legacy `service_role` bypasses Row Level
+ * Security, and `secret` is its replacement. Those carry no value here at all; the page shows their
+ * prefix and fetches the rest only when someone asks for it.
+ *
+ * This is the same line `KeySummary` in `project-parts.ts` draws, drawn once more at a different
+ * width. `service_role` arrives from the API **complete and unmasked with no special permission**,
+ * so every reader that touches this response has to drop it deliberately.
+ */
+export type KeyRow = {
+  id: string | null;
+  name: string;
+  type: ApiKey["type"];
+  prefix: string | null;
+  description: string | null;
+  /** The key itself, only for the types that are safe in public. Null for everything else. */
+  value: string | null;
+  /** True when the API sent a mask instead of the key — never true for a value that is shown. */
+  masked: boolean;
+};
+
+const PUBLIC_TYPES = new Set(["publishable"]);
+
+/** The legacy pair share a type, so the public one is told apart by name. */
+const isPublic = (key: ApiKey) =>
+  PUBLIC_TYPES.has(key.type ?? "") || (key.type === "legacy" && key.name === "anon");
+
+export function toRow(key: ApiKey): KeyRow {
+  const masked = isMasked(key.api_key);
+
+  return {
+    id: key.id,
+    name: key.name,
+    type: key.type,
+    prefix: key.prefix,
+    description: (key as ApiKey & { description?: string | null }).description ?? null,
+    // Masked values are dropped rather than passed along: a row that carried one would have to
+    // remember not to offer it for copying, and forgetting is the whole failure mode here.
+    value: isPublic(key) && !masked ? key.api_key : null,
+    masked,
+  };
+}
+
+/** Which tab a key belongs to. The screenshot's two tabs are one list, split by type. */
+export const isLegacy = (key: Pick<KeyRow, "type">) => key.type === "legacy";
