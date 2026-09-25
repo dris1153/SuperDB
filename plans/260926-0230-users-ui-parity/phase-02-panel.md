@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "The panel, rebuilt"
-status: pending
+status: in-progress  # built; not looked at in a browser
 priority: P2
 effort: "5h"
 dependencies: []
@@ -60,21 +60,47 @@ card keeps the badge and drops the button.
 
 ## Todo List
 
-- [ ] Tabs and header
-- [ ] Eight attribute rows
-- [ ] Provider card
-- [ ] Described action rows
-- [ ] Danger zone with the MFA row always present
+- [x] Tabs and header
+- [x] Eight attribute rows
+- [x] Provider card
+- [x] Described action rows
+- [x] Danger zone with the MFA row always present
 
 ## Success Criteria
 
-- [ ] The panel shows `Updated at`, `Invited at`, `Confirmation sent at` and `SSO`.
-- [ ] A user with no MFA factor still sees the row, disabled, with a reason.
-- [ ] Every action carries the sentence that says what it does.
-- [ ] The measured mail warning stays on the two email actions.
+- [x] The panel shows `Updated at`, `Invited at`, `Confirmation sent at` and `SSO`.
+- [x] A user with no MFA factor still sees the row, disabled, with a reason.
+- [x] Every action carries the sentence that says what it does.
+- [x] The measured mail warning stays on the two email actions.
 
 ## Risk Assessment
 
 - **A rebuild can quietly drop a safety control.** The typed-email delete confirm, the ban dialog
   and the mail sentence all exist for reasons written down in
   `plans/260925-1950-authentication/phase-02-user-lifecycle.md`. They move; they do not go.
+
+## Built 2026-09-26
+
+Laid out as the original has it: tabs above the header, the name over the email with a copy control,
+the eight-row attribute table, Provider Information, the two mail actions, the danger zone.
+
+- **The four missing rows needed no new read.** `updated_at`, `invited_at`, `confirmation_sent_at`
+  and `is_sso_user` were already in the body — the Raw JSON tab had been rendering them all along.
+  They are typed on `AuthUser` now rather than reached through an index signature.
+- **Every row reads through `timestamp()`**, which answers a dash for null, for undefined and for a
+  value that is not a date. `email_confirmed_at` is *absent* rather than null on an unconfirmed
+  user, so a row that tested for null itself would have printed `undefined`.
+- **Remove MFA factors is a row that is always there**, disabled with the reason when `/factors`
+  answers `[]` — which it does for most users. It removes all of them, as the original's wording
+  says, one request each, stopping at the first refusal and showing it.
+- **The safety controls moved rather than went.** The typed-email delete confirm, the ban duration
+  dialog and the measured mail sentence are all still in front of the things they guard.
+
+## Not copied, deliberately
+
+"Configure GitHub provider" leads to a providers page this app does not have. The card keeps the
+provider, the sentence and the `Enabled` badge, and drops the button.
+
+## Not verified
+
+The browser. Checked: 543 tests, typecheck, lint, build.

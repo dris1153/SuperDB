@@ -21,7 +21,7 @@ piece is a different data source: the Logs tab.
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
 | 1 | [The table, and its toolbar](phase-01-table.md) | **in-progress** | ~6h | — |
-| 2 | [The panel, rebuilt](phase-02-panel.md) | pending | ~5h | — |
+| 2 | [The panel, rebuilt](phase-02-panel.md) | **in-progress** | ~5h | — |
 | 3 | [The Logs tab](phase-03-logs-tab.md) | pending | ~2h | 2 |
 | 4 | [Raw JSON](phase-04-raw-json.md) | pending | ~1h | 2 |
 

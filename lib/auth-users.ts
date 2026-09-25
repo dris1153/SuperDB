@@ -15,6 +15,17 @@ export type AuthUser = {
   banned_until?: string | null;
   app_metadata?: { provider?: string; providers?: string[] };
   user_metadata?: Record<string, unknown>;
+  /**
+   * Present on a single read, and the panel's attribute table is built from them. `invited_at` and
+   * `confirmation_sent_at` are null on a user who signed up rather than being invited — which is a
+   * fact about them, not a gap in the record.
+   */
+  updated_at?: string | null;
+  invited_at?: string | null;
+  confirmation_sent_at?: string | null;
+  is_sso_user?: boolean;
+  /** Null in a listing, filled in a single read. Measured. */
+  identities?: { identity_id?: string; provider?: string; last_sign_in_at?: string }[] | null;
 };
 
 /** Fifty rows is what the original pages by, and the endpoint takes it as `per_page`. */
