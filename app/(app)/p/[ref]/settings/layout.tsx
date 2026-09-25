@@ -12,6 +12,10 @@ import { SettingsNav } from "@/components/project-settings/settings-nav";
  * this its own scroller would nest one inside the other and put two scrollbars on a long section.
  * The panel's border runs to whichever column is taller, which is what makes it read as a column
  * rather than a card.
+ *
+ * **No title here.** One heading reading "Project Settings" over every section said nothing about
+ * which section you were looking at, while the nav on the left already says you are in settings.
+ * Each page titles itself with `SettingsHeader`.
  */
 export default async function SettingsLayout({
   children,
@@ -27,14 +31,9 @@ export default async function SettingsLayout({
       <SettingsNav projectRef={ref} />
 
       <div className="min-w-0 flex-1">
-        <div className="mx-auto max-w-3xl space-y-8 p-8">
-          <header className="space-y-1">
-            <h1 className="text-2xl">Project Settings</h1>
-            <p className="text-sm text-subtle">General configuration and lifecycle</p>
-          </header>
-
-          {children}
-        </div>
+        {/* `max-w-7xl` like every other project page. At 3xl the JWT keys table did not fit and
+            scrolled its own status column out of sight, which is worse than a wide form. */}
+        <div className="mx-auto max-w-7xl space-y-8 p-8">{children}</div>
       </div>
     </div>
   );

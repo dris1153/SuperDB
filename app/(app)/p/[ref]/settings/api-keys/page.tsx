@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { ApiKeys } from "@/components/project-settings/api-keys";
+import { SettingsHeader } from "@/components/project-settings/settings-header";
 
 export const dynamic = "force-dynamic";
 
@@ -16,5 +17,13 @@ export default async function ApiKeysPage({ params }: { params: Promise<{ ref: s
 
   // The name is what the disable confirm asks the user to type, so it comes from the same resolve
   // that proved they own the project rather than from anything the browser could supply.
-  return <ApiKeys projectRef={ref} projectName={found.project.name} />;
+  return (
+    <>
+      <SettingsHeader title="API Keys">
+        Keys that authenticate requests to this project
+      </SettingsHeader>
+
+      <ApiKeys projectRef={ref} projectName={found.project.name} />
+    </>
+  );
 }

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { GeneralSettings } from "@/components/project-settings/general";
+import { SettingsHeader } from "@/components/project-settings/settings-header";
 
 export const dynamic = "force-dynamic";
 
@@ -16,5 +17,13 @@ export default async function ProjectSettingsPage({
   const { ref } = await params;
   if (!(await resolveProject(ref))) notFound();
 
-  return <GeneralSettings projectRef={ref} />;
+  return (
+    <>
+      <SettingsHeader title="General">
+        This project&apos;s name, reference and where it runs
+      </SettingsHeader>
+
+      <GeneralSettings projectRef={ref} />
+    </>
+  );
 }
