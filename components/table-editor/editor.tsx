@@ -15,7 +15,7 @@ import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-pa
 
 type Schemas = { schemas: string[]; exposed: string[] | null };
 type Rows = { rows: RowRecord[]; total: RowCount; page: number; size: number };
-type Definition = { ddl: string; html: string | null; complete: boolean } | null;
+type Definition = { ddl: string; complete: boolean } | null;
 
 /**
  * The query layer for the table editor.

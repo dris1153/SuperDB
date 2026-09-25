@@ -58,7 +58,7 @@ export function TableWorkspace({
   /** A view has no rows to address, and neither does a table without a primary key. */
   editable: boolean;
   /** Only fetched when the definition tab is the one being looked at. */
-  definition: { ddl: string; html: string | null; complete: boolean } | null;
+  definition: { ddl: string; complete: boolean } | null;
   /** The definition's own wait and its own refusal, which are not the same as having none. */
   definitionPending: boolean;
   definitionReason: string | null;
@@ -89,7 +89,6 @@ export function TableWorkspace({
         />
         <Definition
           ddl={definition?.ddl ?? null}
-          html={definition?.html ?? null}
           complete={definition?.complete ?? true}
           pending={definitionPending}
           reason={definitionReason}

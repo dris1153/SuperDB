@@ -69,7 +69,6 @@ import { rowCount, selectRows, type RowCount } from "./table-rows";
 import { parseFilters } from "./table-filter";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseSort } from "./table-view";
 import { clampInt } from "./sql-ident";
-import { highlight } from "./highlight";
 import { getExposedSchemas } from "./mgmt-api";
 import { attempt, type Attempt } from "./safe";
 import { requireUser } from "./supabase/server";
@@ -284,9 +283,10 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   definition: async (t, ref, search) => {
     const built = await tableDefinition(t, ref, schemaOf(search), tableOf(search));
     if (!built) return null;
-    // Highlighted here, not in the browser: `lib/highlight.ts` is server-only precisely so Shiki's
-    // grammars and WASM never ship, and colouring one tab is not worth a megabyte on this route.
-    return { ddl: built.ddl, html: await highlight(built.ddl, "sql"), complete: built.complete };
+    // Not highlighted here. `lib/highlight.ts` is Shiki, and importing it from this module put its
+    // grammars on the route every reader shares: 12.7 MB traced against 2.0 MB without, measured
+    // 2026-09-26. The definition tab colours the text itself, from `lib/sql-tokens.ts`.
+    return { ddl: built.ddl, complete: built.complete };
   },
 
   /**

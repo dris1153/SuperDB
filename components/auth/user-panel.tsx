@@ -41,11 +41,21 @@ type UserDetail = { user: AuthUser & Record<string, unknown>; factors: Factor[] 
 export function UserPanel({
   projectRef,
   userId,
+  seed,
   onClose,
   onChanged,
 }: {
   projectRef: string;
   userId: string | null;
+  /**
+   * The row this was opened from.
+   *
+   * It already carries the id, the email, the name, the avatar, `created_at` and `last_sign_in_at` —
+   * six of the things on screen — so rendering a skeleton over all of them while a ~600ms read runs
+   * hides data the browser is holding. The read still happens: `identities`, `updated_at`,
+   * `invited_at`, `confirmation_sent_at`, `is_sso_user` and the factors exist only in it.
+   */
+  seed?: AuthUser | null;
   onClose: () => void;
   /** The table's own page is stale after a delete or a ban, and only it can refetch that. */
   onChanged: () => void;
@@ -62,7 +72,11 @@ export function UserPanel({
   const [busy, start] = useTransition();
 
   const detail = state.status === "ready" ? state.data : null;
-  const user = detail?.user ?? null;
+  // The seeded row until the read lands, then the read. `loaded` is what the attribute table branches
+  // on: a value that has not arrived must not render as one the API said was empty.
+  const user = detail?.user ?? seed ?? null;
+  const detailState: "pending" | "ready" | "failed" =
+    detail !== null ? "ready" : isWaiting(state) ? "pending" : "failed";
   const factors = detail?.factors ?? [];
   const banned = user ? isBanned(user) : false;
 
@@ -86,19 +100,24 @@ export function UserPanel({
 
   return (
     <Sheet open={userId !== null} onOpenChange={(next) => !next && !busy && onClose()}>
-      <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl">
-        {isWaiting(state) ? (
+      {/* `sm:max-w-4xl!` — the `!` is not decoration. `ui/sheet.tsx` sets the width through a
+          `data-[side=right]:` variant, tailwind-merge keeps both classes because they are in
+          different groups, and the variant wins: a plain `sm:max-w-2xl` left this sheet at 384px
+          from the day it was written. `connect-sheet.tsx` hit the same wall and solved it this way. */}
+      <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-4xl!">
+        {isWaiting(state) && !user ? (
           <div className="space-y-2 p-6">
             {Array.from({ length: 8 }, (_, i) => (
               <Skeleton key={i} className="h-8 w-full" />
             ))}
           </div>
-        ) : state.status !== "ready" || !user ? (
+        ) : !user ? (
           <p className="p-6 text-sm text-subtle">{reasonOf(state) ?? "This user is unavailable."}</p>
         ) : (
           <Tabs defaultValue="overview">
-            {/* Tabs first, as the original has them — above the person rather than under them. */}
-            <div className="border-b border-border px-6 pt-4">
+            {/* Tabs first, as the original has them — above the person rather than under them.
+                `pr-14` keeps them out from under the close control, `pb-4` off the rule below. */}
+            <div className="border-b border-border px-6 pt-5 pr-14 pb-4">
               <TabsList>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="logs">Logs</TabsTrigger>
@@ -124,7 +143,15 @@ export function UserPanel({
             </SheetHeader>
 
             <TabsContent value="overview" className="space-y-8 px-6 pb-10">
-              <UserAttributes user={user} />
+              {detailState === "failed" ? (
+                // The seed is enough to render most of this, and saying nothing would leave the
+                // panel looking complete while four fields and the factors are missing.
+                <p className="rounded-lg border border-border px-4 py-3 text-sm text-subtle">
+                  {reasonOf(state) ?? "The full record could not be read."}
+                </p>
+              ) : null}
+
+              <UserAttributes user={user} detail={detailState} />
 
               <section className="space-y-2">
                 <div>

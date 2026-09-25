@@ -1,22 +1,23 @@
-import { Copyable, CodeBlock } from "@/components/connect-primitives";
+import { Copyable } from "@/components/connect-primitives";
+import { SqlCode } from "./sql-code";
 import { Empty } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
- * The synthesised `CREATE TABLE`, highlighted on the server like every other snippet in this app.
+ * The synthesised `CREATE TABLE`, coloured in the browser.
  *
- * `CodeBlock` already handles the case where Shiki returned null — the plain text is more useful than
- * an empty block, so highlighting failure degrades rather than breaks.
+ * **Unlike every other snippet in this app**, which Shiki colours on the server. That import reached
+ * this tab's reader from `lib/project-parts.ts`, and through it every other reader on the same
+ * route: 12.7 MB traced, 10.4 MB of it grammars, against 2.0 MB without. `lib/sql-tokens.ts` is
+ * forty lines and is held to giving the text back unchanged.
  */
 export function Definition({
   ddl,
-  html,
   complete,
   pending,
   reason,
 }: {
   ddl: string | null;
-  html: string | null;
   /** False when this shape cannot be fully reconstructed from the catalog. */
   complete: boolean;
   /** Still being read. Without this, a wait was reported as "nothing could be reconstructed". */
@@ -62,7 +63,7 @@ export function Definition({
 
       <div className="relative">
         <Copyable value={ddl} className="absolute top-2 right-2 z-10" />
-        <CodeBlock html={html} code={ddl} />
+        <SqlCode code={ddl} />
       </div>
     </div>
   );

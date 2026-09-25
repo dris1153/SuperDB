@@ -308,6 +308,9 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
       <UserPanel
         projectRef={projectRef}
         userId={openUser}
+        // The row it was opened from: six of the values the panel shows are already here, and a
+        // skeleton over them would hide data the browser is holding for the length of a read.
+        seed={users.find((u) => u.id === openUser) ?? null}
         onClose={() => setOpenUser(null)}
         // A ban or a delete changes the row this page is showing, and only this page can refetch it.
         onChanged={() => void refetch()}
