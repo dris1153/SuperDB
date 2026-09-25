@@ -122,11 +122,23 @@ secret is unrecoverable. It is deliberately never written to the audit line.
 
 ## A user's audit trail
 
-`auth_logs` is GoTrue's application log — `component`, `level`, `msg` — and carries no user id, so
-it cannot answer "what did this user do". `auth_audit_logs` can, and `log_attributes` flattens its
-nested JSON into dotted keys.
+**Both log sources answer, and an earlier version of this page said otherwise.** It claimed
+`auth_logs` "carries no user id, so it cannot answer what did this user do". Measured 2026-09-26,
+that is false — the claim came from reading a few rows' top-level message fields and generalising:
 
-Filtering needs **both** keys:
+```
+select count(*) from logs
+where source = 'auth_logs' and log_attributes['user_id'] = '91983d71-…'    ->  13
+
+select log_attributes['status'], log_attributes['path'], log_attributes['msg'] …
+  ->  {"msg":"request completed","path":"/user","status":"200"}
+```
+
+So `auth_logs` gives the request rows — a status, a path, a method — and `auth_audit_logs` gives the
+events. The panel reads both in one statement, which the endpoint accepts, and interleaves them as
+Supabase's own panel does.
+
+The audit half needs **both** of its keys:
 
 ```sql
 log_attributes['auth_audit_event.traits.user_id'] = '<id>'   -- done to them
@@ -137,6 +149,11 @@ Measured on one probe user: two rows and six. `traits.user_id` alone would have 
 that user's history — the signup and the deletion — and missed every recovery they requested
 themselves. The bracket form is the one the endpoint accepts; the backtick form fails. See
 [logs.md](./logs.md) for the rest of what that endpoint will and will not do.
+
+**The two sources timestamp differently, and mixing them sorts wrongly.** An audit event carries its
+own `created_at` ending in `Z`; a row's `timestamp` carries no zone at all. `Date.parse` reads the
+second as local time, which in Vietnam is seven hours out — on the first live run a 19:20 request
+sorted *below* a 19:14 event. Every timestamp is normalised before anything compares them.
 
 The user id is interpolated into the SQL, so `buildUserAuditSql` re-checks it is a UUID and throws
 otherwise.
@@ -163,4 +180,6 @@ Five claims in the plan and its research did not survive the build, each correct
 - **"Custom templates just need SMTP."** They are refused by plan, with a specific message.
 - **"`client_secret` exists only in the 201."** A single-client read returns it too.
 - **"Filtering the audit trail is a comparison on `traits.user_id`."** That is half of it.
+- **"`auth_logs` carries no user id."** It does — `log_attributes['user_id']` — and this page said
+  the opposite until 2026-09-26.
 - **"A PATCH either applies or does not."** One call refused a template and applied a switch.

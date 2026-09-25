@@ -39,7 +39,7 @@ async function oneUserAsPage(ref: string, id: string): Promise<UserPage> {
   }
 }
 import { pickEmailConfig, type EmailConfig } from "./auth-config";
-import { buildUserAuditSql, parseAuditEvent, sortEvents, type AuditEvent } from "./auth-audit";
+import { buildUserLogsSql, parseUserLog, sortEvents, type UserEvent, type UserLogRow } from "./auth-audit";
 import { avatarOf, displayNameOf, isUserId, isUserSort, providersOf, PER_PAGE } from "./auth-users";
 import {
   asInterval,
@@ -443,7 +443,7 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
    * carry an `ip_address` and an actor. A row that does not parse is dropped rather than failing
    * the tab — it is a log line, not a record the page depends on.
    */
-  "auth-user-logs": async (t, ref, search): Promise<AuditEvent[]> => {
+  "auth-user-logs": async (t, ref, search): Promise<UserEvent[]> => {
     const id = search.get("id") ?? "";
     if (!isUserId(id)) throw new Error("That is not a user.");
 
@@ -451,18 +451,18 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
     // A day, which is all a free project keeps anyway.
     const from = to - 24 * 3_600_000;
 
-    const rows = await queryLogs<{ timestamp: string; event_message: string | null }>(
+    const rows = await queryLogs<UserLogRow>(
       t,
       ref,
-      buildUserAuditSql(id),
+      buildUserLogsSql(id),
       new Date(from).toISOString(),
       new Date(to).toISOString(),
     );
 
     return sortEvents(
       rows
-        .map((row) => parseAuditEvent(row.event_message, row.timestamp, id))
-        .filter((event): event is AuditEvent => event !== null),
+        .map((row) => parseUserLog(row, id))
+        .filter((event): event is UserEvent => event !== null),
     );
   },
 
