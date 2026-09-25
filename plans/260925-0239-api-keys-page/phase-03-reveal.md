@@ -77,6 +77,31 @@ it and survive navigating away and back. Hiding discards it; a remount starts fr
       permission.
 - [x] `pnpm test` still green — 427, three of them new.
 
+## Corrected after seeing it, 2026-09-25
+
+Three things, and the first was a defect rather than a preference.
+
+**The row was rendering `prefix` as though it were the key.** For the newer types a prefix really is
+one — `sb_publishable_NeIMo` is the first 20 characters of that key. For the legacy pair it is an
+unrelated identifier: `service_role`'s is `a5fKL` while the key itself begins `eyJhbGciOiJIUzI1`. On
+screen that read as a short, complete key. `KeyRow` gained a `display` field that carries the API's
+own mask where there is one — `sb_secret_plAo7` followed by dots, which the first version threw away
+— and a fixed-width placeholder where there is nothing showable. Fixed width on purpose: matching the
+real length would publish how long the key is, and the two legacy JWTs differ.
+
+A **Hidden** line sits under such a row, so the state is read rather than inferred from a string
+looking short.
+
+**Hiding now conceals rather than discards, for sixty seconds.** Toggling inside that window costs no
+round trip; the countdown runs from the *reveal*, not from the last hide, so clicking at it cannot
+keep a key alive. The comment saying hiding discards was true and is now false, so it was rewritten —
+leaving it would have been a lie in the one place someone would check.
+
+**The code box becomes a skeleton while the reveal is in flight**, instead of a disabled button and
+an unchanged string that looked like nothing was happening.
+
+/p/[ref]/settings/api-keys 697,925 to 698,410 bytes.
+
 ## Risk Assessment
 
 **A revealed secret is the most dangerous string this app handles**, and unlike a database password it

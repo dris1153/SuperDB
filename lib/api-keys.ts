@@ -31,9 +31,26 @@ export type KeyRow = {
   description: string | null;
   /** The key itself, only for the types that are safe in public. Null for everything else. */
   value: string | null;
+  /**
+   * What to show before anyone asks to reveal — and it is **not** the prefix.
+   *
+   * The prefix is only a prefix for the newer types: `sb_publishable_NeIMo` really is the first 20
+   * characters of that key. For the legacy pair it is an unrelated identifier — `service_role`'s is
+   * `a5fKL` while the key itself begins `eyJhbGciOiJIUzI1` — so rendering it looked like a short
+   * complete key rather than a hidden one. Measured 2026-09-25.
+   */
+  display: string;
   /** True when the API sent a mask instead of the key — never true for a value that is shown. */
   masked: boolean;
 };
+
+/**
+ * Stands in for a key with nothing showable about it.
+ *
+ * A fixed width on purpose: matching the real length would publish how long the key is, and the
+ * legacy JWTs differ in length between `anon` and `service_role`.
+ */
+const HIDDEN = "•".repeat(24);
 
 const PUBLIC_TYPES = new Set(["publishable"]);
 
@@ -53,6 +70,9 @@ export function toRow(key: ApiKey): KeyRow {
     // Masked values are dropped rather than passed along: a row that carried one would have to
     // remember not to offer it for copying, and forgetting is the whole failure mode here.
     value: isPublic(key) && !masked ? key.api_key : null,
+    // The API's own mask when it sent one — `sb_secret_plAo7` followed by dots is exactly the right
+    // thing to show, and the first version of this threw it away and rendered the prefix instead.
+    display: masked ? (key.api_key ?? HIDDEN) : isPublic(key) ? (key.api_key ?? HIDDEN) : HIDDEN,
     masked,
   };
 }

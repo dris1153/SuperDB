@@ -111,3 +111,34 @@ test("the cases that look fine and are not", () => {
   assert.notEqual(nameProblem("web app"), null, "a space");
   assert.notEqual(nameProblem(""), null, "empty");
 });
+
+test("a legacy prefix is never shown — it is not part of the key", () => {
+  // Measured 2026-09-25: service_role's prefix is "a5fKL" while its key begins "eyJhbGciOiJIUzI1".
+  // Rendering the prefix looked like a short complete key, which is the bug this field exists for.
+  const row = toRow(key({ type: "legacy", name: "service_role", prefix: "a5fKL", api_key: "eyJhbGciOi.admin.sig" }));
+  assert.equal(row.display.includes("a5fKL"), false);
+  assert.equal(row.display.includes("eyJ"), false, "nor any of the key itself");
+  assert.match(row.display, /^•+$/, "dots and nothing else");
+});
+
+test("a masked secret shows the API's own mask, prefix included", () => {
+  // The API already sends the right thing to display; an earlier version threw it away.
+  const row = toRow(key({ type: "secret", name: "default", prefix: "sb_secret_plAo7", api_key: MASKED_SECRET }));
+  assert.equal(row.display, MASKED_SECRET);
+  assert.equal(row.value, null, "still not copyable");
+});
+
+test("a public key displays itself", () => {
+  assert.equal(toRow(key()).display, "sb_publishable_abcdefghijklmnopqrstuvwxyz0123");
+  assert.equal(
+    toRow(key({ type: "legacy", name: "anon", api_key: "eyJhbGciOi.payload.sig" })).display,
+    "eyJhbGciOi.payload.sig",
+  );
+});
+
+test("the hidden placeholder does not leak the key's length", () => {
+  // anon and service_role are different lengths; both must render the same width.
+  const short = toRow(key({ type: "legacy", name: "service_role", api_key: "a".repeat(208) }));
+  const long = toRow(key({ type: "legacy", name: "service_role", api_key: "a".repeat(219) }));
+  assert.equal(short.display, long.display);
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { IconEye, IconEyeOff, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { createKey, removeKey, renameKey, revealApiKey } from "@/lib/api-key-actions";
 import type { KeyRow } from "@/lib/api-keys";
@@ -138,6 +138,9 @@ function Tab({
  * the two that are not. This component never sees a `service_role` or `secret` value, which is why
  * it cannot leak one by accident — the decision is upstream and tested, not repeated here.
  */
+/** Long enough to copy and paste, short enough that a page left open is not a page holding a key. */
+const REVEAL_WINDOW_MS = 60_000;
+
 function Row({
   row,
   projectRef,
@@ -157,19 +160,30 @@ function Row({
    * Local state, deliberately — not a query cache.
    *
    * A revealed key in TanStack's cache would outlive the click that asked for it, survive navigating
-   * away and back, and be readable by anything else holding the client. Here, hiding it discards it
-   * and a remount starts from nothing.
+   * away and back, and be readable by anything else holding the client. Here it belongs to this row
+   * and dies with it.
+   *
+   * **Hiding conceals; it does not discard.** That is a change from the first version, and worth
+   * stating because the button's label implies otherwise: within the window below, toggling is free
+   * and costs no round trip. The countdown runs from the *reveal*, not from the last hide, so a key
+   * cannot be kept alive by clicking at it.
    */
   const [revealed, setRevealed] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const expiry = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const shown = row.value ?? revealed;
+  // Without this a timer outlives the row and calls setState on something that is gone.
+  useEffect(() => () => {
+    if (expiry.current) clearTimeout(expiry.current);
+  }, []);
+
+  const shown = row.value ?? (visible ? revealed : null);
 
   const toggle = () => {
     if (revealed) {
-      setRevealed(null);
-      setProblem(null);
+      setVisible((v) => !v);
       return;
     }
 
@@ -177,8 +191,15 @@ function Row({
       setProblem(null);
       try {
         const result = await revealApiKey(projectRef, row.id ?? "");
-        if (result.ok) setRevealed(result.value);
-        else setProblem(result.reason);
+        if (!result.ok) return setProblem(result.reason);
+
+        setRevealed(result.value);
+        setVisible(true);
+        if (expiry.current) clearTimeout(expiry.current);
+        expiry.current = setTimeout(() => {
+          setRevealed(null);
+          setVisible(false);
+        }, REVEAL_WINDOW_MS);
       } catch {
         setProblem("Could not reach the server.");
       }
@@ -201,9 +222,15 @@ function Row({
 
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
-          <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
-            {shown ?? row.prefix ?? "—"}
-          </code>
+          {pending ? (
+            <Skeleton className="h-[30px] min-w-0 flex-1" />
+          ) : (
+            <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
+              {/* `display` rather than the prefix: for the legacy pair the prefix is an unrelated
+                  identifier, and rendering it looked like a short complete key. */}
+              {shown ?? row.display}
+            </code>
+          )}
 
           {row.value ? null : (
             <Button
@@ -213,7 +240,7 @@ function Row({
               disabled={pending || !row.id}
               aria-label={revealed ? `Hide ${row.name}` : `Reveal ${row.name}`}
             >
-              {revealed ? <IconEyeOff size={13} stroke={1.5} /> : <IconEye size={13} stroke={1.5} />}
+              {visible ? <IconEyeOff size={13} stroke={1.5} /> : <IconEye size={13} stroke={1.5} />}
             </Button>
           )}
 
@@ -241,6 +268,13 @@ function Row({
             </>
           ) : null}
         </div>
+
+        {!shown && !pending ? (
+          <p className="text-xs text-subtle">
+            <span className="text-warn">Hidden.</span> Use the eye to reveal it — the value is not on
+            this page until you do.
+          </p>
+        ) : null}
 
         {problem ? (
           // Not styled as an error: a connection that may not read secrets is a fact about the
