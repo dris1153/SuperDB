@@ -16,3 +16,7 @@
 - [rotateVault covers one table](project_rotatevault_covers_one_table.md) — a master-password change orphans every vault blob outside connection_secrets; seal() returning undefined is the same boundary
 - [Repo is not prettier-formatted](project_repo_is_not_prettier_formatted.md) — no dep, no config; running prettier on a subset diverges from house style and lint never catches it
 - [A refused refetch unmounts dialogs](project_refused_refetch_unmounts_dialogs.md) — a refusal is 200+ok:false, so ready→refused mid-write; early-return branches drop open confirms
+- [Storage config PATCH merges by key](project_storage_config_patch_merges_by_key.md) — but a feature sub-object is validated in full, so send it whole or not at all
+- [Project credential in process](project_project_credential_now_in_process.md) — service_role now lives in a globalThis memo; reads of it are unaudited and its bound flushes every user
+- [Two parts, one gate](project_cross_part_dependency_renders_early.md) — a component reading two parts gates on one; the other's empty fallback renders as a confident lie
+- [Lint misses unused symbols](project_lint_misses_unused_symbols.md) — green lint+typecheck prove nothing about dead imports; no-unused-vars and noUnusedLocals are both off
