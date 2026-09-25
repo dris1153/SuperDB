@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Shared order hook"
-status: in-progress
+status: completed
 priority: P1
 effort: "2h"
 dependencies: []

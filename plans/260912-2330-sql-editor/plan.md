@@ -88,3 +88,7 @@ conflict between them — but whichever lands last means one more run of that fi
 - Saved queries survive a reload and are scoped to their project.
 - The nav slug is live and no longer marked "soon".
 - `pnpm test` (294 today), `pnpm typecheck`, `pnpm lint`, `pnpm build` stay green.
+
+## Status
+
+Audited 2026-09-26: every phase's code has shipped — the editor, saved queries, tabs, templates and the chart are all in `components/sql-editor/`. They stay `in-progress` because nothing has been clicked through in a running browser, which is what their success criteria ask for.

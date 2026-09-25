@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Ordering UI"
-status: pending
+status: completed
 priority: P2
 effort: "4h"
 dependencies: [2, 3]

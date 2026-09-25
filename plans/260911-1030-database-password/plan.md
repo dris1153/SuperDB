@@ -1,6 +1,6 @@
 ---
 title: "The database password"
-status: pending
+status: in-progress
 created: 2026-09-11
 blockedBy: []
 blocks: []
@@ -155,3 +155,7 @@ Whichever lands second rebases onto the other.
 - The connection credentials form behaves identically after phase 2.
 - `pnpm test` (**396** today), `pnpm typecheck`, `pnpm lint`, `pnpm build` stay green. The suite is
   `lib/**/*.test.ts` with no DOM harness, so every UI criterion in phases 3-7 is a manual check.
+
+## Status
+
+Audited 2026-09-26: phases 1, 5, 6 and 7 are code-complete and blocked on the same thing — `supabase/schema.sql` has not been applied to this app's own database, so the tables the password manager writes to may not exist there. See `docs/deploying-the-schema.md`.

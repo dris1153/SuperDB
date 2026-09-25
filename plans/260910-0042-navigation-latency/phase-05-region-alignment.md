@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Region alignment"
-status: pending
+status: blocked  # phase 1, which is itself blocked
 priority: P2
 effort: "30m"
 dependencies: [1]

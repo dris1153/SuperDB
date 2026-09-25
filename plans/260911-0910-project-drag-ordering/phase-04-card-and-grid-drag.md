@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Card restructure and grid drag"
-status: in-progress
+status: completed
 priority: P1
 effort: "5h"
 dependencies: [2, 3]

@@ -1,6 +1,6 @@
 ---
 title: "Navigation latency: cut redundant round trips, then stream"
-status: pending
+status: in-progress
 created: 2026-09-10
 blockedBy: []
 blocks: []
@@ -27,11 +27,11 @@ Diagnosis, rejected alternatives, and why client components + API routes would m
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [Measure and baseline](phase-01-measure-baseline.md) | pending | ~1h | — |
+| 1 | [Measure and baseline](phase-01-measure-baseline.md) | **blocked** | ~1h | — |
 | 2 | [Cache requireUser](phase-02-cache-require-user.md) | **in-progress** | ~30m | — |
 | 3 | [MFA gate: authoritative factors](phase-03-proxy-auth-roundtrip.md) | **in-progress** | ~3h | 2 |
 | 4 | [Streaming and skeletons](phase-04-streaming-skeletons.md) | **in-progress** | ~3h | — |
-| 5 | [Region alignment](phase-05-region-alignment.md) | pending | ~30m | 1 |
+| 5 | [Region alignment](phase-05-region-alignment.md) | **blocked** | ~30m | 1 |
 | 6 | [Management API cache](phase-06-mgmt-api-cache.md) | pending | ~2h | 4 |
 
 Phase 2 is the whole latency win on the auth path. Phase 3 turned out to be a security fix rather
@@ -78,3 +78,32 @@ new implementation before hardening is called done. Cross-reference added there.
 - Cold production FCP on `/p/[ref]/tables`: skeleton visible **under 800 ms**, full content under 2 s.
 - No white screen on any navigation.
 - `pnpm test` green — 262 today (253 prior + 9 MFA gate). ✅
+
+## Audited 2026-09-26
+
+Against the code, not from memory.
+
+**Phases 2, 3 and 4 have shipped.** `requireUser` is `cache()`-wrapped in `lib/supabase/server.ts`;
+`proxy.ts` reads factors from the `getUser()` response rather than from `session.user.factors` in
+the cookie; the project pages render behind `Suspense` with skeletons. None of them has been *timed*,
+which is what phase 1 was for, so they stay `in-progress` rather than completed.
+
+**Phases 1 and 5 are blocked on one fact.** Both need the region of the Supabase project that backs
+SuperDB itself — `kupekvmyzqypwrtnjlid`. The access token in this repo's `.env` does not own that
+project: `GET /v1/projects` returns two projects and it is neither of them, and
+`GET /v1/projects/kupekvmyzqypwrtnjlid` answers `Missing required permission(s): database_read`.
+Asking the project directly does not help either — `/rest/v1/` answers 401
+`UNAUTHORIZED_INVALID_API_KEY_TYPE` with the key in `.env`, and the only region in the response
+headers is the Cloudflare edge that served it, which is the *caller's* region and not the
+database's.
+
+So phase 5 is one line of `vercel.json` waiting on one word. Read the region off the project's
+dashboard and it can be written; guessing it would be worse than leaving it, since aligning to the
+wrong region adds the latency this plan exists to remove.
+
+**Phase 6 is not started deliberately.** Its own text says not to begin until phases 2–4 are
+measured and shown insufficient, and the failure it risks is a cross-tenant data leak rather than a
+slow page. Measurement is blocked, so the gate has not opened. Note that
+`lib/part-cache.ts` and the owner memo in `lib/inventory.ts` have since landed for other reasons,
+both keyed on the connection rather than on a token, which is a large part of what phase 6 wanted —
+whoever picks it up should re-scope it rather than implement it as written.

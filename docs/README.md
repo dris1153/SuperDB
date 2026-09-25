@@ -32,6 +32,9 @@ upstream APIs actually do is not what their shape suggests.
 
 ## Operations
 
+- **[Deploying the schema](./deploying-the-schema.md)** — this app's own database is one idempotent
+  file pasted into a SQL editor by hand, so the code can be ahead of it. What to run, and how to
+  check what is already there.
 - **[Secret rotation runbook](./secret-rotation-runbook.md)** — procedures for rotating encryption
   keys. Read it before rotating anything.
 

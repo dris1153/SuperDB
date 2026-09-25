@@ -1,6 +1,6 @@
 ---
 title: "The API Keys page"
-status: pending
+status: in-progress
 created: 2026-09-25
 blockedBy: []
 blocks: []
@@ -91,3 +91,7 @@ where the password reset lives.
   get wrong.
 - The Connect sheet's Server tab works again.
 - `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` stay green — 415 tests today.
+
+## Status
+
+Audited 2026-09-26: the page, the reveal path, CRUD and the legacy switch have all shipped and three of the four were verified against the live API when they were written. They stay `in-progress` because the UI itself has not been exercised in a browser.

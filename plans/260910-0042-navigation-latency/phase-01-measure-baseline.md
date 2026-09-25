@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Measure and baseline"
-status: pending
+status: blocked  # the SuperDB project's region, and a deployed build to time
 priority: P1
 effort: "1h"
 dependencies: []
