@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Raw JSON"
-status: pending
+status: in-progress  # built; not looked at in a browser
 priority: P3
 effort: "1h"
 dependencies: [2]
@@ -38,17 +38,37 @@ JSON that is not the record, on the one tab whose job is to show the record as i
 
 ## Todo List
 
-- [ ] Coloured JSON
-- [ ] Filter and Clear
-- [ ] A line saying the view is filtered
+- [x] Coloured JSON
+- [x] Filter and Clear
+- [x] A line saying the view is filtered
 
 ## Success Criteria
 
-- [ ] The record renders coloured, and matches what the API returned.
-- [ ] Filtering narrows the visible lines and says so.
-- [ ] No highlighting library is added.
+- [x] The record renders coloured, and matches what the API returned.
+- [x] Filtering narrows the visible lines and says so.
+- [x] No highlighting library is added.
 
 ## Risk Assessment
 
 - **A tokeniser that mangles a value** would make this tab lie about the record it exists to show.
   Render from the parsed object rather than from a regex over the whole string.
+
+## Built 2026-09-26
+
+`components/auth/json-view.tsx` renders the record, and `lib/json-line.ts` takes a line apart —
+split in two so the part that could mangle a value is testable.
+
+**The risk this phase names is now six assertions.** The obvious way to break a JSON tokeniser is a
+`": "` inside a value, which every URL in a user record has:
+
+```
+"iss": "https://api.github.com"      ->  key "iss", value "https://api.github.com"
+"msg": "request completed: 200, ok"  ->  the document's comma, not the one inside the string
+"a\"b": 1                            ->  an escaped quote does not end the key
+```
+
+The contract the tests hold to is reassembly: indent + key + separator + value + comma must give
+back the original line, character for character.
+
+A value that is not recognised is left uncoloured rather than guessed at — `2026-08-25` is not a
+number, and a bracket is not a value.

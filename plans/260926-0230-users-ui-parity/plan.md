@@ -23,7 +23,7 @@ piece is a different data source: the Logs tab.
 | 1 | [The table, and its toolbar](phase-01-table.md) | **in-progress** | ~6h | — |
 | 2 | [The panel, rebuilt](phase-02-panel.md) | **in-progress** | ~5h | — |
 | 3 | [The Logs tab](phase-03-logs-tab.md) | **in-progress** | ~2h | 2 |
-| 4 | [Raw JSON](phase-04-raw-json.md) | pending | ~1h | 2 |
+| 4 | [Raw JSON](phase-04-raw-json.md) | **in-progress** | ~1h | 2 |
 
 Phases 1 and 2 are independent — different files, different data.
 
@@ -55,3 +55,13 @@ plan rather than change how it is built:
    one page of fifty is wrong as soon as there are two pages.
 2. If the log endpoint refuses the merged two-source query, the Logs tab runs two requests or keeps
    one source.
+
+## Where it stands 2026-09-26
+
+All four phases are built and none has been looked at in a browser, which is the only check left on
+any of them. What the code is checked against: 551 tests, typecheck, lint, build, and three live
+measurements — the sort parameter, the merged log query, and the panel's own pipeline against the
+real user.
+
+Two things the original does that this does not, both recorded where they were decided: sorting by
+user id, which the API refuses, and the two buttons that lead to pages this app does not have.

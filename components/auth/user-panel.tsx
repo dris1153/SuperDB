@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isWaiting, reasonOf, useProjectPart, useRefetchPart } from "@/components/use-project-part";
 import { BanDialog, DeleteUserConfirm, MAIL_QUOTA_NOTE } from "./user-dialogs";
+import { JsonView } from "./json-view";
 import { ProviderCard } from "./provider-card";
 import { UserAttributes } from "./user-attributes";
 import { UserLogs } from "./user-logs";
@@ -273,9 +274,7 @@ export function UserPanel({
 
             <TabsContent value="raw" className="px-6 pb-10">
               {/* The one view that cannot go stale in meaning: whatever GoTrue holds, as it holds it. */}
-              <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-4 text-xs">
-                {JSON.stringify(user, null, 2)}
-              </pre>
+              <JsonView value={user} />
             </TabsContent>
           </Tabs>
         )}
