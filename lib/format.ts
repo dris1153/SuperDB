@@ -20,6 +20,36 @@ export function date(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString("en-CA");
 }
 
+/**
+ * The whole moment, in the reader's own zone: `Tue 25 Aug 2026 09:40:19 GMT+0700`.
+ *
+ * A user record is read to answer when something happened, and to the second — a date alone cannot
+ * tell two sign-ins on one day apart, and the offset is what makes the number comparable with a log
+ * line from somewhere else.
+ */
+export function timestamp(iso: string | null | undefined): string {
+  if (!iso) return "—";
+
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "—";
+
+  // `longOffset` prints GMT+07:00; the original has no colon in it.
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    timeZoneName: "longOffset",
+  })
+    .format(at)
+    .replace(/,/g, "")
+    .replace(/GMT([+-])(\d{2}):(\d{2})/, "GMT$1$2$3");
+}
+
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["year", 31_536_000],
   ["month", 2_592_000],

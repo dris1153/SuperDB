@@ -42,6 +42,7 @@ const Reason = ({ error }: { error: string | null }) =>
 /** Create takes a password; invite sends mail and lets the person set their own. */
 export function CreateUserDialog({
   open,
+  mode: opensAs = "create",
   onOpenChange,
   busy,
   error,
@@ -49,13 +50,15 @@ export function CreateUserDialog({
   onInvite,
 }: {
   open: boolean;
+  /** Which half the split button asked for. Changeable once open — they are one dialog. */
+  mode?: "create" | "invite";
   onOpenChange: (next: boolean) => void;
   busy: boolean;
   error: string | null;
   onCreate: (input: { email: string; password: string; autoConfirm: boolean }) => void;
   onInvite: (email: string) => void;
 }) {
-  const [mode, setMode] = useState<"create" | "invite">("create");
+  const [mode, setMode] = useState<"create" | "invite">(opensAs);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [autoConfirm, setAutoConfirm] = useState(true);
@@ -65,7 +68,7 @@ export function CreateUserDialog({
     setWasOpen(open);
     setEmail("");
     setPassword("");
-    setMode("create");
+    setMode(opensAs);
     setAutoConfirm(true);
   }
 

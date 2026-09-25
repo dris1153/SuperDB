@@ -35,9 +35,10 @@ export function providersOf(user: AuthUser): string[] {
 /**
  * The Provider type column.
  *
- * **This rule is ours, not Supabase's.** The dashboard shows a column by this name and the API
- * returns no such field, so it is derived: an `sso:` provider means SSO, `email`, `phone` and
- * `anonymous` are the ones GoTrue handles itself, and anything else is a third party.
+ * **The rule is ours; the words are Supabase's.** The dashboard shows a column by this name and the
+ * API returns no such field, so something has to derive it — but the original prints `Social` for a
+ * GitHub user, and this printed `OAuth`, which reads as a different product. Compared against a
+ * screenshot 2026-09-26.
  */
 export function providerTypeOf(user: AuthUser): string {
   const providers = providersOf(user);
@@ -45,7 +46,77 @@ export function providerTypeOf(user: AuthUser): string {
   if (providers.some((p) => p.startsWith("sso"))) return "SSO";
 
   const builtin = new Set(["email", "phone", "anonymous"]);
-  return providers.every((p) => builtin.has(p)) ? "Basic Auth" : "OAuth";
+  return providers.every((p) => builtin.has(p)) ? "Email" : "Social";
+}
+
+/**
+ * How a provider's name is spelled when it is shown.
+ *
+ * GoTrue reports `github`; the original renders `GitHub`. Only the ones whose capitalisation cannot
+ * be guessed are listed — everything else is title-cased, which is right for `google`, `discord` and
+ * the rest, and no worse than the raw value for a provider nobody here has seen.
+ */
+const PROVIDER_NAMES: Record<string, string> = {
+  github: "GitHub",
+  gitlab: "GitLab",
+  linkedin: "LinkedIn",
+  linkedin_oidc: "LinkedIn",
+  workos: "WorkOS",
+  keycloak: "Keycloak",
+  azure: "Azure",
+  bitbucket: "Bitbucket",
+  zoom: "Zoom",
+  kakao: "Kakao",
+  vercel_marketplace: "Vercel",
+  web3: "Web3",
+  email: "Email",
+  phone: "Phone",
+  anonymous: "Anonymous",
+};
+
+export const providerName = (provider: string): string =>
+  PROVIDER_NAMES[provider] ?? provider.charAt(0).toUpperCase() + provider.slice(1);
+
+/**
+ * What the list can be ordered by, which is one column.
+ *
+ * Measured 2026-09-26: `sort` is a real parameter and a bad field is refused rather than ignored —
+ * `id`, `email`, `updated_at` and `last_sign_in_at` all answer
+ * `400 Bad Sort Parameters: bad field for sort`. Only `created_at` is accepted, and the direction
+ * rides in the same parameter separated by a space: `sort=created_at asc`. `&order=desc` is not a
+ * parameter and does nothing.
+ *
+ * So the original's "Sorted by user ID" cannot be built. Sorting the fifty rows on screen instead
+ * would be wrong the moment a project has fifty-one users.
+ */
+export const SORTS = [
+  { value: "created_at desc", label: "Newest first" },
+  { value: "created_at asc", label: "Oldest first" },
+] as const;
+
+export type UserSort = (typeof SORTS)[number]["value"];
+
+export const isUserSort = (value: unknown): value is UserSort =>
+  SORTS.some((s) => s.value === value);
+
+/** The image a provider gave us, if it gave us one that is safe to put in an `img`. */
+export function avatarOf(user: AuthUser): string | null {
+  const url = user.user_metadata?.avatar_url;
+  if (typeof url !== "string") return null;
+
+  // A third-party URL going straight into an `<img src>`: anything that is not plain https is
+  // refused rather than rendered — `javascript:` and `data:` have no business here.
+  return /^https:\/\//.test(url) ? url : null;
+}
+
+/** Two letters for when there is no avatar, from whatever the row does have. */
+export function initialsOf(user: AuthUser): string {
+  const source = displayNameOf(user) ?? user.email ?? user.phone ?? "";
+  const words = source.split(/[\s@._-]+/).filter(Boolean);
+
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
 }
 
 /**

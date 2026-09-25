@@ -22,9 +22,25 @@ import {
 import { listTables } from "./db-introspect";
 import { getUser, listFactors, listOAuthClients, listUsers, type UserPage } from "./auth-api";
 import { sortClients } from "./oauth-clients";
+
+/**
+ * One user, shaped like a page of them, so the table renders a lookup the same way it renders a
+ * search. A malformed id is an empty result rather than a request, and an id that matches nothing
+ * is an empty result rather than an error — both are "no users match", which is what the box asked.
+ */
+async function oneUserAsPage(ref: string, id: string): Promise<UserPage> {
+  if (!isUserId(id)) return { users: [], total: 0, hasNext: false };
+
+  try {
+    const user = await getUser(ref, id);
+    return { users: [user], total: 1, hasNext: false };
+  } catch {
+    return { users: [], total: 0, hasNext: false };
+  }
+}
 import { pickEmailConfig, type EmailConfig } from "./auth-config";
 import { buildUserAuditSql, parseAuditEvent, sortEvents, type AuditEvent } from "./auth-audit";
-import { displayNameOf, isUserId, providersOf, PER_PAGE } from "./auth-users";
+import { avatarOf, displayNameOf, isUserId, isUserSort, providersOf, PER_PAGE } from "./auth-users";
 import {
   asInterval,
   buildFiguresSql,
@@ -362,8 +378,18 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   "auth-users": async (_t, ref, search): Promise<UserPage> => {
     const page = Math.max(1, Math.floor(Number(search.get("page"))) || 1);
     const filter = (search.get("filter") ?? "").slice(0, 200).trim();
+    const sortRaw = search.get("sort");
+    const sort = isUserSort(sortRaw) ? sortRaw : undefined;
 
-    const read = await listUsers(ref, { page, perPage: PER_PAGE, filter: filter || undefined });
+    // Searching by UID is a lookup, not a search. There is one `?filter=` and it is a substring
+    // match over the searchable columns; an id is exact and has its own endpoint, so asking for a
+    // user by id fetches that user instead of scanning pages for text that looks like one.
+    const read = search.get("by") === "id" ? await oneUserAsPage(ref, filter) : await listUsers(ref, {
+      page,
+      perPage: PER_PAGE,
+      filter: filter || undefined,
+      sort,
+    });
 
     return {
       ...read,
@@ -376,9 +402,12 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
         email_confirmed_at: u.email_confirmed_at ?? null,
         banned_until: u.banned_until ?? null,
         app_metadata: { providers: providersOf(u) },
-        // Only the name, not the whole of it: `user_metadata` is whatever the project put there,
-        // and this table shows one field of it.
-        user_metadata: { display_name: displayNameOf(u) ?? undefined },
+        // Two fields of it, not the object: `user_metadata` is whatever the project put there, and
+        // this table shows a name and a picture.
+        user_metadata: {
+          display_name: displayNameOf(u) ?? undefined,
+          avatar_url: avatarOf(u) ?? undefined,
+        },
       })),
     };
   },

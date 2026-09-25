@@ -71,6 +71,10 @@ export type UserPage = { users: AuthUser[]; total: number | null; hasNext: boole
  * The totals are in headers rather than the body: `x-total-count` is the count, and `link` carries
  * `rel="next"` only while there is a next page, which is what decides the paging control.
  *
+ * **`sort` takes one field.** Measured: `created_at` is accepted and `id`, `email`, `updated_at`
+ * and `last_sign_in_at` are each refused with `400 Bad Sort Parameters`. The direction is part of
+ * the value, space separated. See `SORTS` in `lib/auth-users.ts`.
+ *
  * `identities` is null on every user in a listing, so the details panel has to read the user again.
  */
 /**
@@ -166,13 +170,15 @@ export const deleteOAuthClient = (ref: string, clientId: string) =>
 
 export async function listUsers(
   ref: string,
-  options: { page: number; perPage: number; filter?: string },
+  options: { page: number; perPage: number; filter?: string; sort?: string },
 ): Promise<UserPage> {
   const query = new URLSearchParams({
     page: String(options.page),
     per_page: String(options.perPage),
   });
   if (options.filter) query.set("filter", options.filter);
+  // `sort=created_at asc`, direction in the same parameter. `&order=` is not one — measured.
+  if (options.sort) query.set("sort", options.sort);
 
   const { body, headers } = await call<{ users?: AuthUser[] }>(ref, `/admin/users?${query}`);
 

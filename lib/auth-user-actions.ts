@@ -174,6 +174,58 @@ export async function removeUserFactor(
  * The typed email is checked here as well as in the dialog: the dialog is a UI, and this is the
  * endpoint. Whether the deletion is soft or hard is unmeasured, so nothing here promises either.
  */
+export type BulkResult = {
+  deleted: string[];
+  failed: { id: string; reason: string }[];
+};
+
+/**
+ * Several users, one request each, and a result per id.
+ *
+ * **A batch that partly failed is not a success and not a failure.** There is no transaction here —
+ * by the time the fourth id is refused, the first three accounts are gone — so this reports what
+ * happened to each rather than a verdict on the whole. The caller shows both halves.
+ *
+ * Sequential rather than parallel: these are deletes against someone's live project, and a burst of
+ * them is how a rate limit turns half a batch into an unexplained mess.
+ *
+ * No typed confirmation here, unlike deleting one. The dialog in front of this says how many and
+ * lists them; asking somebody to type five email addresses is friction that would be clicked
+ * through rather than read.
+ */
+export async function deleteProjectUsers(
+  projectRef: string,
+  ids: string[],
+): Promise<{ ok: true; result: BulkResult } | { ok: false; reason: string }> {
+  if (!Array.isArray(ids) || ids.length === 0) return { ok: false, reason: "Nothing selected." };
+  if (ids.length > 50) return { ok: false, reason: "That is more than fifty users." };
+  if (!ids.every(isUserId)) return { ok: false, reason: "That is not a user." };
+
+  if (!(await project(projectRef))) return { ok: false, reason: "Project not found." };
+
+  const result: BulkResult = { deleted: [], failed: [] };
+
+  for (const id of new Set(ids)) {
+    try {
+      await deleteUser(projectRef, id);
+      result.deleted.push(id);
+    } catch (e) {
+      result.failed.push({ id, reason: failed(e) });
+    }
+  }
+
+  await recordWrite({
+    ref: projectRef,
+    what: "auth users",
+    outcome:
+      result.failed.length === 0
+        ? `deleted ${result.deleted.length}`
+        : `deleted ${result.deleted.length}, ${result.failed.length} failed`,
+  });
+
+  return { ok: true, result };
+}
+
 export async function deleteProjectUser(
   projectRef: string,
   id: string,

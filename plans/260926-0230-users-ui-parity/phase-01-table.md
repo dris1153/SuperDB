@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "The table, and its toolbar"
-status: pending
+status: in-progress  # built; the grid itself has not been looked at in a browser
 priority: P2
 effort: "6h"
 dependencies: []
@@ -43,10 +43,23 @@ match, so:
 The UID branch needs a branch in the part reader, and an id that is not a UUID should say so rather
 than spend a request.
 
-**Sort is gated on a measurement.** The original's control reads "Sorted by user ID". Before
-building it: does `GET /admin/users` accept an order parameter? If not, sorting can only reorder the
-fifty rows on screen, which is wrong as soon as there are two pages, and the control does not ship —
-recorded in this phase either way.
+**Sort: measured 2026-09-26, and the original's control cannot be built.**
+
+```
+sort=created_at asc     200   order flipped        <- the direction rides in the same parameter
+sort=created_at&order=desc   200   order unchanged  <- `order` is not a parameter
+sort=id                 400   bad field for sort
+sort=email              400   bad field for sort
+sort=updated_at         400   bad field for sort
+sort=last_sign_in_at    400   bad field for sort
+```
+
+`sort` is real and validated — a bad field is refused rather than ignored — and `created_at` is the
+only one of those it accepts. So **"Sorted by user ID" is not buildable**: the API will not order by
+id, and ordering fifty rows in the browser is wrong on page two.
+
+What ships instead is the one thing the API can do, honestly labelled: newest first (the default)
+or oldest first, server-side, correct across pages.
 
 **Provider icons.** `developer-icons` is already a dependency and carries Google, GitLab, Discord,
 Slack, Azure, Bitbucket, Figma, LinkedIn, Notion and Twitter; `@tabler/icons-react` has brand icons
@@ -82,22 +95,22 @@ a batch where three of five failed must not report success, and the two that wen
 
 ## Todo List
 
-- [ ] Sort measured and recorded
-- [ ] Full timestamp + test
-- [ ] Avatar through the part
-- [ ] UID lookup branch
-- [ ] Provider icons and `Social`
-- [ ] Checkbox, avatar, rules, scroll
-- [ ] Toolbar controls
-- [ ] Bulk delete with per-row outcomes
+- [x] Sort measured and recorded
+- [x] Full timestamp + test
+- [x] Avatar through the part
+- [x] UID lookup branch
+- [x] Provider icons and `Social`
+- [x] Checkbox, avatar, rules, scroll
+- [x] Toolbar controls
+- [x] Bulk delete with per-row outcomes
 
 ## Success Criteria
 
-- [ ] A row shows avatar, full UID, provider icon and name, `Social`, and full timestamps.
-- [ ] Searching by UID fetches that user; searching by email filters server-side as it does today.
-- [ ] Deleting three reports each outcome, and a partial failure is not reported as success.
-- [ ] Changing page or filter clears the selection.
-- [ ] `pnpm test && pnpm typecheck && pnpm lint && pnpm build` stay green.
+- [x] A row shows avatar, full UID, provider icon and name, `Social`, and full timestamps.
+- [x] Searching by UID fetches that user; searching by email filters server-side as it does today.
+- [x] Deleting three reports each outcome, and a partial failure is not reported as success.
+- [x] Changing page or filter clears the selection.
+- [x] `pnpm test && pnpm typecheck && pnpm lint && pnpm build` stay green.
 
 ## Risk Assessment
 
@@ -107,3 +120,31 @@ a batch where three of five failed must not report success, and the two that wen
   opened. Fail closed to initials, and never block a row on an image.
 - **A sort that only sorts one page** looks right until a project has fifty-one users. The
   measurement decides whether it exists at all.
+
+## Built 2026-09-26
+
+- `lib/format.ts` gained `timestamp()`, which prints `Tue 25 Aug 2026 09:40:19 GMT+0700` — pinned by
+  shape in a test, because the offset belongs to whoever is reading.
+- `providerTypeOf` keeps its rule and takes the original's words: `Social` and `Email` in place of
+  `OAuth` and `Basic Auth`. `providerName` spells `github` as `GitHub`, and title-cases anything it
+  has not met.
+- The part picks `avatar_url` alongside the display name, through `avatarOf`, which refuses anything
+  that is not plain `https` — it goes straight into an `img src`.
+- Searching by UID reads that user through `GET /admin/users/{id}` and shapes it as a page of one. A
+  malformed id is an empty result rather than a request.
+- Sort is `created_at desc` or `created_at asc`, server-side. **Not** "Sorted by user ID", which the
+  API refuses.
+- The grid has the checkbox, the avatar, the full UID, column rules and horizontal scroll; the
+  toolbar has the field selector, the sort, the column picker, a refresh that indicates, and Add
+  user as a split button.
+- Bulk delete reports per id. A batch where some failed keeps its dialog open and names them: the
+  ones that went are gone, and a toast would be the only record otherwise.
+
+**The refresh button tracks its own state.** With `keepPrevious` the query stays `ready` through a
+refetch, so reading `status` would have given a button that never indicated.
+
+## Not verified
+
+Nobody has looked at the grid in a browser. What is checked: 543 tests, typecheck, lint, build, and
+the two API behaviours this phase rests on — `sort=created_at asc` flipping the order, and a bad
+sort field being refused rather than ignored.
