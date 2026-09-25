@@ -15,6 +15,7 @@ import {
   listMigrations,
   listSigningKeys,
   getAuthConfig,
+  getStorageConfig,
   queryLogs,
 } from "./mgmt-api";
 import { listTables } from "./db-introspect";
@@ -32,7 +33,10 @@ import type { SigningKeysPart } from "./signing-keys";
 import type { Part } from "./project-part-names";
 import { memoryUsedPercent, parseMetrics } from "./prometheus";
 import { savedQueries } from "./saved-queries";
-import { describeTable, listPolicies, listSchemas, listTablesIn } from "./table-editor";
+import { describeTable, listPolicies, listSchemas, listTablesIn, type Policy } from "./table-editor";
+import { bucketNameProblem, countBucketPolicies, type BucketRow } from "./buckets";
+import type { StorageObject } from "./storage-objects";
+import { listObjects, listStorageBuckets } from "./storage-api";
 import { tableDefinition } from "./table-ddl";
 import { rowCount, selectRows, type RowCount } from "./table-rows";
 import { parseFilters } from "./table-filter";
@@ -118,6 +122,97 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
    * with. `toRow` is where the line is drawn, and it has tests.
    */
   "api-key-rows": async (t, ref): Promise<KeyRow[]> => (await listApiKeys(t, ref)).map(toRow),
+
+  /**
+   * Passed through rather than picked, unlike its neighbours.
+   *
+   * The body carries `purgeCache`, `capabilities` and `external.upstreamTarget`, none of which this
+   * app models and none of which is a credential — measured 2026-09-25. Picking fields here would
+   * mean this page shows less of a project's storage config than the project has, for no gain.
+   */
+  "storage-config": (t, ref) => getStorageConfig(t, ref),
+
+  /**
+   * One folder of one bucket.
+   *
+   * `t` is unused: this is the project's own Storage API, which does not accept the account token —
+   * `lib/project-key.ts` supplies the credential instead.
+   *
+   * The parameters come from a browser, so they are bounded here as well as escaped downstream. A
+   * prefix and a search term travel in the request body rather than the URL, so neither can escape
+   * the bucket — but neither needs to be a megabyte either.
+   */
+  objects: async (_t, ref, search): Promise<StorageObject[]> => {
+    const bucket = search.get("bucket") ?? "";
+    if (bucketNameProblem(bucket)) return [];
+
+    const listed = await listObjects(ref, bucket, {
+      prefix: (search.get("prefix") ?? "").slice(0, 1024),
+      search: (search.get("q") ?? "").slice(0, 200) || undefined,
+      limit: PAGE,
+    });
+
+    // Picked rather than passed through, for the reason the reader below states: `call()` casts
+    // over `JSON.parse`, so the declared type is a subset of the body and not a filter.
+    return listed.map(({ name, id, created_at, updated_at, metadata }) => ({
+      name,
+      id,
+      created_at,
+      updated_at,
+      metadata: metadata ? { size: metadata.size, mimetype: metadata.mimetype } : null,
+    }));
+  },
+
+  /**
+   * The policies on both storage tables.
+   *
+   * Two reads, resolved together. They are separate tables and neither is optional: `objects` holds
+   * everything about who may touch a file, `buckets` holds the much rarer policies about listing
+   * buckets at all, and the tab shows both because the original does.
+   */
+  "storage-policies": async (t, ref): Promise<{ objects: Policy[]; buckets: Policy[] }> => {
+    const [objects, buckets] = await Promise.all([
+      listPolicies(t, ref, "storage", "objects"),
+      listPolicies(t, ref, "storage", "buckets"),
+    ]);
+
+    return { objects, buckets };
+  },
+
+  /**
+   * Buckets, each with the number of policies naming it.
+   *
+   * Two sources, and neither is optional: the buckets come from the project's Storage API, which is
+   * the only thing that knows their settings, and the policy count is a SQL question about
+   * `storage.objects`. Resolved together so the browser makes one request rather than walking a
+   * chain — the rule the table editor set.
+   *
+   * The policy read is allowed to fail on its own: a connection that cannot run SQL should still
+   * see its buckets, with the count left at zero.
+   */
+  buckets: async (t, ref): Promise<BucketRow[]> => {
+    const [buckets, policies] = await Promise.all([
+      listStorageBuckets(ref),
+      listPolicies(t, ref, "storage", "objects").catch(() => []),
+    ]);
+
+    // Fields picked rather than spread. `call()` casts over `JSON.parse`, so `StorageBucket` is a
+    // subset of the body and not a filter — the measured response also carries `owner`, which this
+    // page has no use for.
+    return buckets.map(
+      ({ id, name, public: isPublic, type, file_size_limit, allowed_mime_types, created_at, updated_at }) => ({
+        id,
+        name,
+        public: isPublic,
+        type,
+        file_size_limit,
+        allowed_mime_types,
+        created_at,
+        updated_at,
+        policies: countBucketPolicies(policies, id),
+      }),
+    );
+  },
 
   /** A single boolean, and the only thing this endpoint holds. */
   "legacy-api-keys": (t, ref) => getLegacyKeys(t, ref),
@@ -338,6 +433,15 @@ const safeExposed = (t: string, ref: string) =>
     (schemas) => schemas,
     () => null,
   );
+
+/**
+ * One folder's worth.
+ *
+ * A folder with more objects than this is truncated, and the browser says so rather than implying
+ * the listing is complete. There is no pager: `/object/list` takes an offset, but a folder that
+ * needs paging is a folder nobody should be reading through a settings page.
+ */
+const PAGE = 200;
 
 const schemaOf = (search: URLSearchParams) => search.get("schema") ?? "public";
 const tableOf = (search: URLSearchParams) => search.get("table") ?? "";

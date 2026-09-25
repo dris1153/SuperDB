@@ -166,6 +166,14 @@ export type Policy = {
   roles: string | null;
   using_expr: string | null;
   check_expr: string | null;
+  /**
+   * False for a RESTRICTIVE policy.
+   *
+   * It matters more than it looks: Postgres ORs the permissive policies together and ANDs the
+   * restrictive ones over the top. So a permissive policy grants access and dropping it takes some
+   * away — but a restrictive policy *limits* access, and dropping one **widens** it.
+   */
+  permissive: boolean;
 };
 
 export const listPolicies = (token: string, ref: string, schema: string, table: string) =>
@@ -173,6 +181,7 @@ export const listPolicies = (token: string, ref: string, schema: string, table: 
     token,
     ref,
     `select p.polname::text as name,
+            p.polpermissive as permissive,
             case p.polcmd when 'r' then 'SELECT' when 'a' then 'INSERT' when 'w' then 'UPDATE'
                           when 'd' then 'DELETE' else 'ALL' end as command,
             -- polroles is {0} when a policy applies to PUBLIC, and oid 0 matches no pg_roles row.

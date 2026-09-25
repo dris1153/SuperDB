@@ -216,6 +216,61 @@ export const deleteSigningKey = (t: string, ref: string, id: string) =>
 export const getAuthConfig = (t: string, ref: string) =>
   call<{ jwt_exp?: number }>(t, `/v1/projects/${ref}/config/auth`);
 
+/**
+ * Everything this app knows about a project's storage, in one response.
+ *
+ * Four screens read from it: the size limit and transformation flag are the Settings tab, the S3
+ * page's toggle is `features.s3Protocol`, and whether Analytics and Vectors exist for this project
+ * at all is `icebergCatalog.enabled` and `vectorBuckets.enabled` — the project's own flags rather
+ * than a guess from its plan name.
+ *
+ * Note what is *not* here: buckets and objects. The Management API has three storage paths in total
+ * and none of them reaches an object. See `plans/reports/260925-storage-api-measured.md`.
+ */
+export type StorageConfig = {
+  fileSizeLimit: number;
+  features?: {
+    imageTransformation?: { enabled: boolean };
+    s3Protocol?: { enabled: boolean };
+    icebergCatalog?: { enabled: boolean };
+    vectorBuckets?: { enabled: boolean };
+  };
+  capabilities?: { list_v2?: boolean };
+};
+
+export const getStorageConfig = (t: string, ref: string) =>
+  call<StorageConfig>(t, `/v1/projects/${ref}/config/storage`);
+
+/**
+ * Writing the storage config. Measured 2026-09-25, and not what it looks like:
+ *
+ * - The **top level merges** — a field not sent is left alone.
+ * - **`features` merges by key** — a feature not sent is left alone. An earlier version of this
+ *   comment claimed the opposite and prescribed read-merge-write, which is now the one thing
+ *   guaranteed to fail.
+ * - A feature **sub-object is validated in full**. Sending `{icebergCatalog: {enabled}}` without its
+ *   `maxNamespaces`, `maxTables` and `maxCatalogs` is refused with a 400 naming each missing field.
+ *
+ * Hence the body type below: only the two features that carry nothing but `enabled` can be written
+ * at all, so the type says so rather than letting a caller compose a payload the API always
+ * refuses.
+ */
+export const updateStorageConfig = (
+  t: string,
+  ref: string,
+  body: {
+    fileSizeLimit?: number;
+    features?: {
+      imageTransformation?: { enabled: boolean };
+      s3Protocol?: { enabled: boolean };
+    };
+  },
+) =>
+  call<StorageConfig>(t, `/v1/projects/${ref}/config/storage`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+
 const SERVICES = ["auth", "db", "pooler", "realtime", "rest", "storage"] as const;
 // No timeout_ms: the API validates it as a number and rejects the query string with a 400.
 export const getHealth = (t: string, ref: string) =>

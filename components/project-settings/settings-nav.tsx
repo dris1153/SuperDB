@@ -15,6 +15,9 @@ type Row = { slug: string; label: string; endpoint: string; ready?: boolean };
  * and a settings page is where it is easiest to break: eight aspirational links look harmless until
  * one of them can never be built.
  *
+ * Storage is absent because it is not a settings section: it grew a page of its own under the
+ * project, and its configuration is a tab there, next to the buckets that configuration governs.
+ *
  * Integrations is absent for a subtler reason than in the main nav. `integrations/tpa` does not
  * exist, but `config/auth/third-party-auth` does — so the honest reason is that nothing in this app
  * consumes third-party auth config, not that the API is missing. Billing, Usage and Team are absent
@@ -55,7 +58,6 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         ready: true,
       },
       { slug: "auth", label: "Authentication", endpoint: "GET,PATCH /v1/projects/{ref}/config/auth" },
-      { slug: "storage", label: "Storage", endpoint: "GET,PATCH /v1/projects/{ref}/config/storage" },
       {
         slug: "domains",
         label: "Domains",

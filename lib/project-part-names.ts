@@ -42,6 +42,16 @@ export const PART_NAMES = [
   // The JWT Keys settings page. Signing keys carry no secret — `private_jwk` is never returned —
   // so this is a lifecycle, not a credential.
   "signing-keys",
+  // Storage's limits and feature flags. Four screens read from this one response.
+  "storage-config",
+  // Buckets, from the project's own Storage API rather than the Management API — which can list
+  // them but knows nothing else about them.
+  "buckets",
+  // One level of one bucket. A folder in the answer is an entry with no id, because Storage has no
+  // folders — see `lib/storage-objects.ts`.
+  "objects",
+  // Row level security on storage.objects and storage.buckets, which is what the Policies tab is.
+  "storage-policies",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

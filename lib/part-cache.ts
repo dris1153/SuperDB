@@ -60,6 +60,14 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   // Same reason, and it holds no credential at all: the JWT keys page is built around writes, so a
   // cached list would show the state from before the click.
   "signing-keys": 0,
+  // Written from the storage settings tab, and the flags decide what three other pages offer.
+  "storage-config": 0,
+  // Created, edited and deleted from the page that lists them.
+  buckets: 0,
+  // The thing the reader is looking at, and the thing they are changing.
+  objects: 0,
+  // Written from the Policies tab.
+  "storage-policies": 0,
   definition: 0,
   "saved-queries": 0,
 };

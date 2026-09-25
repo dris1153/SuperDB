@@ -11,6 +11,7 @@ import {
   updateApiKey,
   type ApiKey,
 } from "./mgmt-api";
+import { forgetProjectKey } from "./project-key";
 import { recordWrite } from "./write-audit";
 import { attempt, type Attempt } from "./safe";
 
@@ -110,6 +111,9 @@ export async function createKey(
 
   const body = { type, name: trimmed, ...(description.trim() ? { description: description.trim() } : {}) };
   const result = await attempt(() => createApiKey(found.token, projectRef, body));
+  // Storage caches one of these for a minute; the cached one may be the key just changed.
+  forgetProjectKey(projectRef);
+
   return result.ok ? { ok: true } : { ok: false, reason: result.reason };
 }
 
@@ -150,6 +154,9 @@ export async function removeKey(projectRef: string, id: string): Promise<KeyResu
   if (!found) return { ok: false, reason: "Project not found." };
 
   const result = await attempt(() => deleteApiKey(found.token, projectRef, id));
+  // Storage caches one of these for a minute; the cached one may be the key just changed.
+  forgetProjectKey(projectRef);
+
   return result.ok ? { ok: true } : { ok: false, reason: result.reason };
 }
 
@@ -178,6 +185,9 @@ export async function setLegacyKeysEnabled(
   if (!found) return { ok: false, reason: "Project not found." };
 
   const result = await attempt(() => setLegacyKeys(found.token, projectRef, enabled));
+
+  // Turning the legacy pair off invalidates service_role, which is what Storage caches.
+  forgetProjectKey(projectRef);
 
   // Audited either way, and before the outcome is returned. This is the widest-reaching switch on
   // the page, and a change nobody can find afterwards is worse than one that failed.

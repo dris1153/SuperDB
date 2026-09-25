@@ -39,7 +39,7 @@ const SECTIONS: { items: { slug: string; label: string; icon: typeof IconHome; r
     items: [
       { slug: "database", label: "Database", icon: IconDatabase, ready: true },
       { slug: "auth", label: "Authentication", icon: IconLock },
-      { slug: "storage", label: "Storage", icon: IconFolder },
+      { slug: "storage", label: "Storage", icon: IconFolder, ready: true },
       { slug: "functions", label: "Edge Functions", icon: IconBolt },
       { slug: "realtime", label: "Realtime", icon: IconBinaryTree2 },
     ],
@@ -140,7 +140,7 @@ export function ProjectNav({ projectRef, mode: initial }: { projectRef: string; 
               {section.items.map(({ slug, label, icon: Icon, ready }) => {
                 const href = slug ? `${base}/${slug}` : base;
                 // Prefix, not equality: settings has routes beneath it, and an exact test left
-                // "Project Settings" unlit on every one of them. The other slugs have no children.
+                // "Project Settings" unlit on every one of them. A slug whose section has sub-routes of its own stays lit inside them.
                 const active = slug ? pathname.startsWith(href) : pathname === base;
 
                 const row = ready ? (
