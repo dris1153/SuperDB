@@ -64,7 +64,12 @@ export function useProjectPart<T>(
    * one is chosen.
    */
   params?: PartParams,
-  options?: { enabled?: boolean; keepPrevious?: boolean },
+  options?: {
+    enabled?: boolean;
+    keepPrevious?: boolean;
+    /** Attempts after the first. Zero for a part behind a limit a retry would only push further out. */
+    retry?: number;
+  },
 ): PartState<T> {
   const key = queryOf(params);
   const enabled = options?.enabled ?? true;
@@ -75,6 +80,7 @@ export function useProjectPart<T>(
     // Keep the last answer on screen while a new key is in flight. Without it, every sort, page and
     // filter drops the grid to "no data" for the length of a round trip, which reads as an error.
     placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
+    retry: options?.retry,
   });
 
   // A disabled query stays `pending` for ever in TanStack v5, which is indistinguishable from slow

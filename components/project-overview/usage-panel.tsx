@@ -3,13 +3,28 @@
 import { useSearchParams } from "next/navigation";
 import { count as compact } from "@/lib/format";
 import { asInterval, successRate, type ServiceCard } from "@/lib/logs-sql";
-import { IntervalPicker } from "@/components/interval-picker";
+import { INTERVAL_LABELS, IntervalPicker } from "@/components/interval-picker";
 import { ServiceCarousel, ServiceCarouselSkeleton } from "@/components/service-carousel";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
 
-type Usage = { from: number; to: number; cards: ServiceCard[] };
+type Usage = {
+  from: number;
+  to: number;
+  /** Where the sampled rows begin when the read hit the endpoint's cap; null when nothing was cut. */
+  sampledFrom: number | null;
+  cards: ServiceCard[];
+};
+
+/** "12 minutes", "3 hours". `timeAgo` phrases a past moment, and this is a span. */
+function span(ms: number): string {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 90) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+
+  const hours = Math.round(minutes / 60);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
 
 /**
  * Requests per service over the chosen window.
@@ -24,7 +39,9 @@ type Usage = { from: number; to: number; cards: ServiceCard[] };
  */
 export function UsagePanel({ projectRef }: { projectRef: string }) {
   const interval = asInterval(useSearchParams().get("interval"));
-  const usage = useProjectPart<Usage>(projectRef, "logs", { interval });
+  // retry: 0 — the logs endpoint throttles on a schedule nobody here can predict, and the default
+  // single retry would spend an attempt on a limit that only waiting clears.
+  const usage = useProjectPart<Usage>(projectRef, "logs", { interval }, { retry: 0 });
 
   const cards = usage.status === "ready" ? usage.data.cards : [];
   const total = cards.reduce((sum, c) => sum + c.total, 0);
@@ -65,9 +82,21 @@ export function UsagePanel({ projectRef }: { projectRef: string }) {
       ) : usage.status !== "ready" ? (
         <Card className="p-6 text-center text-sm text-subtle">{reasonOf(usage)}</Card>
       ) : total === 0 ? (
-        <Card className="p-6 text-center text-sm text-subtle">No request data for this period.</Card>
+        <Card className="p-6 text-center text-sm text-subtle">
+          No requests in the {INTERVAL_LABELS[interval].toLowerCase()}.
+        </Card>
       ) : (
-        <ServiceCarousel cards={cards} from={usage.data.from} to={usage.data.to} />
+        <>
+          <ServiceCarousel cards={cards} from={usage.data.from} to={usage.data.to} />
+          {usage.data.sampledFrom === null ? null : (
+            // The endpoint returns at most 1000 rows whatever the statement asks for, so on a busy
+            // project the bars and the figures cover different ranges. Unsaid, that reads as a bug.
+            <p className="text-center text-xs text-subtle">
+              Bars cover the last {span(usage.data.to - usage.data.sampledFrom)}. Totals cover the
+              full window.
+            </p>
+          )}
+        </>
       )}
     </section>
   );

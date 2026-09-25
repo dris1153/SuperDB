@@ -1,15 +1,16 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import type { ChartInterval } from "@/lib/logs-sql";
+import { INTERVALS, type ChartInterval } from "@/lib/logs-sql";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
-const INTERVALS: { value: ChartInterval; label: string }[] = [
-  { value: "15min", label: "Last 15 minutes" },
-  { value: "30min", label: "Last 30 minutes" },
-  { value: "1hr", label: "Last 60 minutes" },
-  { value: "1day", label: "Last 24 hours" },
-];
+/** Exported so a card can name the window the reader chose rather than calling it "this period". */
+export const INTERVAL_LABELS: Record<ChartInterval, string> = {
+  "15min": "Last 15 minutes",
+  "30min": "Last 30 minutes",
+  "1hr": "Last 60 minutes",
+  "1day": "Last 24 hours",
+};
 
 /**
  * Writes the range into the URL, so it survives a reload and a shared link.
@@ -37,7 +38,7 @@ export function IntervalPicker({ value }: { value: ChartInterval }) {
       </SelectTrigger>
       <SelectContent>
         {INTERVALS.map((i) => (
-          <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>
+          <SelectItem key={i} value={i}>{INTERVAL_LABELS[i]}</SelectItem>
         ))}
       </SelectContent>
     </Select>

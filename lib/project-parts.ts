@@ -17,15 +17,21 @@ import {
   getAuthConfig,
   getStorageConfig,
   queryLogs,
+  MgmtError,
 } from "./mgmt-api";
 import { listTables } from "./db-introspect";
 import {
   asInterval,
-  buildServiceLogsSql,
+  buildFiguresSql,
+  buildSampleSql,
   bucketUnit,
+  figuresFor,
+  parseLogTime,
+  SAMPLE_LIMIT,
   toCards,
   windowMinutes,
-  type LogRow,
+  type FigureRow,
+  type LogEntry,
 } from "./logs-sql";
 import { generationOf, partKey, PART_TTL_MS, readCached, writeCached } from "./part-cache";
 import { toRow, type KeyRow } from "./api-keys";
@@ -347,14 +353,31 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
     const from = to - minutes * 60_000;
     const unit = bucketUnit(minutes);
 
-    const rows = await queryLogs<LogRow>(
-      t,
-      ref,
-      buildServiceLogsSql(unit),
-      new Date(from).toISOString(),
-      new Date(to).toISOString(),
-    );
-    return { from, to, cards: toCards(rows, { from, to, unit }) };
+    const ask = <T>(sql: string) =>
+      queryLogs<T>(t, ref, sql, new Date(from).toISOString(), new Date(to).toISOString());
+
+    // Two requests, not one: the figures are counted over the whole window and the rows are only
+    // the shape of it. They cannot be the same statement — the row read is capped at 1000 and the
+    // aggregate is not.
+    const [rows, entries] = await Promise.all([
+      ask<FigureRow>(buildFiguresSql()),
+      ask<LogEntry>(buildSampleSql()),
+    ]).catch((e: unknown) => {
+      // `ThrottlerException: Too Many Requests` is all the endpoint says, and a reader cannot act on
+      // that. Nothing retries into it, so waiting is the whole fix.
+      if (e instanceof MgmtError && e.status === 429) {
+        throw new Error("Log queries are rate limited. Wait a minute, then reload.");
+      }
+      throw e;
+    });
+
+    const figures = figuresFor(rows);
+    // Exactly the cap means the window was cut, and the sample arrives newest first, so its last
+    // row is where the bars really begin.
+    const sampledFrom =
+      entries.length >= SAMPLE_LIMIT ? parseLogTime(entries[entries.length - 1].timestamp) : null;
+
+    return { from, to, sampledFrom, cards: toCards(entries, { from, to, unit }, figures) };
   },
 };
 

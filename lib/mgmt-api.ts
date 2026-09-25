@@ -338,10 +338,19 @@ export const restoreProject = (t: string, ref: string) =>
 export const listBackups = (t: string, ref: string) =>
   call<BackupsResponse>(t, `/v1/projects/${ref}/database/backups`);
 /**
- * Logflare SQL over the project's log sources.
+ * Logflare SQL over the project's logs.
  *
  * Answers 200 with `error` populated when the SQL itself is wrong, so a caller has to read the
  * envelope rather than trust the status line.
+ *
+ * **`logs`, not `logs.all`.** The latter was removed — it answers 410 with a pointer to this one —
+ * and the replacement is a single stream rather than a table per service: `from logs where
+ * source = 'auth_logs'` in place of `from auth_logs`. `lib/logs-sql.ts` has the shape.
+ *
+ * It throttles with `ThrottlerException: Too Many Requests`, and not on volume alone: ten identical
+ * queries back to back went through, while an earlier run of varied probes was still refused with
+ * seventy seconds between them. The limit is real and its shape is not known, so nothing should
+ * retry into it automatically.
  */
 export async function queryLogs<T>(
   t: string,
@@ -357,12 +366,11 @@ export async function queryLogs<T>(
   });
   const body = await call<{ result: T[] | null; error: string | null }>(
     t,
-    `/v1/projects/${ref}/analytics/endpoints/logs.all?${query}`,
+    `/v1/projects/${ref}/analytics/endpoints/logs?${query}`,
   );
-  if (body.error) throw new MgmtError(400, `logs.all → ${body.error}`);
+  if (body.error) throw new MgmtError(400, `logs → ${body.error}`);
   return body.result ?? [];
 }
-
 
 /** Prometheus exposition format, not JSON — parse it with lib/prometheus.ts. */
 export async function getMetricsText(token: string, ref: string): Promise<string> {
