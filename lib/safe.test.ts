@@ -50,6 +50,13 @@ test("rate limiting is reported as temporary, not as a failure to act on", async
   assert.match(await reasonFor(thrown(429, "Too Many Requests")), /rate limiting/);
 });
 
+test("a 429 that says when it lifts is shown saying so", async () => {
+  // Measured 2026-09-25: the signing-key endpoints answer a throttled write with the exact moment
+  // it lifts. The body outranks the sentence above, which cannot know that moment.
+  const body = JSON.stringify({ message: "Please wait until 2026-09-25T06:04:10.312Z before attempting this request again." });
+  assert.match(await reasonFor(thrown(429, body)), /Please wait until 2026-09-25T06:04:10/);
+});
+
 test("a platform gap over OAuth says no scope will help", async () => {
   const error = new MgmtError(401, "does not support oauth access yet");
   assert.match(await reasonFor(error), /no scope enables it/);

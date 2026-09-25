@@ -47,12 +47,12 @@ function describe(error: MgmtError): string {
     return `The OAuth grant is missing the ${scope[1]} scope. Re-authorize the connection to add it.`;
   }
 
-  if (error.status === 429) {
-    return "Supabase is rate limiting this token — the figures return once the minute rolls over.";
-  }
-  // Supabase explains write failures in the response body — "…reached their maximum limits…" and
-  // the like. A generic status line would throw away the only part the user can act on. Parsed
-  // rather than pattern-matched: the text routinely contains quotes and commas of its own.
+  // Supabase explains failures in the response body — "…reached their maximum limits…" and the
+  // like. A generic status line would throw away the only part the user can act on. Parsed rather
+  // than pattern-matched: the text routinely contains quotes and commas of its own.
+  //
+  // Ahead of the 429 below, and that ordering matters: the signing-key endpoints answer a throttled
+  // request with the exact moment it lifts, which no sentence written here could reconstruct.
   const brace = message.indexOf("{");
   if (brace !== -1) {
     try {
@@ -63,6 +63,10 @@ function describe(error: MgmtError): string {
     } catch {
       // Not JSON after all; the status line below still says something true.
     }
+  }
+
+  if (error.status === 429) {
+    return "Supabase is rate limiting this token — the figures return once the minute rolls over.";
   }
 
   if (error.status === 401) return "Not authorized for this project.";
