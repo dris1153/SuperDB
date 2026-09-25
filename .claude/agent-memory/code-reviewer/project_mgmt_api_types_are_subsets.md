@@ -16,6 +16,12 @@ Two measured landmines:
 - `GET /v1/projects/{ref}/billing/addons` returns `available_addons` (the whole priced catalogue)
   alongside `selected_addons`.
 
+The cast bites scalars too, not only credentials: `getAuthConfig` is typed `{jwt_exp?: number}` and
+whatever arrives is handed straight to a formatter. A value that is not a number renders as one —
+`"NaN hours"`, `"true seconds"` — and when that string is the wait printed in front of a destructive
+confirm, the subset type is the only thing standing between the API and a false promise. A
+`Number.isFinite` check belongs in the reader, beside the `.map()`.
+
 **Why:** this was safe while every read was consumed inside a server component, which rendered only
 the named fields. It stops being safe the moment a value is returned from a route handler or a server
 action.
