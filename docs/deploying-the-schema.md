@@ -49,13 +49,19 @@ with expected(kind, name) as (
 select e.kind, e.name,
        case when e.kind = 'table'
             then exists (select 1 from information_schema.tables
-                          where table_schema = 'public' and table_name = e.name)
-            else exists (select 1 from information_schema.routines
-                          where routine_schema = 'public' and routine_name = e.name)
+                         where table_schema = 'public' and table_name = e.name)
+            else exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                         where n.nspname = 'public' and p.proname = e.name)
        end as present
 from expected e
 order by present, e.kind, e.name;
 ```
+
+**`pg_proc`, not `information_schema.routines`.** The first version of this query used the latter and
+reported all three functions missing on a database that had them. `information_schema` lists only
+routines the caller may `EXECUTE`, and `schema.sql` revokes these from `public` and grants them to
+`authenticated` — while the read-only query endpoint runs as `supabase_read_only_user`. The view was
+telling the truth about privileges and a lie about existence.
 
 Then the columns that arrived later than their table, which a `create table if not exists` will not
 add on its own — this is the failure the converge blocks exist for:
@@ -80,4 +86,6 @@ deliberately does not assert policies — verify them in the dashboard, or with:
 select tablename, policyname from pg_policies where schemaname = 'public' order by tablename;
 ```
 
-Eight policies across seven tables, as the file writes them.
+Eight policies across seven tables, as the file writes them. A ninth on `supabase_accounts` means
+the database predates the `connections` rewrite and still carries the table it replaced — dead
+weight rather than a fault, and nothing in the app reads it.

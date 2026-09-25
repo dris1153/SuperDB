@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Management API cache"
-status: pending
+status: in-progress  # built and unit-tested; the two-connection manual check is the release gate
 priority: P3
 effort: "2h"
 dependencies: [4]
@@ -150,3 +150,55 @@ deliberately; recorded in the header comment so a future `cacheComponents` migra
 
 **Scope creep into a caching layer.** Three functions, one file. If this phase starts touching
 `mgmt-api.ts` or the table editor, stop — that is a different project.
+
+## Built 2026-09-26, and re-scoped on the way
+
+**`getProject` was already cached.** The owner memo in `lib/inventory.ts` landed after this phase was
+written and remembers the resolved project per `user.id:ref` for sixty seconds. One of the three
+calls named here was done before this phase started.
+
+**The other two are now memoised together.** `listProjects` and `listOrgs` are fetched as a pair per
+connection — they are always read together — through `lib/projects-memo.ts`, keyed on the connection
+id, TTL 20 s.
+
+### Not `unstable_cache`, and not for style
+
+This phase recommended it, having established that `use cache` needs a `cacheComponents` flag this
+project does not set. Reading `unstable_cache.md` again for the deviation, one line decides it:
+
+> This API uses Next.js' built-in cache to persist the result across requests **and deployments**.
+
+A durable, deployment-wide store holding one Supabase account's project list is a much larger blast
+radius than twenty seconds of process memory, on the one phase whose stated risk is a cross-tenant
+leak. The repo also already has this pattern twice — `lib/part-cache.ts` and the owner memo — both
+`globalThis`-pinned for the bundle-layer reason, and both plain enough to unit test. A memo dies
+with the instance, is capped at a hundred entries, and can be tested without a network, which is
+what turned this phase's isolation requirement from a promise into six assertions.
+
+The cost is honest: a cold instance still pays full price, and two instances do not share the work.
+That is the trade taken deliberately.
+
+### Invalidation
+
+- `removeConnection` forgets that connection before it drops the read cache — a disconnect that
+  leaves the account's projects on the board for another twenty seconds does not read as one.
+- `write()` in `lib/connections.ts` forgets on a re-paste or re-authorization, since that is usually
+  somebody expecting to see a project they just created.
+- A **token refresh does not invalidate**, deliberately: the key is the connection, and the same
+  account's projects are the same projects.
+- `display_name` and `tags` are applied in `loadInventory` from the connection row, outside the
+  memo, so renaming a connection still shows immediately.
+
+### What is verified, and what is not
+
+- ✅ Two connection ids never share an entry — `lib/projects-memo.test.ts`, which also covers the TTL
+  boundary, that a failed load is never remembered, that a stale entry is dropped *before* the
+  refetch rather than after it succeeds, and that eviction drops the oldest rather than the map.
+- ✅ Only these two calls are memoised. `getProject` keeps its own memo; health, metrics, logs, disk
+  and every table-editor read are untouched.
+- ✅ No token appears in a key.
+- ❌ **The two-connection and two-user manual checks have not been run.** They need a signed-in
+  session on the deployment and this phase's own risk section makes them a release gate: if the
+  isolation check cannot be performed, do not ship. The unit test covers the mechanism; it does not
+  cover the wiring in `loadInventory`.
+- ❌ The navigation measurement against `baseline.md` — same reason.

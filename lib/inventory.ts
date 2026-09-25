@@ -3,6 +3,7 @@ import { cache } from "react";
 import { connectionsWithTokens, type Connection, type ConnectionKind } from "./connections";
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
 import { projectOrder } from "./project-order";
+import { projectsForConnection } from "./projects-memo";
 import { isProjectRef } from "./project-ref";
 import { requireUser } from "./supabase/server";
 import { bySavedOrder } from "./project-sort";
@@ -39,7 +40,15 @@ export async function loadInventory(): Promise<Inventory> {
         return [];
       }
       try {
-        const [projects, orgs] = await Promise.all([listProjects(token), listOrgs(token)]);
+        // Memoised per connection for twenty seconds — these two are the slowest-changing reads in
+        // the app and the most often repeated, and `lib/projects-memo.ts` explains why the key is
+        // the connection rather than the token.
+        const { projects, orgs } = await projectsForConnection(connection.id, () =>
+          Promise.all([listProjects(token), listOrgs(token)]).then(([projects, orgs]) => ({
+            projects,
+            orgs,
+          })),
+        );
         const orgName = new Map(orgs.map((o) => [o.slug, o.name]));
         return projects.map<InventoryProject>((p) => ({
           ...p,

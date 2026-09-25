@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Region alignment"
-status: blocked  # nothing is deployed, so the A/B this phase requires cannot run
+status: blocked  # needs a syd1 preview to compare against; see baseline.md
 priority: P2
 effort: "30m"
 dependencies: [1]
@@ -112,16 +112,23 @@ not only in the plan.
 **Cold starts in a lower-traffic region.** A less-used region can show more cold starts. Minor for
 this workload, but watch it in the preview measurement rather than assuming.
 
-## Why this is blocked 2026-09-26
+## Where this stands 2026-09-26
 
-The region was never the missing piece: it is in this file, and the project owner confirmed it again
-— `ap-southeast-2`, Vercel's `syd1`.
+The region was never the missing piece: it is in this file, and the project owner confirmed it —
+`ap-southeast-2`, Vercel's `syd1`.
 
-**Nothing is deployed.** There is no `.vercel/` link in the checkout, no deployment workflow, and
-`SITE_URL` is `http://localhost:3000`. This phase is an A/B between two deployments, and there are
-zero. Adding `vercel.json` now would be config for a deployment that does not exist, against a trade
-this file already says reasoning cannot settle — and its own last step says an unexplained config
-file is worse than none.
+**There is a deployment after all** — `https://database.drisdev.io`, which the checkout gives no sign
+of. Measured in [`baseline.md`](baseline.md): `x-vercel-id: hkg1::iad1::…`, so functions do run in
+`iad1` and the premise of this phase holds.
 
-Unblocking it needs one deployment, not one fact. Once there is a preview to measure, this is the
-one-line change above plus two runs of Phase 1.
+What is missing is the *second* deployment. This is an A/B, and the numbers now say why it cannot be
+skipped: authenticated Management API reads answer 200–400 ms slower than the same host's
+edge-answered 401, which is a round trip to an origin outside Asia. Moving to `syd1` wins the ~800 ms
+database group and the browser hop, and risks giving it back across five Management API calls.
+
+The honest next step is not this phase at all — it is **phase 6**, which removes Management API
+calls rather than relocating them, and which is built. Measure the board with the memo warm first;
+if the Management API group shrinks enough, this phase's trade changes shape.
+
+When it is run: `{ "regions": ["syd1"] }` on a preview, production left on `iad1`, and two runs of
+`baseline.md` compared group by group.

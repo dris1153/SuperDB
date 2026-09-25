@@ -27,12 +27,12 @@ Diagnosis, rejected alternatives, and why client components + API routes would m
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [Measure and baseline](phase-01-measure-baseline.md) | **blocked** | ~1h | — |
+| 1 | [Measure and baseline](phase-01-measure-baseline.md) | **in-progress** | ~1h | — |
 | 2 | [Cache requireUser](phase-02-cache-require-user.md) | **in-progress** | ~30m | — |
 | 3 | [MFA gate: authoritative factors](phase-03-proxy-auth-roundtrip.md) | **in-progress** | ~3h | 2 |
 | 4 | [Streaming and skeletons](phase-04-streaming-skeletons.md) | **in-progress** | ~3h | — |
 | 5 | [Region alignment](phase-05-region-alignment.md) | **blocked** | ~30m | 1 |
-| 6 | [Management API cache](phase-06-mgmt-api-cache.md) | pending | ~2h | 4 |
+| 6 | [Management API cache](phase-06-mgmt-api-cache.md) | **in-progress** | ~2h | 4 |
 
 Phase 2 is the whole latency win on the auth path. Phase 3 turned out to be a security fix rather
 than a performance one and no longer gates Phase 4 — the original "proxy before skeletons" ordering

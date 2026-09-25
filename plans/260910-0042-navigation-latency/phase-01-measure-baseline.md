@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Measure and baseline"
-status: blocked  # needs a deployment to time; the region half is answered
+status: in-progress  # browser-side numbers recorded in baseline.md; server timings need instrumentation
 priority: P1
 effort: "1h"
 dependencies: []
@@ -100,3 +100,12 @@ Vercel's `syd1` — confirmed by the project's owner. That is the input phase 5 
 `SITE_URL` is `http://localhost:3000`. Local numbers would answer a different question — the whole
 point of the split in phase 5 is the distance between Vercel's region and each backend, which does
 not exist on a laptop.
+
+## Partly done 2026-09-26
+
+`baseline.md` now exists, measured against `https://database.drisdev.io`. It settles where things
+run — edge `hkg1`, functions `iad1`, database `ap-southeast-2` — and records cold and warm page
+timings plus the two backends' latency from Vietnam.
+
+What it cannot contain is the per-stage server breakdown, which needs instrumentation this phase
+forbids shipping, and an authenticated navigation, which needs a session.

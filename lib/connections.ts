@@ -1,5 +1,6 @@
 import "server-only";
 import { recordEvent } from "./audit";
+import { forgetConnectionProjects } from "./projects-memo";
 import { normaliseTags } from "./tags";
 import { open, seal } from "./crypto";
 import { listOrgs } from "./mgmt-api";
@@ -331,6 +332,10 @@ async function write({
       });
   if (error) throw new Error(error.message);
 
+  // Re-pasting a token or re-authorizing is usually somebody expecting to see something new — a
+  // project they just created upstream. The memo would otherwise hold the old list for its window.
+  if (existing) forgetConnectionProjects(existing.id);
+
   await recordEvent(supabase, {
     connectionId: existing?.id,
     owner: org.name,
@@ -409,6 +414,10 @@ export async function removeConnection(id: string) {
 
   const { error } = await supabase.from("connections").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  // Before the read cache below, and for the same reason: a disconnect that leaves this account's
+  // projects on the board for another twenty seconds does not read as a disconnect.
+  forgetConnectionProjects(id);
 
   // The read cache is keyed by project, not by connection, so there is no way to drop only what this
   // token fetched. Everything of theirs goes: a disconnect that leaves five minutes of data fetched
