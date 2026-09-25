@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "OAuth Apps"
-status: pending
+status: completed
 priority: P3
 effort: "5h"
 dependencies: [1]
@@ -42,9 +42,10 @@ GET /admin/oauth/clients   (two)   200  {"clients":[…]}
 
 `body.clients` is `undefined` on an empty project, so `?? []` is not enough.
 
-**`client_secret` exists only in the 201 from create.** Neither the list nor a single read carries
-it. The create dialog is the only place it can ever be copied from, and it has to say so — the same
-shape as a secret API key.
+**`client_secret` is not in the list.** It is in the 201 from create — and, corrected while
+building, in a single `GET /admin/oauth/clients/{id}` too. This app only ever lists, so the create
+dialog is still the only place it appears here; the dialog says that rather than claiming the
+secret is unrecoverable, which would have been false.
 
 `token_endpoint_auth_method` follows `client_type`: `client_secret_basic` for confidential, `none`
 for public. It is derived, not chosen.
@@ -68,13 +69,33 @@ for public. It is derived, not chosen.
 
 ## Success Criteria
 
-- [ ] A project with the server off shows the banner, not an error.
-- [ ] An empty list renders as empty rather than throwing on `{}`.
-- [ ] Creating shows the secret once and says it cannot be retrieved.
-- [ ] Deleting removes the row.
+- [x] A project with the server off shows the banner, not an error.
+- [x] An empty list renders as empty rather than throwing on `{}`.
+- [x] Creating shows the secret once and says it cannot be retrieved.
+- [x] Deleting removes the row.
 
 ## Risk Assessment
 
 - **Enabling the OAuth server makes the project an identity provider.** The page links to the
   setting rather than offering the switch, because turning it on is a configuration decision rather
   than a step in creating an app.
+
+## Verified end to end, 2026-09-26
+
+```
+GET  clients (server off)          404 {"error_code":"feature_disabled"}  -> the banner, not an error
+PATCH {oauth_server_enabled}       400 "must be provided together …"
+PATCH both fields                  200
+GET  clients (immediately)         404 feature_disabled     <- still off, as the banner warns
+GET  clients (+75s)                200 {}                   <- the empty shape, no `clients` key
+POST clients                       201 client_secret present
+GET  clients (one exists)          200 {"clients":[…]}, no client_secret in the row
+GET  clients/{id}                  200 client_secret IS present   <- corrects the earlier report
+DELETE clients/{id}                204
+GET  clients                       200 {}
+```
+
+`oauth_server_enabled` and the authorization path were restored to false and null.
+
+**Not exercised:** a public client, which returns no secret and closes the dialog instead of
+showing one. The branch exists; nothing has run it.

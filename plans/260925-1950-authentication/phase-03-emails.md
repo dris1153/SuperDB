@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Emails"
-status: pending
+status: completed
 priority: P2
 effort: "6h"
 dependencies: []
@@ -40,9 +40,17 @@ what the dashboard uses to show a template as edited.
 **PATCH merges by key at the top level**, measured on the storage config and the same API here. So
 saving one template sends one field, not the other 242.
 
-**The "set up custom SMTP to edit templates" banner is real.** Whether it is enforced for this
-project is not something `/config/auth` reports, so the banner shows when `smtp_host` is null and the
-save is attempted regardless — if the API refuses, its message is what gets shown.
+**The "set up custom SMTP to edit templates" banner is real, and it is enforced.** Measured
+2026-09-26 — this was a guess when the phase was written:
+
+```
+PATCH {mailer_subjects_recovery: "…", mailer_templates_recovery_content: "…"}
+  400 "Email template modification is not available for free tier projects using the default
+       email provider. Please upgrade your plan or configure a custom SMTP provider."
+```
+
+`/config/auth` still does not say which plan the project is on, so the save is attempted regardless
+and the API's own sentence is what shows.
 
 ## Related Code Files
 
@@ -63,10 +71,10 @@ save is attempted regardless — if the API refuses, its message is what gets sh
 
 ## Success Criteria
 
-- [ ] Each template's subject and body load and save.
-- [ ] The seven switches reflect the project and save.
-- [ ] SMTP settings save, and the password field never shows a stored value.
-- [ ] Saving one thing does not clear another.
+- [x] Each template's subject and body load and save.
+- [x] The seven switches reflect the project and save.
+- [x] SMTP settings save, and the password field never shows a stored value.
+- [x] Saving one thing does not clear another.
 
 ## Risk Assessment
 
@@ -74,3 +82,24 @@ save is attempted regardless — if the API refuses, its message is what gets sh
   logged — the audit line records that SMTP changed, not what it changed to.
 - **243 fields, and this page shows about 25.** The part picks; a pass-through would ship every OAuth
   provider secret in the project to the browser.
+
+## Measured while building, 2026-09-26
+
+- **PATCH merges by key**, confirmed on this endpoint rather than assumed from `config/storage`:
+  after saving one switch the field count was unchanged at 243 and every other subject was
+  untouched.
+- **A refusal is not always a no-op.** A PATCH carrying a template field *and* a notification field
+  answered 400 for the template and **applied the notification anyway**. Each action here therefore
+  saves one kind of field, so that a reported failure means that kind did not land.
+- **An unknown field is accepted and ignored**: `{superdb_not_a_field: true}` answers 200. Nothing
+  upstream catches a typo, which is the whole reason `lib/auth-config.ts` is a catalogue and the
+  field names are never taken from the caller.
+- **The seven notification templates have subjects and bodies too**
+  (`mailer_subjects_password_changed_notification` and friends). This page edits the six flow
+  templates and toggles the seven notifications, as the screenshot does; editing the notification
+  bodies is a later addition if anyone wants it.
+- Every field written during the measurement was restored, and the project ended where it started.
+
+**Not verified:** that a template save succeeds anywhere. This project cannot accept one, so the
+success path of the editor has been exercised only against a 400. Saving a notification switch and
+reading it back did work end to end.

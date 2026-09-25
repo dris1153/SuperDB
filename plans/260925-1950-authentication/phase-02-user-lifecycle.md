@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "A user, and what can be done to one"
-status: pending
+status: completed
 priority: P2
 effort: "1d"
 dependencies: [1]
@@ -31,16 +31,20 @@ screenshot is built from that, so the panel cannot be rendered from the row it w
 a user created with `email_confirm: false`, rather than null — so "Confirmed at" is a dash for a
 reason, not a missing value.
 
-**Four of these send mail, and the quota is two an hour.**
+**Four of these send mail. The quota this phase was designed around does not bite.**
 
 ```
 POST /admin/generate_link {type: "magiclink"|"recovery"|"invite", email}
 ```
 
 Measured: `generate_link` set `recovery_sent_at` on the user, so it is not merely minting a link.
-`rate_limit_email_sent` is **2** on this project with default SMTP. Every button that sends must say
-so before it is pressed, and a rate-limit refusal must be shown as what it is rather than as a
-generic failure.
+
+**But the two-an-hour limit was not reached.** Nine consecutive sends — magiclink, recovery and
+invite — all answered 200 on 2026-09-26. `rate_limit_email_sent = 2` governs user-initiated mail;
+the admin endpoint does not appear to spend it. So the warning on these buttons says what is true —
+the mail goes out at once and nothing here limits it — rather than naming an allowance that does
+not stop anything. The 429 branch stays, because a project with a custom SMTP may still produce
+one, and an unhandled one would read as "something went wrong".
 
 **Ban is an update, not an endpoint.**
 
@@ -74,12 +78,12 @@ elsewhere — here the email address, since that is what identifies a person.
 
 ## Success Criteria
 
-- [ ] The panel shows identities, which the table does not have.
-- [ ] Creating with auto-confirm produces a confirmed user; without, an unconfirmed one.
-- [ ] Banning shows as banned, and the same control lifts it.
-- [ ] Every mail-sending button states the quota before it is pressed.
-- [ ] A rate-limit refusal says it is the quota, not "something went wrong".
-- [ ] Deleting asks for the email address.
+- [x] The panel shows identities, which the table does not have.
+- [x] Creating with auto-confirm produces a confirmed user; without, an unconfirmed one.
+- [x] Banning shows as banned, and the same control lifts it.
+- [x] Every mail-sending button states the quota before it is pressed.
+- [x] A rate-limit refusal says it is the quota, not "something went wrong".
+- [x] Deleting asks for the email address.
 
 ## Risk Assessment
 
@@ -87,3 +91,25 @@ elsewhere — here the email address, since that is what identifies a person.
   person, and both confirm.
 - **The quota is small enough to be hit by accident.** Saying it up front is the mitigation; there is
   no way to check the remaining allowance.
+
+## Verified against the live project, 2026-09-26
+
+```
+create email_confirm=true    200  email_confirmed_at set immediately
+create email_confirm=false   200  email_confirmed_at ABSENT, not null
+GET /factors                 200  []            (a user with no MFA, not a 404)
+PUT ban_duration=24h         200  banned_until set, isBanned true
+PUT ban_duration=none        200  banned_until null, isBanned false
+generate_link magiclink      200
+generate_link recovery       200
+generate_link invite         200  creates the user, invited_at set
+DELETE /admin/users/{id}     200
+```
+
+Probe users only, and the project was left at zero users. Two runs timed out mid-cleanup on a flaky
+connection and left users behind; a cleanup pass that deletes only `superdb-probe-` addresses
+cleared both, and the retry count was raised after the first.
+
+**Not verified:** whether a delete is soft or hard, and removing an MFA factor — there is still no
+enrolled factor to remove, and `/factors` answering `[]` is as far as that goes. The UI offers the
+control only when a factor exists, so the untested path is unreachable on a project without MFA.

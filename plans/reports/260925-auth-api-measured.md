@@ -100,9 +100,13 @@ GET  /admin/users/{id}/factors                                                 2
 POST /admin/generate_link    {type: "magiclink", email}                        200
 ```
 
-`generate_link` came back with **`recovery_sent_at` set**, so it does not merely mint a link — it
-counts against `rate_limit_email_sent`, which is **2 per hour** on default SMTP. A page offering
-"send magic link" and "send password recovery" can exhaust that in two clicks.
+`generate_link` came back with **`recovery_sent_at` set**, so it does not merely mint a link.
+
+**The quota claim that followed was wrong.** This report said it spends `rate_limit_email_sent`,
+which is 2 an hour, and that two clicks exhaust a project's allowance. Measured 2026-09-26 while
+building the page: nine consecutive `generate_link` calls — magiclink, recovery and invite — all
+answered 200. The admin endpoint does not appear to spend the hourly allowance a user-initiated
+send does. The limit still exists in `/config/auth`; it is not what guards this page.
 
 `email_confirm: true` on create produces `email_confirmed_at` immediately, which is the
 "Auto confirm user?" checkbox in the screenshot.
@@ -171,9 +175,10 @@ GET /admin/oauth/clients   (two)   200  {"clients":[{client_id, client_type, red
 So `body.clients` is `undefined` on an empty project, and `?? []` is not enough — this is the trap
 `listSigningKeys` already has a test for, arriving a second time. `Array.isArray(body?.clients)`.
 
-`client_secret` is in **neither** the list nor a single read. It exists only in the 201 from create,
-which makes the create dialog the one place it can ever be copied from — the same shape as a
-`sb_secret` API key.
+`client_secret` is **not** in the list. It is in the 201 from create — and, corrected 2026-09-26,
+in a single `GET /admin/oauth/clients/{id}` as well, which this report previously denied. The app
+only ever lists, so the create dialog remains the one place it appears there; the difference is that
+it is recoverable from Supabase rather than lost.
 
 `token_endpoint_auth_method` follows `client_type`: `client_secret_basic` for confidential,
 `none` for public.
@@ -301,6 +306,8 @@ request.url            https://…/auth/v1/admin/oauth/clients/…
 Forty-seven keys on that row, and worth noticing before anything renders them raw:
 `request.sb.jwt.apikey.payload.role` is in there, holding `service_role`.
 
-**One thing still unmeasured:** how a dotted key is addressed in the SQL. `response.status_code` is
-a key containing a dot, not a nested field, so `log_attributes['response.status_code']` and
-`` log_attributes.`response.status_code` `` are the two candidates and neither has been tried.
+**Answered 2026-09-26.** The bracket form is the one that works:
+`log_attributes['auth_audit_event.traits.user_id'] = '…'` filters server-side; the backtick form
+answers `Backend error! Retry your query`. Filtering a user's own history needs **both**
+`traits.user_id` (done to them) and `actor_id` (done by them) — 2 rows and 6 for the same probe
+user — joined with `or`, which the endpoint also accepts.

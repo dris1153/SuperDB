@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "The Logs tab"
-status: pending
+status: completed
 priority: P3
 effort: "3h"
 dependencies: [2]
@@ -79,3 +79,29 @@ it is waiting on `queryLogs`, not on the data existing.
 One caveat worth carrying: this project had **nine** audit rows against four thousand pgbouncer
 ones. Retention is short, so an empty tab will be the common case and should read as "nothing
 recently" rather than as a failure.
+
+## Built 2026-09-26, and the unmeasured part measured
+
+The open question — how a dotted key inside `log_attributes` is addressed — has an answer, and the
+filter this phase assumed was only half right.
+
+```
+log_attributes['auth_audit_event.traits.user_id'] = '<id>'    works, 2 rows for the probe user
+log_attributes.`auth_audit_event.traits.user_id` = '<id>'     Backend error! Retry your query
+log_attributes['auth_audit_event.actor_id']      = '<id>'     works, 6 rows for the same user
+(traits OR actor)                                             works, 8 rows
+```
+
+**`traits.user_id` alone would have shown half the tab.** It carries what was done *to* the user —
+the signup and the deletion — while the six recovery requests they made themselves are under
+`actor_id`. The statement asks for both and the list marks which is which.
+
+The id is interpolated into the SQL, so `buildUserAuditSql` re-checks it is a UUID and throws
+otherwise; a test covers `' or '1'='1`.
+
+**A defect the live run showed that the tests did not:** the query orders by the row's `timestamp`
+— when the line was ingested — and the list renders the event's own `created_at`. Seven events
+inside one second came back visibly jumbled. `sortEvents` now orders by what is displayed.
+
+Pipeline verified end to end against the live project: 8 rows in, 8 events parsed, the
+subject/actor distinction correct on every one.

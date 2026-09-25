@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "The page, and the users table"
-status: pending
+status: completed
 priority: P2
 effort: "6h"
 dependencies: []
@@ -71,12 +71,12 @@ that should survive a reload, so it belongs in `localStorage` keyed by project, 
 
 ## Success Criteria
 
-- [ ] The rail's Authentication entry is live and lands on Users.
-- [ ] The table lists real users with real values.
-- [ ] Searching narrows the list **and** the total, proving it is the server filtering.
-- [ ] Hidden columns stay hidden after a reload.
-- [ ] A project with no users says so rather than showing an empty grid.
-- [ ] Authentication no longer appears in the settings nav.
+- [x] The rail's Authentication entry is live and lands on Users.
+- [x] The table lists real users with real values.
+- [x] Searching narrows the list **and** the total, proving it is the server filtering.
+- [x] Hidden columns stay hidden after a reload.
+- [x] A project with no users says so rather than showing an empty grid.
+- [x] Authentication no longer appears in the settings nav.
 
 ## Risk Assessment
 
@@ -84,3 +84,36 @@ that should survive a reload, so it belongs in `localStorage` keyed by project, 
   never in a response, never stored.
 - **A project with many users.** Paging is server-side and the filter is too, so the browser never
   holds more than a page.
+
+## Built, and where it differs
+
+- **Eleven Configuration rows, not twelve.** Each names an endpoint or a `/config/auth` field
+  family that exists. A twelfth was not invented to match the count.
+- **Provider type is our rule.** The column exists in the dashboard and the API returns no such
+  field, so it is derived — `sso*` means SSO, `email`/`phone`/`anonymous` mean Basic Auth, anything
+  else means OAuth. Written down in `providerTypeOf` rather than left implicit.
+- **The column preference is an external store, not state in an effect.** `react-hooks/
+  set-state-in-effect` rejects the effect version, and `getSnapshot` has to return a stable
+  reference — the pitfalls `components/table-editor/session-store.ts` already documents, applied to
+  `localStorage` because a column hidden in one tab should stay hidden in the next.
+- **The search resets the page from the input's own handler.** The effect that watched the filter
+  was the other half of the same lint rule.
+- **Two badges the plan did not ask for**, because the row otherwise hides them: an unconfirmed
+  email, and a ban that is in force *now* rather than one that has since expired — GoTrue leaves
+  `banned_until` behind after an unban.
+
+## Verified against the live project
+
+Three throwaway users created, listed, filtered and deleted (2026-09-26):
+
+```
+page=1&per_page=2   2 users, x-total-count 3, link rel="next" present
+page=2&per_page=2   1 user,  no rel="next"
+filter=<substring>  1 user,  x-total-count 1   <- the server filtered, not the browser
+```
+
+The project was left with zero users, as it started. One run timed out mid-cleanup and left two
+behind; they were deleted by a second pass that skips anything not named `superdb-probe-`.
+
+**Not verified in a browser:** that a hidden column survives a reload. The store is unit-covered in
+shape but nobody has clicked it.
