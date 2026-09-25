@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { isWaiting, reasonOf, useProjectPart, useRefetchPart } from "@/components/use-project-part";
 import { DeleteKeyConfirm, KeyForm } from "./key-dialogs";
 import { LegacyKeysSwitch } from "./legacy-keys";
-import { cn } from "@/lib/utils";
+import { Tab } from "./tab";
 
 /**
  * The project's API keys, in the two tabs the Supabase dashboard uses.
@@ -104,30 +104,6 @@ export function ApiKeys({
         }}
       />
     </section>
-  );
-}
-
-function Tab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "-mb-px border-b-2 px-1 pb-2 text-sm transition-colors",
-        active
-          ? "border-foreground text-foreground"
-          : "border-transparent text-subtle hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

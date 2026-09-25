@@ -39,6 +39,9 @@ export const PART_NAMES = [
   "api-key-rows",
   // Whether this project still issues the legacy anon and service_role JWTs. One flag, both keys.
   "legacy-api-keys",
+  // The JWT Keys settings page. Signing keys carry no secret — `private_jwk` is never returned —
+  // so this is a lifecycle, not a credential.
+  "signing-keys",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

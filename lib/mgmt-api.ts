@@ -30,6 +30,18 @@ export type ApiKey = {
   api_key: string | null;
 };
 
+export type SigningKeyStatus = "in_use" | "standby" | "previously_used" | "revoked";
+
+export type SigningKey = {
+  id: string;
+  algorithm: "ES256" | "RS256" | "HS256" | "EdDSA";
+  status: SigningKeyStatus;
+  /** Null for HS256, which is symmetric and so has no public half to publish. */
+  public_jwk: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export class MgmtError extends Error {
   // Assigned rather than declared as a parameter property: Node's type stripping, which runs the
   // tests, rejects that syntax.
@@ -138,6 +150,72 @@ export const setLegacyKeys = (t: string, ref: string, enabled: boolean) =>
 export const deleteApiKey = (t: string, ref: string, id: string) =>
   call<ApiKey>(t, `/v1/projects/${ref}/api-keys/${id}`, { method: "DELETE" });
 
+/**
+ * The keys that sign this project's JWTs.
+ *
+ * Wraps its array in `{keys}`, unlike `/api-keys` right next to it — measured 2026-09-25. Unwrapped
+ * here so that one difference is not something every call site has to remember.
+ */
+export const listSigningKeys = async (t: string, ref: string) => {
+  const body = await call<{ keys: SigningKey[] }>(t, `/v1/projects/${ref}/config/auth/signing-keys`);
+  // Not `body?.keys ?? []`: on a bare array that reads `Array.prototype.keys`, a function, which is
+  // truthy and would travel on as if it were the list.
+  return Array.isArray(body?.keys) ? body.keys : [];
+};
+
+/**
+ * A new signing key.
+ *
+ * `status` is always `standby` from this app: a key created straight into `in_use` would begin
+ * signing before anyone confirmed a rotation. The API also accepts `private_jwk` here, importing a
+ * key rather than generating one, which this app deliberately does not offer.
+ */
+export const createSigningKey = (
+  t: string,
+  ref: string,
+  // The literal union rather than `SigningAlgorithm` from `lib/signing-keys.ts`: that module imports
+  // a type back from this one, and a value import in either direction would make a real ESM cycle in
+  // the server-only layer.
+  body: { algorithm: "ES256" | "RS256"; status: "standby" },
+) =>
+  call<SigningKey>(t, `/v1/projects/${ref}/config/auth/signing-keys`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/**
+ * Moving a key through its lifecycle.
+ *
+ * Promoting a standby to `in_use` **also** demotes the key that was in use to `previously_used` —
+ * one request, measured 2026-09-25, not two. There is no state where both are in use.
+ */
+export const updateSigningKeyStatus = (t: string, ref: string, id: string, status: SigningKeyStatus) =>
+  call<SigningKey>(t, `/v1/projects/${ref}/config/auth/signing-keys/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+
+/**
+ * Removing a key for good.
+ *
+ * Refused unless the key is `revoked`, and refused again for thirty days after it was — both 422,
+ * and the second one names the date. Measured 2026-09-25. Nothing here anticipates either: the
+ * caller shows what came back.
+ */
+export const deleteSigningKey = (t: string, ref: string, id: string) =>
+  call<SigningKey>(t, `/v1/projects/${ref}/config/auth/signing-keys/${id}`, { method: "DELETE" });
+
+/**
+ * The auth config, for `jwt_exp` alone.
+ *
+ * How long a token stays valid is how long a retired signing key still has work to do, so it is the
+ * wait before revoking one is safe. It is configurable per project — 3600 on the two measured — and
+ * a page that assumed an hour would be wrong on any project that changed it. There is no
+ * `jwt_secret` field here, despite what the legacy tab's Reveal control would suggest.
+ */
+export const getAuthConfig = (t: string, ref: string) =>
+  call<{ jwt_exp?: number }>(t, `/v1/projects/${ref}/config/auth`);
+
 const SERVICES = ["auth", "db", "pooler", "realtime", "rest", "storage"] as const;
 // No timeout_ms: the API validates it as a number and rejects the query string with a 400.
 export const getHealth = (t: string, ref: string) =>
@@ -237,6 +315,9 @@ export async function getMetricsText(token: string, ref: string): Promise<string
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
+  // The body is deliberately not in the message. `describe` in `lib/safe.ts` prefers a JSON body's
+  // own text over its curated sentences, and the one written for this endpoint's 10-per-minute
+  // limit is more use than whatever the gateway says.
   if (!res.ok) throw new MgmtError(res.status, `metrics → ${res.status}`);
   return res.text();
 }

@@ -13,6 +13,8 @@ import {
   listBackups,
   listBranches,
   listMigrations,
+  listSigningKeys,
+  getAuthConfig,
   queryLogs,
 } from "./mgmt-api";
 import { listTables } from "./db-introspect";
@@ -26,6 +28,7 @@ import {
 } from "./logs-sql";
 import { generationOf, partKey, PART_TTL_MS, readCached, writeCached } from "./part-cache";
 import { toRow, type KeyRow } from "./api-keys";
+import type { SigningKeysPart } from "./signing-keys";
 import type { Part } from "./project-part-names";
 import { memoryUsedPercent, parseMetrics } from "./prometheus";
 import { savedQueries } from "./saved-queries";
@@ -118,6 +121,31 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
 
   /** A single boolean, and the only thing this endpoint holds. */
   "legacy-api-keys": (t, ref) => getLegacyKeys(t, ref),
+
+  /**
+   * Signing keys carry no credential: `private_jwk` is accepted when one is created and never
+   * returned on a read — measured 2026-09-25 — and `public_jwk` is served from the project's public
+   * JWKS anyway. The fields are picked all the same, because a `SigningKey` type is a subset of the
+   * body and not a filter: `call()` passes whatever arrived straight through. `public_jwk` is left
+   * out because nothing renders it.
+   */
+  "signing-keys": async (t, ref): Promise<SigningKeysPart> => {
+    // Two calls, one part. The browser never walks a chain: `jwt_exp` decides what the revoke
+    // confirm says about how long old tokens live, and a second round trip for one integer would
+    // put that sentence on screen after the dialog it belongs in.
+    const [keys, jwtExp] = await Promise.all([listSigningKeys(t, ref), safeJwtExp(t, ref)]);
+
+    return {
+      keys: keys.map(({ id, algorithm, status, created_at, updated_at }) => ({
+        id,
+        algorithm,
+        status,
+        created_at,
+        updated_at,
+      })),
+      jwtExp,
+    };
+  },
   metrics: async (t, ref) => ({ memoryPercent: memoryUsedPercent(parseMetrics(await getMetricsText(t, ref))) }),
   /** What the sidebar lists, and whether PostgREST serves the schema the user is looking at. */
   schemas: async (t, ref) => {
@@ -289,6 +317,21 @@ export async function readIdentity(ref: string) {
     connection: connection.display_name,
   };
 }
+/**
+ * An unreadable `jwt_exp` is `null`, not a default.
+ *
+ * The revoke confirm turns this into "tokens expire within an hour"; guessing 3600 when the config
+ * could not be read would put a specific promise in front of the one irreversible action here.
+ */
+const safeJwtExp = (t: string, ref: string) =>
+  getAuthConfig(t, ref).then(
+    // Checked, not just defaulted. `call()` casts over `JSON.parse`, so a `jwt_exp` that is not a
+    // number would otherwise reach the confirm and be printed — "last NaN hours" is worse than
+    // admitting the value could not be read.
+    (config) => (typeof config?.jwt_exp === "number" && Number.isFinite(config.jwt_exp) ? config.jwt_exp : null),
+    () => null,
+  );
+
 /** The sidebar renders an unknown exposure as no icon at all rather than guessing. */
 const safeExposed = (t: string, ref: string) =>
   getExposedSchemas(t, ref).then(

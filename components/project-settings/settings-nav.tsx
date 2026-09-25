@@ -48,6 +48,12 @@ const GROUPS: { title: string; rows: Row[] }[] = [
         endpoint: "GET,POST /v1/projects/{ref}/api-keys",
         ready: true,
       },
+      {
+        slug: "jwt-keys",
+        label: "JWT Keys",
+        endpoint: "GET,POST /v1/projects/{ref}/config/auth/signing-keys",
+        ready: true,
+      },
       { slug: "auth", label: "Authentication", endpoint: "GET,PATCH /v1/projects/{ref}/config/auth" },
       { slug: "storage", label: "Storage", endpoint: "GET,PATCH /v1/projects/{ref}/config/storage" },
       {
