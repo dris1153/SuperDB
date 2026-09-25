@@ -3,11 +3,11 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The underline tab for a settings page with more than one view of one resource.
+ * The underline tab for a page with more than one view of one resource.
  *
  * Not `components/ui/tabs.tsx`, which is Radix with its own look, and not `sliding-tabs.tsx`: this
- * is the flat underline the API keys page already had, lifted out unchanged. Only that page uses it
- * so far; the JWT keys page picks it up when its second tab arrives.
+ * is the flat underline the API keys page already had, lifted out unchanged. The JWT keys and
+ * Storage pages use the same one, which is the point of it being here.
  */
 export function Tab({
   active,

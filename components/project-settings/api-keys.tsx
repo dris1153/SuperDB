@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { isWaiting, reasonOf, useProjectPart, useRefetchPart } from "@/components/use-project-part";
 import { DeleteKeyConfirm, KeyForm } from "./key-dialogs";
 import { LegacyKeysSwitch } from "./legacy-keys";
-import { Tab } from "./tab";
+import { Tab } from "@/components/tab";
 
 /**
  * The project's API keys, in the two tabs the Supabase dashboard uses.

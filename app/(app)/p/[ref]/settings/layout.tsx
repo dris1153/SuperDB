@@ -15,7 +15,7 @@ import { SettingsNav } from "@/components/project-settings/settings-nav";
  *
  * **No title here.** One heading reading "Project Settings" over every section said nothing about
  * which section you were looking at, while the nav on the left already says you are in settings.
- * Each page titles itself with `SettingsHeader`.
+ * Each page titles itself with `PageHeader`.
  */
 export default async function SettingsLayout({
   children,

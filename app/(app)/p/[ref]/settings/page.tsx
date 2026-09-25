@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { GeneralSettings } from "@/components/project-settings/general";
-import { SettingsHeader } from "@/components/project-settings/settings-header";
+import { PageHeader } from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +19,9 @@ export default async function ProjectSettingsPage({
 
   return (
     <>
-      <SettingsHeader title="General">
+      <PageHeader title="General">
         This project&apos;s name, reference and where it runs
-      </SettingsHeader>
+      </PageHeader>
 
       <GeneralSettings projectRef={ref} />
     </>

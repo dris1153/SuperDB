@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { projectSecret } from "@/lib/project-secrets";
 import { PasswordManager } from "@/components/project-settings/password-manager";
-import { SettingsHeader } from "@/components/project-settings/settings-header";
+import { PageHeader } from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -24,9 +24,9 @@ export default async function PasswordManagerPage({
   // proved they own the project rather than from anything the browser could supply.
   return (
     <>
-      <SettingsHeader title="Password Manager">
+      <PageHeader title="Password Manager">
         The database password for this project, and how to replace it
-      </SettingsHeader>
+      </PageHeader>
 
       <PasswordManager
         projectRef={ref}

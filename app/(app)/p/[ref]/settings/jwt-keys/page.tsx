@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { JwtKeys } from "@/components/project-settings/jwt-keys";
-import { SettingsHeader } from "@/components/project-settings/settings-header";
+import { PageHeader } from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -14,9 +14,9 @@ export default async function JwtKeysPage({ params }: { params: Promise<{ ref: s
   // the project rather than from anything the browser could supply.
   return (
     <>
-      <SettingsHeader title="JWT Keys">
+      <PageHeader title="JWT Keys">
         Control the keys used to sign JSON Web Tokens for your project
-      </SettingsHeader>
+      </PageHeader>
 
       <JwtKeys projectRef={ref} projectName={found.project.name} />
     </>

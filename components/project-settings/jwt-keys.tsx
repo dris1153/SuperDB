@@ -21,7 +21,7 @@ import { DeleteSigningKeyConfirm, RotateConfirm } from "./jwt-key-dialogs";
 import { LegacyJwtSecret } from "./legacy-jwt-secret";
 import { RevokeConfirm } from "./revoke-confirm";
 import { KeyMenu, SigningKeyTable } from "./signing-key-table";
-import { Tab } from "./tab";
+import { Tab } from "@/components/tab";
 
 type Result = { ok: true } | { ok: false; reason: string };
 
