@@ -17,6 +17,19 @@ safety model has the shape it does.
   against a live project. Several are counter-intuitive enough that the code implementing them looks
   wrong without them.
 
+## Project features
+
+Screens that talk to a connected project rather than to this app's own database. Both of these
+reach APIs the Management API does not cover, and both are written down mostly because what the
+upstream APIs actually do is not what their shape suggests.
+
+- **[Authentication](./authentication.md)** — users, email templates and SMTP, OAuth apps, and a
+  user's audit trail. Why users need a `service_role` key at all, what `?filter=` does that
+  `?email=` does not, and five claims the build disproved.
+- **[Logs](./logs.md)** — the service cards on the project overview. One log stream rather than a
+  table per service, a hard 1000-row cap that makes figures aggregates rather than counts, and the
+  short list of SQL the endpoint will accept.
+
 ## Operations
 
 - **[Secret rotation runbook](./secret-rotation-runbook.md)** — procedures for rotating encryption
@@ -31,6 +44,9 @@ believed and turned out to be false, and the way it was caught generalises.
 - **[Misreading branch conditions in vendor code](./journals/260910-misreading-a-branch.md)** — a
   false reading of `@supabase/auth-js` reached six documents before any code was written, and what
   caught it.
+- **[The probe was wrong, not the API](./journals/260926-the-probe-was-wrong-not-the-api.md)** — a
+  measurement script reported a refusal as an empty result, and four other "measured" facts that
+  had never been tried.
 
 ## Writing more of this
 
