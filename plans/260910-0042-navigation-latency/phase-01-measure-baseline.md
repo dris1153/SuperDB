@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Measure and baseline"
-status: blocked  # the SuperDB project's region, and a deployed build to time
+status: blocked  # needs a deployment to time; the region half is answered
 priority: P1
 effort: "1h"
 dependencies: []
@@ -89,3 +89,14 @@ Mitigation: the final step is a `git diff` check, and it is a success criterion.
 
 **Cold vs warm confusion.** A second navigation reuses connections and looks artificially fast.
 Mitigation: record cold explicitly; note in `baseline.md` which numbers are cold.
+
+## Half of this is answered 2026-09-26
+
+**The region question is closed.** The project backing SuperDB is in `ap-southeast-2` — AWS Sydney,
+Vercel's `syd1` — confirmed by the project's owner. That is the input phase 5 was waiting on.
+
+**The timings are not, and cannot be from this checkout.** They are per-stage measurements of a cold
+*production* navigation, and there is no deployment: no `.vercel/` link, no deployment workflow, and
+`SITE_URL` is `http://localhost:3000`. Local numbers would answer a different question — the whole
+point of the split in phase 5 is the distance between Vercel's region and each backend, which does
+not exist on a laptop.

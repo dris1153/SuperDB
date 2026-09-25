@@ -88,18 +88,24 @@ Against the code, not from memory.
 the cookie; the project pages render behind `Suspense` with skeletons. None of them has been *timed*,
 which is what phase 1 was for, so they stay `in-progress` rather than completed.
 
-**Phases 1 and 5 are blocked on one fact.** Both need the region of the Supabase project that backs
-SuperDB itself — `kupekvmyzqypwrtnjlid`. The access token in this repo's `.env` does not own that
-project: `GET /v1/projects` returns two projects and it is neither of them, and
-`GET /v1/projects/kupekvmyzqypwrtnjlid` answers `Missing required permission(s): database_read`.
-Asking the project directly does not help either — `/rest/v1/` answers 401
-`UNAUTHORIZED_INVALID_API_KEY_TYPE` with the key in `.env`, and the only region in the response
-headers is the Cloudflare edge that served it, which is the *caller's* region and not the
-database's.
+**Phases 1 and 5 are blocked, though not on what this section first said.** The access token in
+this repo's `.env` does not own `kupekvmyzqypwrtnjlid`, the project backing SuperDB itself:
+`GET /v1/projects` returns two projects and it is neither, and the project answers
+`Missing required permission(s): database_read`. That is true, and it is not the blocker — the
+region is written in phase 5 already.
 
-So phase 5 is one line of `vercel.json` waiting on one word. Read the region off the project's
-dashboard and it can be written; guessing it would be worse than leaving it, since aligning to the
-wrong region adds the latency this plan exists to remove.
+**Corrected an hour later:** phase 5 was never blocked on the region. That phase already carried it
+— `ap-southeast-2`, corrected into the file on 2026-09-10 — and the project owner has since
+confirmed it. The audit above read the phase's `status: pending` and reached for the nearest
+explanation instead of reading the phase.
+
+What phase 5 is actually blocked on is that **nothing is deployed**: no `.vercel/` link, no
+deployment workflow, `SITE_URL` still `localhost`. It is an A/B between two deployments and there
+are none. Its mechanism question is now settled though — `preferredRegion` is deprecated in this
+version of Next and rejects region codes on Vercel, so `vercel.json` is the only lever.
+
+Phase 1 remains blocked on the same thing for its timings; the region half of its question is
+answered.
 
 **Phase 6 is not started deliberately.** Its own text says not to begin until phases 2–4 are
 measured and shown insufficient, and the failure it risks is a cross-tenant data leak rather than a

@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Region alignment"
-status: blocked  # phase 1, which is itself blocked
+status: blocked  # nothing is deployed, so the A/B this phase requires cannot run
 priority: P2
 effort: "30m"
 dependencies: [1]
@@ -51,15 +51,18 @@ The corrected rule: **with N serial round trips split across backends in differe
 no single "next to the data" — measure both placements.** The original one-backend rule only applies
 when all N share a destination.
 
-Two mechanisms exist; confirm which applies before editing. Check
-`node_modules/next/dist/docs/` per `AGENTS.md` — this Next version's conventions may differ from
-training data:
+**Settled 2026-09-26 against `node_modules/next/dist/docs/`.** Only one mechanism is left:
 
-1. `vercel.json` with a top-level `"regions"` array — applies to all functions.
-2. Next's per-segment `export const preferredRegion` — finer-grained, useful only if different routes
-   want different regions. Not needed here; every route hits the same backend.
+1. `vercel.json` with a top-level `"regions"` array — applies to all functions. **This is the one.**
+2. ~~`export const preferredRegion`~~ — **deprecated in this version of Next**, and on Vercel it now
+   accepts only `'auto'`, `'global'` and `'home'`. A region code like `'syd1'` *throws*. The plan
+   offered it as the finer-grained option; it no longer exists as one.
 
-Prefer option 1: one file, one line, no per-route drift.
+So the change, when it is made, is one file:
+
+```json
+{ "regions": ["syd1"] }
+```
 
 **Cost to be honest about:** users far from the chosen region pay a longer browser-to-server hop.
 That is one round trip against the five-plus saved on the backend side. If Phase 1 shows backend
@@ -76,7 +79,7 @@ Region is known (`ap-southeast-2`), so this is now an A/B measurement, not a loo
 
 1. Complete Phase 1 on the current `iad1` deployment, with the per-stage timings split into the two
    destination groups above. That split is the whole point — a single total cannot decide this.
-2. Confirm the region config mechanism against `node_modules/next/dist/docs/`.
+2. ~~Confirm the region config mechanism~~ — done, see above.
 3. Add `vercel.json` → `{"regions": ["syd1"]}` and deploy to a **preview**, leaving production on
    `iad1`.
 4. Re-run the same measurements against the preview.
@@ -108,3 +111,17 @@ not only in the plan.
 
 **Cold starts in a lower-traffic region.** A less-used region can show more cold starts. Minor for
 this workload, but watch it in the preview measurement rather than assuming.
+
+## Why this is blocked 2026-09-26
+
+The region was never the missing piece: it is in this file, and the project owner confirmed it again
+— `ap-southeast-2`, Vercel's `syd1`.
+
+**Nothing is deployed.** There is no `.vercel/` link in the checkout, no deployment workflow, and
+`SITE_URL` is `http://localhost:3000`. This phase is an A/B between two deployments, and there are
+zero. Adding `vercel.json` now would be config for a deployment that does not exist, against a trade
+this file already says reasoning cannot settle — and its own last step says an unexplained config
+file is worse than none.
+
+Unblocking it needs one deployment, not one fact. Once there is a preview to measure, this is the
+one-line change above plus two runs of Phase 1.
