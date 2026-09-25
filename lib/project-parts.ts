@@ -20,6 +20,11 @@ import {
   MgmtError,
 } from "./mgmt-api";
 import { listTables } from "./db-introspect";
+import { getUser, listFactors, listOAuthClients, listUsers, type UserPage } from "./auth-api";
+import { sortClients } from "./oauth-clients";
+import { pickEmailConfig, type EmailConfig } from "./auth-config";
+import { buildUserAuditSql, parseAuditEvent, sortEvents, type AuditEvent } from "./auth-audit";
+import { displayNameOf, isUserId, providersOf, PER_PAGE } from "./auth-users";
 import {
   asInterval,
   buildFiguresSql,
@@ -346,6 +351,126 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
       // `relation "public.saved_queries" does not exist` is a deployment detail, not an instruction.
       throw new Error("Saved queries are unavailable on this instance.");
     }),
+
+  /**
+   * One page of users, filtered by the server.
+   *
+   * Fields picked rather than passed through: `call()` casts over `JSON.parse`, so `AuthUser` is a
+   * claim about the body and not a filter, and the real body carries more of a person's record than
+   * a table of eight columns needs.
+   */
+  "auth-users": async (_t, ref, search): Promise<UserPage> => {
+    const page = Math.max(1, Math.floor(Number(search.get("page"))) || 1);
+    const filter = (search.get("filter") ?? "").slice(0, 200).trim();
+
+    const read = await listUsers(ref, { page, perPage: PER_PAGE, filter: filter || undefined });
+
+    return {
+      ...read,
+      users: read.users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        phone: u.phone,
+        created_at: u.created_at,
+        last_sign_in_at: u.last_sign_in_at,
+        email_confirmed_at: u.email_confirmed_at ?? null,
+        banned_until: u.banned_until ?? null,
+        app_metadata: { providers: providersOf(u) },
+        // Only the name, not the whole of it: `user_metadata` is whatever the project put there,
+        // and this table shows one field of it.
+        user_metadata: { display_name: displayNameOf(u) ?? undefined },
+      })),
+    };
+  },
+
+  /**
+   * One user and their MFA factors.
+   *
+   * **Passed through whole, unlike every other reader here.** The panel's Raw JSON tab is the
+   * point: it shows what GoTrue holds about this person, and picking fields would make it a
+   * curated view that quietly omits whatever was added upstream. The body carries no secret —
+   * there is no password hash in it — and this is the project owner reading their own project.
+   *
+   * The factors are read alongside because the panel offers to remove them, and `[]` is the common
+   * answer: a user with no MFA is not an error.
+   */
+  "auth-user": async (_t, ref, search) => {
+    const id = search.get("id") ?? "";
+    if (!isUserId(id)) throw new Error("That is not a user.");
+
+    const [user, factors] = await Promise.all([
+      getUser(ref, id),
+      // Offered only when there are factors, so failing to read them must not fail the panel.
+      listFactors(ref, id).catch(() => []),
+    ]);
+
+    return { user, factors };
+  },
+
+  /**
+   * One user's auth events.
+   *
+   * Parsed here rather than in the panel: `event_message` is JSON inside a string, and the rows
+   * carry an `ip_address` and an actor. A row that does not parse is dropped rather than failing
+   * the tab — it is a log line, not a record the page depends on.
+   */
+  "auth-user-logs": async (t, ref, search): Promise<AuditEvent[]> => {
+    const id = search.get("id") ?? "";
+    if (!isUserId(id)) throw new Error("That is not a user.");
+
+    const to = Date.now();
+    // A day, which is all a free project keeps anyway.
+    const from = to - 24 * 3_600_000;
+
+    const rows = await queryLogs<{ timestamp: string; event_message: string | null }>(
+      t,
+      ref,
+      buildUserAuditSql(id),
+      new Date(from).toISOString(),
+      new Date(to).toISOString(),
+    );
+
+    return sortEvents(
+      rows
+        .map((row) => parseAuditEvent(row.event_message, row.timestamp, id))
+        .filter((event): event is AuditEvent => event !== null),
+    );
+  },
+
+  /**
+   * OAuth clients, with the disabled server reported rather than thrown.
+   *
+   * Fields picked, as everywhere else here — and one of them cannot be: `client_secret` is not in
+   * this response at all. It exists only in the 201 from create, which is why the create dialog is
+   * the one place it can be copied from.
+   */
+  "oauth-clients": async (_t, ref) => {
+    const { enabled, clients } = await listOAuthClients(ref);
+
+    return {
+      enabled,
+      clients: sortClients(clients).map(
+        ({ client_id, client_name, client_type, registration_type, redirect_uris, created_at }) => ({
+          client_id,
+          client_name,
+          client_type,
+          registration_type,
+          redirect_uris,
+          created_at,
+        }),
+      ),
+    };
+  },
+
+  /**
+   * The Emails page.
+   *
+   * Picked, hard. The response carries every configured OAuth provider's client secret alongside
+   * the mail settings, so a pass-through here would ship a project's secrets to a browser to render
+   * six subject lines. `smtp_pass` is excluded even though it reads back null.
+   */
+  "auth-config": async (t, ref): Promise<EmailConfig> =>
+    pickEmailConfig(await getAuthConfig(t, ref)),
 
   logs: async (t, ref, search) => {
     const minutes = windowMinutes(asInterval(search.get("interval")));

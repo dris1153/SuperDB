@@ -52,6 +52,16 @@ export const PART_NAMES = [
   "objects",
   // Row level security on storage.objects and storage.buckets, which is what the Policies tab is.
   "storage-policies",
+  // One page of a project's users, from its own GoTrue. The Management API has no users at all.
+  "auth-users",
+  // One user, read again: a listed user has `identities: null` and only a single read fills them.
+  "auth-user",
+  // One user's auth events, from `auth_audit_logs` — the only source that carries a user id.
+  "auth-user-logs",
+  // The OAuth clients this project issues tokens for, and whether that server is switched on.
+  "oauth-clients",
+  // The Emails page: about twenty-five fields of `/config/auth`, picked out of 243.
+  "auth-config",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

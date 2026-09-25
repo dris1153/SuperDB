@@ -51,6 +51,15 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
 
   rows: 0,
   logs: 0,
+  // A page of users, which the same page bans, deletes and invites. A cached list would show the
+  // state from before the click.
+  "auth-users": 0,
+  "auth-user": 0,
+  // Written from the page that shows it, so a cached copy would show the state before the save.
+  "auth-config": 0,
+  "oauth-clients": 0,
+  // Read once when the tab is opened. The logs endpoint throttles, so nothing polls it.
+  "auth-user-logs": 0,
   // Carries real key values for the public key types. Sixty seconds of a credential sitting in this
   // process buys nothing on a page somebody opens to read one thing.
   "api-key-rows": 0,

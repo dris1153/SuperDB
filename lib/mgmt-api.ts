@@ -214,7 +214,20 @@ export const deleteSigningKey = (t: string, ref: string, id: string) =>
  * `jwt_secret` field here, despite what the legacy tab's Reveal control would suggest.
  */
 export const getAuthConfig = (t: string, ref: string) =>
-  call<{ jwt_exp?: number }>(t, `/v1/projects/${ref}/config/auth`);
+  call<{ jwt_exp?: number } & Record<string, unknown>>(t, `/v1/projects/${ref}/config/auth`);
+
+/**
+ * Writes some of those 243 fields.
+ *
+ * **PATCH merges by key** — measured on this endpoint and on `config/storage` before it — so a
+ * caller sends the field it changed and the other 242 are left alone. `lib/auth-config.ts` is the
+ * only place field names are written down.
+ */
+export const updateAuthConfig = (t: string, ref: string, body: Record<string, unknown>) =>
+  call<Record<string, unknown>>(t, `/v1/projects/${ref}/config/auth`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 
 /**
  * Everything this app knows about a project's storage, in one response.
