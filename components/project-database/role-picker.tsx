@@ -8,7 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 export function RolePicker({ roles, value, onChange }: { roles: string[]; value: string[]; onChange: (next: string[]) => void }) {
   const toggle = (r: string) => onChange(value.includes(r) ? value.filter((x) => x !== r) : [...value, r]);
   return (
-    <Popover>
+    // Modal: the sheet's scroll lock swallows the wheel over portalled content; a modal popover holds its own.
+    <Popover modal>
       <PopoverTrigger asChild>
         <button type="button" className="flex min-h-9 w-full flex-wrap items-center gap-1.5 rounded-md border border-input px-2 py-1.5 text-left text-sm dark:bg-input/30">
           {value.length === 0 ? (
