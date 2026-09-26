@@ -199,7 +199,10 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
             </Empty>
           </div>
         ) : (
-          <Table>
+          // The rule under the last row. `TableBody` carries `[&_tr:last-child]:border-0`, and
+          // fighting that from the same element would tie on specificity and leave the stylesheet's
+          // order to decide — so the line goes on the table itself, where nothing contests it.
+          <Table className="border-b border-border">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 {/* `pr-3!`, not `pr-3`: `ui/table.tsx` zeroes the right padding of any cell holding
