@@ -43,6 +43,7 @@ import { listEntities, listTableColumns } from "./schema-entities-sql";
 import { tableFacts } from "./table-facts-sql";
 import { columnFacts } from "./column-facts-sql";
 import { listEnums } from "./enum-types-sql";
+import { listFunctions } from "./functions-sql";
 import { buildUserLogsSql, parseUserLog, sortEvents, type UserEvent, type UserLogRow } from "./auth-audit";
 import { avatarOf, displayNameOf, isUserId, isUserSort, providersOf, PER_PAGE } from "./auth-users";
 import {
@@ -266,6 +267,8 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   "table-facts": (t, ref, search) => tableFacts(t, ref, schemaOf(search), tableOf(search)),
 
   "enum-types": (t, ref, search) => listEnums(t, ref, schemaOf(search)),
+
+  "db-functions": (t, ref, search) => listFunctions(t, ref, schemaOf(search)),
 
   "column-facts": (t, ref, search) =>
     columnFacts(t, ref, schemaOf(search), tableOf(search), search.get("column") ?? ""),

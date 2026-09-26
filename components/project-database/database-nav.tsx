@@ -18,7 +18,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     rows: [
       { slug: "schemas", label: "Schema Visualizer", endpoint: "SQL: pg_class, pg_attribute, pg_constraint", ready: true },
       { slug: "tables", label: "Tables", endpoint: "SQL: pg_class", ready: true },
-      { slug: "functions", label: "Functions", endpoint: "SQL: pg_proc" },
+      { slug: "functions", label: "Functions", endpoint: "SQL: pg_proc", ready: true },
       { slug: "triggers", label: "Triggers", endpoint: "SQL: pg_trigger" },
       { slug: "types", label: "Enumerated Types", endpoint: "SQL: pg_type, pg_enum", ready: true },
       { slug: "extensions", label: "Extensions", endpoint: "SQL: pg_available_extensions" },

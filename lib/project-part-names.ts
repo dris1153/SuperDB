@@ -72,6 +72,8 @@ export const PART_NAMES = [
   "column-facts",
   // Database › Enumerated Types: one schema's enums and their labels.
   "enum-types",
+  // Database › Functions: one schema's functions and procedures, with their bodies.
+  "db-functions",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

@@ -88,3 +88,26 @@ create sheet orders them by drag, or by ArrowUp/ArrowDown on the grip. Measured 
 a rename in **one request** all applied (`add value` inside the endpoint's implicit transaction is
 fine on these Postgres versions); `drop type` while a column used it answered `2BP01: cannot drop
 type … because other objects depend on it`, which the confirm passes through.
+
+## Functions
+
+`/database/functions`, as the original lists them, from one `pg_proc` read per schema with
+`search_path` emptied — so a type in a signature comes back qualified unless it is in `pg_catalog`,
+and the text can be replayed into `create or replace` and `drop` meaning the same thing on the write
+role's path. Extension-owned functions are left out. Search matches name and body; Return Type and
+Security are `CheckboxFilter`s. No AI entries; *Client API docs* links out to the dashboard.
+
+The panel is the original's. **Edit locks type, return type and arguments**, and the server
+replaces with the catalog's own signature — `pg_get_function_arguments` and
+`pg_get_function_result` — never the draft's; then renames; then moves schema, last. Drop uses the
+identity arguments, so one overload is never mistaken for another. Types come from the catalog by
+both `typname` and `format_type` name (`int4` and `integer`), languages from `pg_language`.
+
+Measured on ZKVault, 2026-09-26, then dropped: a function, an overload of it and a procedure
+created; the body — containing `$$` and `$function$` — read back byte for byte, because the quote
+tag is chosen to be absent from it and **nothing is padded inside the quotes** (a first version put
+a newline either side, which `prosrc` stored, so every save would have grown the body by two
+lines); body, security and `search_path` replaced, renamed and moved to `extensions` in one
+request, and the call answered 3; one overload dropped, the other kept. A stored config comes back
+as SQL that sets it again: `search_path=""` is not SQL, so it is read as `''`, and other values as
+literals, as `pg_dump` writes them.
