@@ -54,7 +54,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { slug: "sessions", label: "Sessions", endpoint: "config/auth: sessions_*" },
       { slug: "rate-limits", label: "Rate Limits", endpoint: "config/auth: rate_limit_*" },
       { slug: "mfa", label: "Multi-Factor", endpoint: "config/auth: mfa_*" },
-      { slug: "urls", label: "URL Configuration", endpoint: "config/auth: site_url, uri_allow_list" },
+      { slug: "urls", label: "URL Configuration", endpoint: "GET,PATCH /v1/projects/{ref}/config/auth: site_url, uri_allow_list", ready: true },
       { slug: "protection", label: "Attack Protection", endpoint: "config/auth: security_*, captcha_*" },
       { slug: "hooks", label: "Auth Hooks", endpoint: "config/auth: hook_*" },
       { slug: "advanced", label: "Advanced", endpoint: "config/auth: jwt_exp, refresh_token_*" },

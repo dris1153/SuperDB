@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
-import { IconArrowUpRight, IconInfoCircle } from "@tabler/icons-react";
+import { IconInfoCircle } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { previewAuthorizationUrl, type OAuthServerConfig } from "@/lib/oauth-server";
 import { saveOAuthServer } from "@/lib/oauth-server-actions";
@@ -120,15 +121,10 @@ function Settings({
               description={
                 <>
                   The base URL of your application, configured in{" "}
-                  <a
-                    href={`https://supabase.com/dashboard/project/${projectRef}/auth/url-configuration`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-0.5 text-foreground underline"
-                  >
+                  {/* A new tab: leaving here would drop whatever is unsaved on this page. */}
+                  <Link href={`/p/${projectRef}/auth/urls`} target="_blank" className="text-foreground underline">
                     Auth URL Configuration
-                    <IconArrowUpRight className="size-3.5" aria-hidden />
-                  </a>{" "}
+                  </Link>{" "}
                   settings.
                 </>
               }

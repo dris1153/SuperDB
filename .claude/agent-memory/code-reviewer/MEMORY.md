@@ -23,3 +23,4 @@
 - [No error boundary above project layout](project_no_error_boundary_above_project_layout.md) — p/[ref]/error.tsx wraps the page only; a topbar/nav throw crashes the whole app
 - [Server actions dispatch serially](project_server_actions_dispatch_serially.md) — an action used as a read queues behind runSql; client reads belong in route handlers
 - [QueryClient dies with the project layout](project_query_client_scoped_to_project_layout.md) — staleTime freshness claims hold only if the observer remounts; focus refetch is off
+- [Signup is open: authenticated is untrusted](project_signup_open_authenticated_is_untrusted.md) — resolveProject gates nothing for CPU abuse; ported Supabase regexes go cubic on `>`

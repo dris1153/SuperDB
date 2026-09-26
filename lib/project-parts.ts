@@ -38,6 +38,7 @@ async function oneUserAsPage(ref: string, id: string): Promise<UserPage> {
 }
 import { pickEmailConfig, type EmailConfig } from "./auth-config";
 import { pickOAuthServer, type OAuthServerConfig } from "./oauth-server";
+import { pickUrlConfig, type UrlConfig } from "./auth-urls";
 import { readGraph } from "./schema-graph-sql";
 import { listEntities, listTableColumns } from "./schema-entities-sql";
 import { tableFacts } from "./table-facts-sql";
@@ -517,6 +518,9 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
     ]);
     return pickOAuthServer(raw, discovery);
   },
+
+  /** URL Configuration: two fields, picked for the same reason as the Emails page's. */
+  "auth-urls": async (t, ref): Promise<UrlConfig> => pickUrlConfig(await getAuthConfig(t, ref)),
 
   logs: async (t, ref, search) => {
     const minutes = windowMinutes(asInterval(search.get("interval")));

@@ -11,6 +11,7 @@ test("the page in view opens as the original names it", () => {
   assert.equal(at("/auth"), `${home}/auth/users`);
   assert.equal(at("/auth/oauth"), `${home}/auth/oauth-apps`);
   assert.equal(at("/auth/oauth-server"), `${home}/auth/oauth-server`);
+  assert.equal(at("/auth/urls"), `${home}/auth/url-configuration`);
   assert.equal(at("/database"), `${home}/database/schemas`);
   assert.equal(at("/database/policies"), `${home}/database/policies`);
   assert.equal(at("/tables"), `${home}/editor`);
