@@ -10,7 +10,8 @@ import { isProjectRef } from "./project-ref";
  * and only because it is the key.
  *
  * Not a "use server" module. Every export of one becomes an action the browser can call, and the read
- * is used by a server component — the same reason write-audit.ts stays out. The browser-facing half
+ * is used on the server — the same reason write-audit.ts stays out. The browser does get the blob, but
+ * through the `access` part, after that part has established the project is the caller's. The browser-facing half
  * is `project-secret-actions.ts`: a `"use server"` file may only export async functions, so the
  * wrapper cannot live in a page, as this comment used to claim.
  */

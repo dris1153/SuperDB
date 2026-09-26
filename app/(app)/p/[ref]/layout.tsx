@@ -46,7 +46,7 @@ export default async function ProjectLayout({
         and refuses to shrink, which pushes the page taller instead of scrolling inside it.
       */}
       <div className="flex h-dvh flex-col">
-        <ProjectTopbar projectName={found.project.name} />
+        <ProjectTopbar projectRef={ref} projectName={found.project.name} account={found.connection.display_name} />
 
         <div className="flex min-h-0 flex-1">
           <ProjectNav projectRef={ref} mode={mode} />

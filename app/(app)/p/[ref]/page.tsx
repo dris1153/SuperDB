@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
-import { projectSecret } from "@/lib/project-secrets";
+import { readProjectAccess } from "@/lib/project-access";
 import { isMoving, isPaused } from "@/lib/project-status";
 import { PausedProject } from "@/components/paused-project";
 import { CopyButton } from "@/components/copy-button";
+import { AccessPanel } from "@/components/project-access/access-panel";
 import { ConnectPanel } from "@/components/project-overview/connect-panel";
 import { DatabaseCard } from "@/components/project-overview/database-card";
 import { ProjectServices } from "@/components/project-overview/services";
@@ -39,6 +40,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
   }
 
   const projectUrl = `https://${ref}.supabase.co`;
+  const access = await readProjectAccess(ref);
 
   return (
     <div className="mx-auto max-w-7xl space-y-12 p-8">
@@ -60,17 +62,24 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
             Two fields, not the project: `resolveProject` returns the upstream body verbatim, and
             handing it to a client component puts every field of GET /v1/projects/{ref} into the RSC
             payload — the same thing `lib/project-parts.ts` refuses to do on the way out. */}
-        <DatabaseCard projectRef={ref} region={project.region} />
+        <div className="space-y-6">
+          <DatabaseCard projectRef={ref} region={project.region} />
+          {access ? (
+            <section className="rounded-lg border border-border bg-card p-5">
+              <AccessPanel projectRef={ref} access={access} />
+            </section>
+          ) : null}
+        </div>
       </div>
 
       {/* Ciphertext the server cannot read, so handing it to a client component exposes nothing
-          that was not already in this app's database. It costs this shell one read of that
-          database — the only thing it waits on besides resolveProject — which is the price of the
-          Copy button being able to appear at all. */}
+          that was not already in this app's database. It comes from the access read above — two
+          queries of that database in parallel, the only thing this shell waits on besides
+          resolveProject — which is the price of the Copy buttons being able to appear at all. */}
       <ConnectPanel
         projectRef={ref}
         dbHost={project.database?.host ?? null}
-        secret={await projectSecret(ref)}
+        secret={access?.dbBlob ?? null}
       />
       <UsagePanel projectRef={ref} />
     </div>

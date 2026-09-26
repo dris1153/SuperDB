@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { IconChevronRight } from "@tabler/icons-react";
 import { BrandMark } from "./brand-mark";
+import { AccountChip } from "./project-access/account-chip";
+import { OpenInSupabase } from "./project-access/open-in-supabase";
 
 /**
  * The bar across the top of every project route.
@@ -19,9 +21,10 @@ import { BrandMark } from "./brand-mark";
  * app sidebar, which is one click away on the board — an action taken once a session does not earn
  * 52KB on every page of it.
  *
- * No client directive for the same reason: nothing here has state, so nothing here needs to ship.
+ * No client directive for the same reason: nothing here has state, so nothing here needs to ship. The
+ * two islands that do — the link reads the path, the chip opens a popover — load that popover on click.
  */
-export function ProjectTopbar({ projectName }: { projectName: string }) {
+export function ProjectTopbar({ projectRef, projectName, account }: { projectRef: string; projectName: string; account: string }) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
       <Link href="/" className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
@@ -35,7 +38,10 @@ export function ProjectTopbar({ projectName }: { projectName: string }) {
         {projectName}
       </span>
 
+      <AccountChip projectRef={projectRef} account={account} />
+
       <nav className="ml-auto flex items-center gap-1">
+        <OpenInSupabase projectRef={projectRef} />
         <Link
           href="/connections"
           className="rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"

@@ -26,6 +26,7 @@ export function EditConnection({
   tags,
   availableTags,
   secret,
+  startOnCredentials = false,
   action,
 }: {
   id: string;
@@ -33,9 +34,11 @@ export function EditConnection({
   tags: string[];
   availableTags: string[];
   secret: ConnectionSecret | null;
+  /** Arrived from a project's access panel (`/connections?edit=<id>`): open on the Credentials tab. */
+  startOnCredentials?: boolean;
   action: (id: string, displayName: string, tags: string[]) => Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOnCredentials);
   const [name, setName] = useState(displayName);
   const [selected, setSelected] = useState(tags);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +59,14 @@ export function EditConnection({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        // Otherwise a reload or Back reopens the dialog that was just closed.
+        if (!next && startOnCredentials) router.replace("/connections", { scroll: false });
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="outline" size="icon-sm" aria-label={`Edit ${displayName}`}>
           <IconPencil size={14} stroke={1.5} />
@@ -70,7 +80,7 @@ export function EditConnection({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="details">
+        <Tabs defaultValue={startOnCredentials ? "credentials" : "details"}>
           <SlidingTabsList className="w-full">
             <SlidingTabsTrigger value="details">Details</SlidingTabsTrigger>
             <SlidingTabsTrigger value="credentials">Credentials</SlidingTabsTrigger>

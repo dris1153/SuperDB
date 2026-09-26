@@ -12,6 +12,7 @@
  */
 export const PART_NAMES = [
   "identity",
+  "access",
   "addons",
   "branches",
   "migrations",

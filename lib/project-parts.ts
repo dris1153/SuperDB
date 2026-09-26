@@ -76,6 +76,7 @@ import { parseFilters } from "./table-filter";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseSort } from "./table-view";
 import { clampInt } from "./sql-ident";
 import { getExposedSchemas } from "./mgmt-api";
+import { readProjectAccess } from "./project-access";
 import { attempt, type Attempt } from "./safe";
 import { requireUser } from "./supabase/server";
 
@@ -112,6 +113,8 @@ type Reader = (token: string, ref: string, search: URLSearchParams) => Promise<u
  * has it.
  */
 const READERS: Record<Exclude<Part, "identity">, Reader> = {
+  // Identity fields and two ciphertexts — see `project-access.ts`. The token is not used.
+  access: (_t, ref) => readProjectAccess(ref),
   // Only the selected ones: the response also carries the whole purchasable catalogue with prices,
   // which the page never reads.
   addons: async (t, ref) => ({ selected_addons: (await listAddons(t, ref)).selected_addons }),

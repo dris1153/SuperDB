@@ -24,6 +24,9 @@ import type { Part } from "./project-part-names";
  * precisely then, and would be handed the version from before the change.
  */
 export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
+  // Never held: sign-in details edited on /connections must show on the next open.
+  access: 0,
+
   // Quota, not speed: one slot of ten per minute, per user, per project.
   metrics: 60_000,
 
