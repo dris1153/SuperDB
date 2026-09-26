@@ -83,11 +83,19 @@ export function ColumnPanelSections({
       <Section
         title="Data Type"
         aside={
-          <Button asChild variant="outline" size="sm" className="gap-1.5">
-            <a href="https://supabase.com/docs/guides/database/tables#data-types" target="_blank" rel="noreferrer">
-              <IconArrowUpRight size={14} /> About data types
-            </a>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {/* As the original: the enum page in a new tab, so the panel and its draft stay open. */}
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <a href={`/p/${projectRef}/database/types`} target="_blank" rel="noreferrer">
+                <IconPlus size={14} /> Create enum types
+              </a>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <a href="https://supabase.com/docs/guides/database/tables#data-types" target="_blank" rel="noreferrer">
+                <IconArrowUpRight size={14} /> About data types
+              </a>
+            </Button>
+          </div>
         }
       >
         <Field label="Type">

@@ -74,3 +74,17 @@ Measured on ZKVault, 2026-09-26, through the app's own builders, then dropped:
 Not measured, but documented Postgres behaviour: a `serial` column's default still names the source's
 sequence after `like … including all`, so the two tables share it. The original has the same
 recipe and the same result; it is not worked around.
+
+## Enumerated Types
+
+`/database/types`, as the original lists them: one statement per schema (`pg_type` joined to
+`pg_enum`, labels in `enumsortorder`). The column panel's *Create enum types* opens it in a new tab,
+as the original does, so the panel and its draft stay where they were.
+
+Create, update and delete go through `run` like every schema change. Postgres can add a value to an
+enum but not remove or reorder one, so the update sheet locks existing values and only appends; the
+create sheet orders them by drag, or by ArrowUp/ArrowDown on the grip. Measured on ZKVault,
+2026-09-26, then dropped: a label with a quote survived as `it's ok`; two `add value`, a comment and
+a rename in **one request** all applied (`add value` inside the endpoint's implicit transaction is
+fine on these Postgres versions); `drop type` while a column used it answered `2BP01: cannot drop
+type … because other objects depend on it`, which the confirm passes through.

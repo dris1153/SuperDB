@@ -70,6 +70,8 @@ export const PART_NAMES = [
   "table-facts",
   // The column panel: one column's type, default, constraints and keys, and its table's primary key.
   "column-facts",
+  // Database › Enumerated Types: one schema's enums and their labels.
+  "enum-types",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

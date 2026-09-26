@@ -20,7 +20,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
       { slug: "tables", label: "Tables", endpoint: "SQL: pg_class", ready: true },
       { slug: "functions", label: "Functions", endpoint: "SQL: pg_proc" },
       { slug: "triggers", label: "Triggers", endpoint: "SQL: pg_trigger" },
-      { slug: "types", label: "Enumerated Types", endpoint: "SQL: pg_enum" },
+      { slug: "types", label: "Enumerated Types", endpoint: "SQL: pg_type, pg_enum", ready: true },
       { slug: "extensions", label: "Extensions", endpoint: "SQL: pg_available_extensions" },
       { slug: "indexes", label: "Indexes", endpoint: "SQL: pg_index" },
       { slug: "publications", label: "Publications", endpoint: "SQL: pg_publication" },
