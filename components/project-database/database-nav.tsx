@@ -29,7 +29,7 @@ const GROUPS: { title: string; rows: Row[] }[] = [
   {
     title: "Access Control",
     rows: [
-      { slug: "policies", label: "Policies", endpoint: "SQL: pg_policy" },
+      { slug: "policies", label: "Policies", endpoint: "SQL: pg_policy, pg_class.relacl", ready: true },
       { slug: "roles", label: "Roles", endpoint: "SQL: pg_roles" },
     ],
   },

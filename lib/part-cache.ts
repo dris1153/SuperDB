@@ -65,6 +65,7 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   "column-facts": 0,
   "enum-types": 0,
   "db-functions": 0,
+  "db-policies": 0,
   "oauth-clients": 0,
   // Read once when the tab is opened. The logs endpoint throttles, so nothing polls it.
   "auth-user-logs": 0,

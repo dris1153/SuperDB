@@ -74,6 +74,8 @@ export const PART_NAMES = [
   "enum-types",
   // Database › Functions: one schema's functions and procedures, with their bodies.
   "db-functions",
+  // Database › Policies: one schema's tables with RLS, policies and Data API grants, and role names.
+  "db-policies",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

@@ -111,3 +111,24 @@ lines); body, security and `search_path` replaced, renamed and moved to `extensi
 request, and the call answered 3; one overload dropped, the other kept. A stored config comes back
 as SQL that sets it again: `search_path=""` is not SQL, so it is read as `''`, and other values as
 literals, as `pg_dump` writes them.
+
+## Policies
+
+`/database/policies`, a card per table as the original draws it, from one read per schema: RLS,
+policies (with `search_path` emptied, so an expression replays into `alter policy` meaning the same)
+and the table's grants to `anon`, `authenticated` and `service_role` from `aclexplode(relacl)`. The
+badges and the admonition line are the original's `getTableDataApiStatus`, ported with its wording:
+fully granted means all three roles hold SELECT, INSERT, UPDATE and DELETE. On SuperDB `public`,
+`anon` holds nothing and the other two everything, so every table reads *API Disabled* with the
+custom-grants line — as the original's screenshot shows. `auth` and `storage` are *Locked*.
+
+The editor is the original's frame: fixed lines read-only, the USING and WITH CHECK expressions
+editable, and only the clauses a command takes — SELECT and DELETE read, INSERT writes, UPDATE and
+ALL both. Edit locks table, command and behaviour, because `alter policy` changes only the name, the
+roles and the expressions; the rename goes last. The original's eight general templates fill it.
+Roles come from `pg_roles`; none selected is `public`, the keyword, never quoted.
+
+Measured on ZKVault, 2026-09-26, then dropped: a policy for each command, one restrictive with two
+roles; roles, both expressions and the name altered in one request; a drop. `pg_get_expr` gives an
+expression back in one pair of brackets, `(( SELECT auth.uid() AS uid) = user_id)`, which the read
+unwraps — only when the pair encloses the whole — so an untouched expression is not re-sent.

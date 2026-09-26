@@ -6,13 +6,22 @@ import { EditorView } from "@codemirror/view";
 import { PostgreSQL, sql } from "@codemirror/lang-sql";
 import { basicSetup } from "codemirror";
 import { editorHighlighting, editorTheme } from "@/components/sql-editor/editor-theme";
+import { cn } from "@/lib/utils";
 
 /**
  * A function's body, as SQL with line numbers — the email template editor's construction with the
  * SQL editor's language. Uncontrolled: a caller that replaces the document remounts it with a `key`.
  * Default-exported for `next/dynamic`, so CodeMirror stays on the routes that open it.
  */
-export default function SqlBodyEditor({ initialValue, onChange }: { initialValue: string; onChange: (value: string) => void }) {
+export default function SqlBodyEditor({
+  initialValue,
+  onChange,
+  className = "h-80 border-y border-border",
+}: {
+  initialValue: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
   const host = useRef<HTMLDivElement | null>(null);
   const latest = useRef(onChange);
   const first = useRef(initialValue);
@@ -43,5 +52,5 @@ export default function SqlBodyEditor({ initialValue, onChange }: { initialValue
     return () => editor.destroy();
   }, []);
 
-  return <div ref={host} className="h-80 overflow-hidden border-y border-border" />;
+  return <div ref={host} className={cn("overflow-hidden", className)} />;
 }
