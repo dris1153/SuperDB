@@ -17,9 +17,9 @@ import { tags } from "@lezer/highlight";
  * SQL therefore reads identically here and in the table editor's Definition tab. The values below
  * were read out of the installed theme rather than typed from memory.
  */
-const FOREGROUND = "#e6edf3";
+export const FOREGROUND = "#e6edf3";
 const COMMENT = "#8b949e";
-const KEYWORD = "#ff7b72";
+export const KEYWORD = "#ff7b72";
 const STRING = "#a5d6ff";
 const CONSTANT = "#79c0ff";
 const FUNCTION = "#d2a8ff";

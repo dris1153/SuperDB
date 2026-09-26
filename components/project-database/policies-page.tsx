@@ -59,7 +59,7 @@ export function PoliciesPage({ projectRef, projectName }: { projectRef: string; 
       )}
 
       <PolicyPanel target={target} onClose={() => setTarget(null)} projectRef={projectRef} projectName={projectName} schema={schema}
-        roles={state.status === "ready" ? state.data.roles : []} />
+        roles={state.status === "ready" ? state.data.roles : []} tables={state.status === "ready" ? state.data.tables.map((t) => t.name) : []} />
     </div>
   );
 }
