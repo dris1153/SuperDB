@@ -24,8 +24,10 @@ dependencies: [1, 2]
 ## Architecture
 
 `dagre` with the original's settings — `rankdir: LR`, `nodesep: 25`, `ranksep: 50` — on node sizes
-computed from row count. The canvas is a client component loaded with `next/dynamic`, so neither
-library reaches another route.
+computed from row count. ~~The canvas is loaded with `next/dynamic`~~ — not needed: a client
+component imported by one page lands in that route's chunks only, and the build confirmed it (the
+xyflow chunk is in the schemas page's manifest and no other). Nothing renders before the part
+arrives in the browser, so there is no server render of the canvas to avoid either.
 
 ## Success Criteria
 
