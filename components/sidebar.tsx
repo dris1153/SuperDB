@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  IconDatabase,
   IconLayoutGrid,
   IconLogout,
   IconPlugConnected,
   IconSettings,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "./brand-mark";
 
 const LINKS = [
   { href: "/", label: "Projects", icon: IconLayoutGrid },
@@ -35,7 +35,7 @@ export function Sidebar({ email }: { email: string }) {
       )}
     >
       <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-        <IconDatabase size={18} stroke={1.5} className="text-primary" />
+        <BrandMark size={18} />
         <span className="text-sm text-foreground">SuperDB</span>
       </div>
 

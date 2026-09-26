@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { IconChevronRight, IconDatabase } from "@tabler/icons-react";
+import { IconChevronRight } from "@tabler/icons-react";
+import { BrandMark } from "./brand-mark";
 
 /**
  * The bar across the top of every project route.
@@ -24,7 +25,7 @@ export function ProjectTopbar({ projectName }: { projectName: string }) {
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-3">
       <Link href="/" className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
-        <IconDatabase size={17} stroke={1.5} className="text-primary" />
+        <BrandMark size={17} />
         <span className="text-sm">Projects</span>
       </Link>
 
