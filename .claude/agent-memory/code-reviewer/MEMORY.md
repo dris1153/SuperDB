@@ -20,3 +20,6 @@
 - [Project credential in process](project_project_credential_now_in_process.md) — service_role now lives in a globalThis memo; reads of it are unaudited and its bound flushes every user
 - [Two parts, one gate](project_cross_part_dependency_renders_early.md) — a component reading two parts gates on one; the other's empty fallback renders as a confident lie
 - [Lint misses unused symbols](project_lint_misses_unused_symbols.md) — green lint+typecheck prove nothing about dead imports; no-unused-vars and noUnusedLocals are both off
+- [No error boundary above project layout](project_no_error_boundary_above_project_layout.md) — p/[ref]/error.tsx wraps the page only; a topbar/nav throw crashes the whole app
+- [Server actions dispatch serially](project_server_actions_dispatch_serially.md) — an action used as a read queues behind runSql; client reads belong in route handlers
+- [QueryClient dies with the project layout](project_query_client_scoped_to_project_layout.md) — staleTime freshness claims hold only if the observer remounts; focus refetch is off
