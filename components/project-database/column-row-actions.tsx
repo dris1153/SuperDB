@@ -6,13 +6,13 @@ import { dropColumn } from "@/lib/ddl-statements";
 import { columnUsage, dropColumn as dropColumnAction } from "@/lib/ddl-actions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { DropWarning } from "@/components/table-editor/column-edit-fields";
+import { DropWarning } from "@/components/table-editor/drop-warning";
 import { DdlConfirm } from "@/components/table-editor/ddl-confirm";
 import { useRefreshTable } from "@/components/table-editor/use-refresh-table";
 
 /**
- * Edit and ⋮ › Delete column, as the original has them. Edit opens the Table Editor's own column
- * sheet; delete is its confirm, with how many rows hold a value read first.
+ * Edit and ⋮ › Delete column, as the original has them. Edit opens the column panel; delete is the
+ * Table Editor's confirm, with how many rows hold a value read first.
  */
 export function ColumnRowActions({
   projectRef,
@@ -29,8 +29,7 @@ export function ColumnRowActions({
   table: string;
   column: string;
   columnCount: number;
-  /** Null until the Table Editor's description of the column has arrived. */
-  onEdit: (() => void) | null;
+  onEdit: () => void;
 }) {
   const refresh = useRefreshTable(projectRef);
   const [dropping, setDropping] = useState(false);
@@ -68,7 +67,7 @@ export function ColumnRowActions({
 
   return (
     <div className="flex justify-end gap-2">
-      <Button variant="outline" size="sm" disabled={!onEdit} onClick={() => onEdit?.()}>
+      <Button variant="outline" size="sm" onClick={onEdit}>
         Edit
       </Button>
       <DropdownMenu>

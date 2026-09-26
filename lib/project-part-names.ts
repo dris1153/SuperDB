@@ -68,6 +68,8 @@ export const PART_NAMES = [
   "table-columns",
   // Edit and Duplicate table: RLS, realtime, comment, and what a copy needs — foreign keys, columns.
   "table-facts",
+  // The column panel: one column's type, default, constraints and keys, and its table's primary key.
+  "column-facts",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

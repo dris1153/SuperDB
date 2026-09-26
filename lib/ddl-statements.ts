@@ -3,10 +3,7 @@
 import { quoteIdent, quoteQualified } from "./sql-ident.ts";
 import {
   checkName,
-  checkType,
   columnClause,
-  defaultClause,
-  type ColumnChange,
   type NewColumn,
 } from "./ddl-build.ts";
 
@@ -51,68 +48,6 @@ export function createTable(
     `create table ${target} (\n${body}\n);` +
     (opts.rls ? `\nalter table ${target} enable row level security;` : "")
   );
-}
-
-export function addColumn(
-  schema: string,
-  table: string,
-  column: NewColumn,
-  allowed: string[],
-): string {
-  // `add column` has no way to declare a key, so a caller asking for one is told rather than having
-  // the flag quietly dropped from a statement that then reports success.
-  if (column.primaryKey) {
-    throw new Error("A column cannot be added as a primary key; change the key separately");
-  }
-  // A column added to a table that already has rows cannot be NOT NULL without a default; Postgres
-  // says so plainly, so the message is left to it rather than guessed at from a row count here.
-  return `alter table ${quoteQualified(schema, table)} add column ${columnClause(column, allowed)};`;
-}
-
-/** One `alter table` with a part per change, so the whole edit succeeds or none of it does. */
-export function alterColumn(
-  schema: string,
-  table: string,
-  column: string,
-  change: ColumnChange,
-  allowed: string[],
-): string {
-  checkName(column, "column name");
-  const target = quoteQualified(schema, table);
-  const ident = quoteIdent(column);
-  const parts: string[] = [];
-
-  if (change.type !== undefined) {
-    checkType(change.type, allowed);
-    // `using` is deliberately absent: without it Postgres refuses a conversion it cannot make
-    // implicitly, which is the right answer. A cast written here could silently truncate.
-    parts.push(`alter column ${ident} type ${change.type}`);
-  }
-  if (change.nullable !== undefined) {
-    parts.push(`alter column ${ident} ${change.nullable ? "drop" : "set"} not null`);
-  }
-  if (change.default !== undefined) {
-    parts.push(
-      change.default === "drop" || change.default === null
-        ? `alter column ${ident} drop default`
-        : `alter column ${ident} set default ${defaultClause(change.default)}`,
-    );
-  }
-
-  // Renaming is its own statement — `alter table … rename column` cannot be combined with the rest.
-  // It goes last so the parts above still name the column the caller was looking at.
-  const rename = change.rename;
-  if (rename !== undefined && rename !== column) checkName(rename, "column name");
-  const renameSql =
-    rename !== undefined && rename !== column
-      ? `alter table ${target} rename column ${ident} to ${quoteIdent(rename)};`
-      : null;
-
-  if (parts.length === 0 && !renameSql) throw new Error("Nothing to change");
-
-  return [parts.length > 0 ? `alter table ${target}\n  ${parts.join(",\n  ")};` : null, renameSql]
-    .filter(Boolean)
-    .join("\n");
 }
 
 export function dropColumn(

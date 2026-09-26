@@ -1,6 +1,6 @@
 ---
 title: "The column editor, against the original"
-status: pending
+status: in-progress  # built and measured; the panel not clicked through signed in
 created: 2026-09-26
 blockedBy: []
 blocks: []
@@ -27,9 +27,9 @@ Management API has no endpoint for it; there is nowhere for this app to keep it.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Facts and statements: one read, one pure builder, measured on ZKVault | pending |
-| 2 | The panel: five sections, shared by add and edit | pending |
-| 3 | Foreign keys: the list and the add dialog | pending |
+| 1 | Facts and statements: one read, one pure builder, measured on ZKVault | **completed** |
+| 2 | The panel: five sections, shared by add and edit | in-progress |
+| 3 | Foreign keys: the list and the add dialog | in-progress |
 
 ## Phase 1 — facts and statements
 
@@ -69,8 +69,21 @@ delete. Saved with the rest of the panel, not on its own.
 
 ## Success criteria
 
-- [ ] Changing one field sends one clause; the preview is what the server runs.
-- [ ] Toggling primary key on a table with a composite key keeps the other columns in it.
-- [ ] A statement failing part-way leaves the column exactly as it was (measured).
-- [ ] Add and edit open the same panel in the Table Editor and in Database › Tables.
+- [x] Changing one field sends one clause; the preview is what the server runs.
+- [x] Toggling primary key on a table with a composite key keeps the other columns in it.
+- [x] A statement failing part-way leaves the column exactly as it was (measured).
+- [x] Add and edit open the same panel in the Table Editor and in Database › Tables.
 - [ ] A foreign key added from the dialog appears as a Foreign key token on the columns page.
+
+## Built 2026-09-26
+
+Every kind of change was run on ZKVault through the app's own builders and dropped after — see
+`docs/table-editor.md`. Two things the plan did not foresee: an identity needs `not null` first, and
+a new identity's sequence starts under the existing values; both are handled in the builder now.
+The real facts of `connection_events.user_id` on SuperDB (read only) — default `(auth.uid())`, a key
+to `auth.users.id` on delete cascade — were drawn in a throwaway route and compared with the
+original's screenshot.
+
+Replaced and deleted: `add-column-sheet.tsx`, `column-edit-sheet.tsx`, `column-edit-fields.tsx`, and
+the `addColumn` / `alterColumn` builders, actions and tests they alone used. `DropWarning` moved to
+its own file. **Not clicked:** Save, Delete column and the foreign key dialog, signed in.

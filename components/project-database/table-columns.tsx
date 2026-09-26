@@ -5,15 +5,13 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { IconChevronLeft, IconPlus, IconSearch } from "@tabler/icons-react";
 import { isWritableTable, type TableColumns as ColumnsPart } from "@/lib/table-entities";
-import type { ColumnInfo } from "@/lib/table-view";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
-import { AddColumnSheet } from "@/components/table-editor/add-column-sheet";
-import { ColumnEditSheet } from "@/components/table-editor/column-edit-sheet";
+import { ColumnPanel } from "@/components/table-editor/column-panel";
 import { ColumnRowActions } from "./column-row-actions";
 import { ConstraintTokens, TypeIcon } from "./column-tokens";
 
@@ -31,14 +29,11 @@ export function TableColumns({ projectRef, projectName, table }: { projectRef: s
   const schema = useSearchParams().get("schema") || "public";
   const [filter, setFilter] = useState("");
   const [adding, setAdding] = useState(false);
-  const [editing, setEditing] = useState<ColumnInfo | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
 
   const state = useProjectPart<ColumnsPart>(projectRef, "table-columns", { schema, table });
   const data = state.status === "ready" ? state.data : null;
   const writable = !!data?.kind && isWritableTable(data.kind);
-  // The edit sheet takes the Table Editor's description of a column; read only where it can be used.
-  const described = useProjectPart<ColumnInfo[]>(projectRef, "columns", { schema, table }, { enabled: writable });
-  const infos = described.status === "ready" ? described.data : [];
 
   const needle = filter.trim().toLowerCase();
   const columns = data ? data.columns.filter((c) => c.name.toLowerCase().includes(needle)) : [];
@@ -99,7 +94,6 @@ export function TableColumns({ projectRef, projectName, table }: { projectRef: s
                   </TableRow>
                 ) : (
                   columns.map((c) => {
-                    const info = infos.find((i) => i.name === c.name) ?? null;
                     return (
                       <TableRow key={c.name} className="h-[73px]">
                         <TableCell className="w-0 pr-1 pl-6">
@@ -122,7 +116,7 @@ export function TableColumns({ projectRef, projectName, table }: { projectRef: s
                               table={table}
                               column={c.name}
                               columnCount={data.columns.length}
-                              onEdit={info ? () => setEditing(info) : null}
+                              onEdit={() => setEditing(c.name)}
                             />
                           ) : null}
                         </TableCell>
@@ -141,16 +135,8 @@ export function TableColumns({ projectRef, projectName, table }: { projectRef: s
 
       {writable ? (
         <>
-          <AddColumnSheet open={adding} onOpenChange={setAdding} projectRef={projectRef} projectName={projectName} schema={schema} table={table} />
-          <ColumnEditSheet
-            column={editing}
-            onClose={() => setEditing(null)}
-            projectRef={projectRef}
-            projectName={projectName}
-            schema={schema}
-            table={table}
-            columnCount={data?.columns.length ?? 0}
-          />
+          <ColumnPanel open={adding} column={null} onClose={() => setAdding(false)} projectRef={projectRef} projectName={projectName} schema={schema} table={table} />
+          <ColumnPanel open={editing !== null} column={editing} onClose={() => setEditing(null)} projectRef={projectRef} projectName={projectName} schema={schema} table={table} />
         </>
       ) : null}
     </div>

@@ -4,14 +4,12 @@ import { resolveProject } from "./inventory";
 import { readOnlyQuery } from "./mgmt-api";
 import { quoteIdent, quoteQualified } from "./sql-ident";
 import {
-  addColumn as buildAddColumn,
-  alterColumn as buildAlterColumn,
   createTable as buildCreateTable,
   dropColumn as buildDropColumn,
   dropTable as buildDropTable,
   setRls as buildSetRls,
 } from "./ddl-statements";
-import type { ColumnChange, NewColumn } from "./ddl-build";
+import type { NewColumn } from "./ddl-build";
 import { listTypes } from "./ddl-types";
 import { describeTable } from "./table-editor";
 import { run, type DdlResult } from "./ddl-run";
@@ -48,29 +46,6 @@ export async function createTable(
 ): Promise<DdlResult> {
   return run(ref, schema, table, "create table", true, (types) =>
     buildCreateTable(schema, table, columns, types, { rls }),
-  );
-}
-
-export async function addColumn(
-  ref: string,
-  schema: string,
-  table: string,
-  column: NewColumn,
-): Promise<DdlResult> {
-  return run(ref, schema, table, `add column ${column.name} to`, true, (types) =>
-    buildAddColumn(schema, table, column, types),
-  );
-}
-
-export async function alterColumn(
-  ref: string,
-  schema: string,
-  table: string,
-  column: string,
-  change: ColumnChange,
-): Promise<DdlResult> {
-  return run(ref, schema, table, `alter column ${column} on`, true, (types) =>
-    buildAlterColumn(schema, table, column, change, types),
   );
 }
 

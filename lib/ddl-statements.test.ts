@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  addColumn,
-  alterColumn,
   createTable,
   dropColumn,
   dropTable,
@@ -162,18 +160,6 @@ test("a literal default is quoted, so a quote in it cannot end the string", () =
   assert.ok(sql.includes(`default 'it''s ''; drop table x; --'`));
 });
 
-test("a raw default is written through, which is what the caller asked for", () => {
-  // Only reachable from a field the UI labels as SQL, after the statement has been shown in full.
-  const sql = alterColumn(
-    "public",
-    "t",
-    "a",
-    { default: { kind: "raw", value: "coalesce(nullif(current_setting('x', true), ''), 'y')" } },
-    TYPES,
-  );
-  assert.ok(sql.includes("default coalesce(nullif("));
-});
-
 // --- identifiers ---
 
 test("a hostile name stays inside one quoted identifier", () => {
@@ -191,45 +177,6 @@ test("a backslash in a name is left alone, since the endpoint passes them throug
 });
 
 // --- add, alter, drop ---
-
-test("adds a column with its full clause", () => {
-  const sql = addColumn("public", "t", c("note", "text", { nullable: false }), TYPES);
-  assert.ok(sql.startsWith('alter table "public"."t" add column "note" text not null'));
-});
-
-test("alters type, nullability and default in one statement", () => {
-  const sql = alterColumn(
-    "public",
-    "t",
-    "a",
-    { type: "int8", nullable: false, default: { kind: "literal", value: "1" } },
-    TYPES,
-  );
-  assert.equal(sql.match(/alter table/g)?.length, 1, "one statement, so it succeeds or fails whole");
-  assert.ok(sql.includes('alter column "a" type int8'));
-  assert.ok(sql.includes('alter column "a" set not null'));
-  assert.ok(sql.includes(`alter column "a" set default '1'`));
-});
-
-test("dropping a default is distinct from setting it to null", () => {
-  const sql = alterColumn("public", "t", "a", { default: "drop" }, TYPES);
-  assert.ok(sql.includes('alter column "a" drop default'));
-});
-
-test("a rename is its own statement and comes last", () => {
-  const sql = alterColumn("public", "t", "a", { rename: "b", nullable: false }, TYPES);
-  assert.ok(sql.indexOf("set not null") < sql.indexOf("rename column"));
-  assert.ok(sql.includes('rename column "a" to "b"'));
-});
-
-test("renaming a column to the name it already has is not a rename", () => {
-  const sql = alterColumn("public", "t", "a", { rename: "a", nullable: false }, TYPES);
-  assert.ok(!sql.includes("rename"));
-});
-
-test("an alter with nothing in it throws rather than emitting a bare ALTER TABLE", () => {
-  assert.throws(() => alterColumn("public", "t", "a", {}, TYPES), /nothing to change/i);
-});
 
 test("the last column cannot be dropped", () => {
   // Postgres refuses this too, but only after the confirmation has promised it.
