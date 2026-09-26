@@ -1,6 +1,16 @@
 import { AuthNav } from "@/components/auth/auth-nav";
 
-/** The frame Storage and Settings use: a nav column against the rail, the section beside it. */
+/**
+ * A nav column against the rail, the section beside it.
+ *
+ * **`h-full`, not `min-h-full`, and the padding lives in the pages.** A minimum height is not a
+ * definite one, so a page asking for `h-full` — which a full-bleed table must, to scroll inside
+ * itself rather than push the window taller — would resolve against `auto` and fill nothing. The
+ * shell's content area is a flex child of an `h-dvh` column, so there is a real height to inherit.
+ *
+ * Padding moved out for the same reason: a form page wants a 1280px column with 32px around it, and
+ * a grid wants both edges. Emails and OAuth Apps ask for it themselves now.
+ */
 export default async function AuthLayout({
   children,
   params,
@@ -11,12 +21,10 @@ export default async function AuthLayout({
   const { ref } = await params;
 
   return (
-    <div className="flex min-h-full">
+    <div className="flex h-full">
       <AuthNav projectRef={ref} />
 
-      <div className="min-w-0 flex-1">
-        <div className="mx-auto max-w-7xl space-y-8 p-8">{children}</div>
-      </div>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }

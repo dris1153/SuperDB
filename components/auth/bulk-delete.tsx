@@ -75,7 +75,8 @@ export function BulkDeleteBar({
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+      {/* No border of its own: it sits in a strip that already has one above and below it. */}
+      <div className="flex items-center justify-between gap-3 text-sm">
         <span>
           {selected.length} {selected.length === 1 ? "user" : "users"} selected
         </span>

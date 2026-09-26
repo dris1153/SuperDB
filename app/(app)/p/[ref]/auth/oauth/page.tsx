@@ -10,11 +10,12 @@ export default async function OAuthAppsPage({ params }: { params: Promise<{ ref:
   if (!(await resolveProject(ref))) notFound();
 
   return (
-    <>
+    // The container the layout used to provide. A form wants a column; a grid wants the window.
+    <div className="mx-auto max-w-7xl space-y-8 p-8">
       <PageHeader title="OAuth Apps">
         Applications that can sign users in with this project
       </PageHeader>
       <OAuthApps projectRef={ref} />
-    </>
+    </div>
   );
 }

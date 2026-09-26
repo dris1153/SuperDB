@@ -10,11 +10,12 @@ export default async function AuthEmailsPage({ params }: { params: Promise<{ ref
   if (!(await resolveProject(ref))) notFound();
 
   return (
-    <>
+    // The container the layout used to provide. A form wants a column; a grid wants the window.
+    <div className="mx-auto max-w-7xl space-y-8 p-8">
       <PageHeader title="Emails">
         The mail this project sends, and the server it sends through
       </PageHeader>
       <EmailsPage projectRef={ref} />
-    </>
+    </div>
   );
 }

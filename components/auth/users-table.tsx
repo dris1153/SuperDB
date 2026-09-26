@@ -39,6 +39,12 @@ type UserPage = { users: AuthUser[]; total: number | null; hasNext: boolean };
  * narrows `x-total-count`; the sort is `sort=created_at asc`, the only column the API will order by;
  * and looking up a UID is a read of that one user rather than a search for text shaped like an id.
  * Filtering or sorting in the browser would be right for one page and wrong for the second.
+ *
+ * **The page owns its height**, in the shape `components/table-editor/editor.tsx` has used since it
+ * was built: title, toolbar and footer are fixed strips, and only the grid scrolls — which is what
+ * puts the horizontal scrollbar at the bottom of the window rather than under the table. `min-h-0`
+ * on that region is what lets it shrink; without it a flex child refuses to, and the page grows
+ * taller instead of scrolling inside itself.
  */
 export function UsersTable({ projectRef }: { projectRef: string }) {
   const [field, setField] = useState<SearchField>("filter");
@@ -84,11 +90,13 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
 
   // A selection outlives nothing: the rows it names are not on screen after a page, a filter or a
   // sort changes, and a delete then acts on accounts nobody is looking at.
-  const reset = <T,>(set: (next: T) => void) => (next: T) => {
-    set(next);
-    setSelected([]);
-    setPage(1);
-  };
+  const reset =
+    <T,>(set: (next: T) => void) =>
+    (next: T) => {
+      set(next);
+      setSelected([]);
+      setPage(1);
+    };
 
   const labels = useMemo(
     () => new Map(users.map((u) => [u.id, u.email ?? u.phone ?? u.id])),
@@ -124,56 +132,78 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
   ].filter((c): c is string => typeof c === "string");
 
   return (
-    <section className="space-y-4">
-      <UsersToolbar
-        field={field}
-        onField={reset(setField)}
-        search={search}
-        onSearch={reset(setSearch)}
-        sort={sort}
-        onSort={reset(setSort)}
-        hidden={hidden}
-        toggle={toggle}
-        onRefresh={refresh}
-        refreshing={refreshing}
-        onCreate={() => {
-          setCreateMode("create");
-          setCreateOpen(true);
-        }}
-        onInvite={() => {
-          setCreateMode("invite");
-          setCreateOpen(true);
-        }}
-      />
+    <div className="flex h-full flex-col">
+      <header className="shrink-0 border-b border-border px-6 py-3.5">
+        <h1 className="text-base text-foreground">Users</h1>
+      </header>
 
-      <BulkDeleteBar
-        projectRef={projectRef}
-        selected={selected}
-        labels={labels}
-        onClear={() => setSelected([])}
-        onDone={() => void refetch()}
-      />
+      <div className="shrink-0 border-b border-border px-6 py-2.5">
+        <UsersToolbar
+          field={field}
+          onField={reset(setField)}
+          search={search}
+          onSearch={reset(setSearch)}
+          sort={sort}
+          onSort={reset(setSort)}
+          hidden={hidden}
+          toggle={toggle}
+          onRefresh={refresh}
+          refreshing={refreshing}
+          onCreate={() => {
+            setCreateMode("create");
+            setCreateOpen(true);
+          }}
+          onInvite={() => {
+            setCreateMode("invite");
+            setCreateOpen(true);
+          }}
+        />
+      </div>
 
-      {isWaiting(state) ? (
-        <TableSkeleton />
-      ) : state.status !== "ready" ? (
-        <Empty>{reasonOf(state)}</Empty>
-      ) : users.length === 0 ? (
-        <Empty>
-          {filter
-            ? field === "id"
-              ? `No user with the UID “${filter}”.`
-              : `No users match “${filter}”.`
-            : "This project has no users yet."}
-        </Empty>
-      ) : (
-        // Overflowing rather than truncating: the original shows every column in full and scrolls
-        // sideways, which is what a UID and a full timestamp need.
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <Table className="[&_td]:border-r [&_td]:border-border/60 [&_td:last-child]:border-r-0 [&_th]:border-r [&_th]:border-border/60 [&_th:last-child]:border-r-0">
+      {selected.length > 0 ? (
+        <div className="shrink-0 border-b border-border px-6 py-2">
+          <BulkDeleteBar
+            projectRef={projectRef}
+            selected={selected}
+            labels={labels}
+            onClear={() => setSelected([])}
+            onDone={() => void refetch()}
+          />
+        </div>
+      ) : null}
+
+      {/* The only region that scrolls. Sideways as well as down, which is what keeps the toolbar
+          and the footer still while eight columns move under them. */}
+      <div className="min-h-0 flex-1 overflow-auto">
+        {isWaiting(state) ? (
+          <div className="space-y-2 p-6">
+            {Array.from({ length: 8 }, (_, i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
+          </div>
+        ) : state.status !== "ready" ? (
+          <div className="p-6">
+            <Empty>{reasonOf(state)}</Empty>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="p-6">
+            <Empty>
+              {filter
+                ? field === "id"
+                  ? `No user with the UID “${filter}”.`
+                  : `No users match “${filter}”.`
+                : "This project has no users yet."}
+            </Empty>
+          </div>
+        ) : (
+          <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-10">
+                {/* `pr-3!`, not `pr-3`: `ui/table.tsx` zeroes the right padding of any cell holding
+                    a checkbox through a `:has()` selector, so the checkbox sat against the avatar.
+                    Matching that selector would only tie on specificity and leave source order to
+                    decide; `!` decides it. Same answer as the sheet's `sm:max-w-4xl!`. */}
+                <TableHead className="w-10 pl-4 pr-3!">
                   <Checkbox
                     checked={allShown}
                     aria-label="Select every user on this page"
@@ -182,11 +212,11 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
                     }
                   />
                 </TableHead>
-                <TableHead className="w-12" />
+                {/* No rule between these two: the original reads a checkbox and a face as one
+                    region before the UID, and a line there marks a column that does not exist. */}
+                <TableHead className="w-12 border-r border-border/60" />
                 {columns.map((label) => (
-                  <TableHead key={label} className="text-xs font-normal whitespace-nowrap text-muted-foreground">
-                    {label}
-                  </TableHead>
+                  <Head key={label}>{label}</Head>
                 ))}
               </TableRow>
             </TableHeader>
@@ -198,7 +228,7 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
                   onClick={() => setOpenUser(user.id)}
                   className="cursor-pointer"
                 >
-                  <TableCell onClick={(e) => e.stopPropagation()}>
+                  <TableCell className="pl-4 pr-3!" onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={selected.includes(user.id)}
                       aria-label={`Select ${labels.get(user.id)}`}
@@ -212,7 +242,7 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
                     />
                   </TableCell>
 
-                  <TableCell>
+                  <TableCell className="border-r border-border/60">
                     <UserAvatar user={user} />
                   </TableCell>
 
@@ -220,7 +250,7 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
                   {shows("name") ? <Cell>{displayNameOf(user)}</Cell> : null}
 
                   {shows("email") ? (
-                    <TableCell className="text-sm whitespace-nowrap">
+                    <Cell>
                       <span className="flex items-center gap-2">
                         {user.email ?? "-"}
                         {/* Two states the row would otherwise hide: never confirmed, and banned
@@ -236,19 +266,19 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
                           </Badge>
                         ) : null}
                       </span>
-                    </TableCell>
+                    </Cell>
                   ) : null}
 
                   {shows("phone") ? <Cell>{user.phone}</Cell> : null}
 
                   {shows("providers") ? (
-                    <TableCell className="text-sm">
+                    <Cell>
                       <span className="flex flex-wrap items-center gap-3">
                         {providersOf(user).map((provider) => (
                           <Provider key={provider} provider={provider} />
                         ))}
                       </span>
-                    </TableCell>
+                    </Cell>
                   ) : null}
 
                   {shows("providerType") ? <Cell>{providerTypeOf(user)}</Cell> : null}
@@ -258,10 +288,10 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
               ))}
             </TableBody>
           </Table>
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <footer className="flex shrink-0 items-center justify-between border-t border-border px-6 py-2 text-sm text-muted-foreground">
         <span>{data ? userCount(data.total) : ""}</span>
 
         <span className="flex items-center gap-2">
@@ -293,7 +323,7 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
             <IconChevronRight className="size-4" />
           </Button>
         </span>
-      </div>
+      </footer>
 
       <CreateUserDialog
         open={createOpen}
@@ -315,24 +345,25 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
         // A ban or a delete changes the row this page is showing, and only this page can refetch it.
         onChanged={() => void refetch()}
       />
-    </section>
-  );
-}
-
-const Cell = ({ children }: { children: React.ReactNode }) => (
-  <TableCell className="text-sm whitespace-nowrap">{children || "-"}</TableCell>
-);
-
-const Mono = ({ children }: { children: React.ReactNode }) => (
-  <TableCell className="font-mono text-xs whitespace-nowrap">{children}</TableCell>
-);
-
-function TableSkeleton() {
-  return (
-    <div className="space-y-2 rounded-lg border border-border p-4">
-      {Array.from({ length: 6 }, (_, i) => (
-        <Skeleton key={i} className="h-8 w-full" />
-      ))}
     </div>
   );
 }
+
+/** Column rules live on the cells rather than on the table, so two of them can go without one. */
+const Head = ({ children }: { children: React.ReactNode }) => (
+  <TableHead className="border-r border-border/60 text-xs font-normal whitespace-nowrap text-muted-foreground last:border-r-0">
+    {children}
+  </TableHead>
+);
+
+const Cell = ({ children }: { children: React.ReactNode }) => (
+  <TableCell className="border-r border-border/60 text-sm whitespace-nowrap last:border-r-0">
+    {children || "-"}
+  </TableCell>
+);
+
+const Mono = ({ children }: { children: React.ReactNode }) => (
+  <TableCell className="border-r border-border/60 font-mono text-xs whitespace-nowrap last:border-r-0">
+    {children}
+  </TableCell>
+);
