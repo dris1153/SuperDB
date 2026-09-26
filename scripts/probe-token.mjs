@@ -40,6 +40,38 @@ async function probe(label, path, init = {}) {
 }
 
 const READ_ONLY_SQL = "select pg_catalog.current_database() as db;";
+// current_user / session_user are reserved keywords, not schema-qualifiable functions — the usual
+// "schema-qualify everything" rule for this endpoint does not apply to them.
+const WHO_SQL = "select current_user::text as who, session_user::text as sess;";
+// Isolates multi-statement support from whether the role switch itself is permitted.
+const MULTI_SQL = "select 1 as a; select 2 as b;";
+const RLS_SELF_SQL = `
+select r.rolsuper, r.rolbypassrls, r.rolcanlogin
+from pg_catalog.pg_roles r where r.rolname = current_user;`;
+// Prefer a table that actually has RLS on — that is the case which can silently read as empty.
+const FIND_RLS_TABLE_SQL = `
+select n.nspname::text as schema, c.relname::text as name, c.relrowsecurity as rls
+from pg_catalog.pg_class c
+join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+where c.relkind in ('r','p') and n.nspname = 'public'
+order by c.relrowsecurity desc, c.relname
+limit 1;`;
+const ROLES_SQL = `
+select
+  r.rolname::text as role,
+  pg_catalog.pg_has_role(current_user, r.oid, 'MEMBER') as can_switch
+from pg_catalog.pg_roles r
+where r.rolname in ('postgres','authenticated','anon','service_role','authenticator')
+order by r.rolname;`;
+const DEFDEF_SQL = `
+select
+  (select count(*) from pg_catalog.pg_constraint)::int as constraints,
+  (select count(*) from pg_catalog.pg_index)::int as indexes,
+  pg_catalog.pg_get_constraintdef(c.oid) as sample_constraint
+from pg_catalog.pg_constraint c limit 1;`;
+
+let whoBaseline, whoAsRole, whoAsRoleRW, defBuiltins, multiOk, roleMembership;
+let roleAttrs, rlsRead, rlsVictim;
 
 const profile = await probe("GET /v1/profile", "/v1/profile");
 const orgs = await probe("GET /v1/organizations", "/v1/organizations");
@@ -65,6 +97,58 @@ if (ref) {
   await probe("POST query (read_only:true)", `/v1/projects/${ref}/database/query`, {
     method: "POST",
     body: JSON.stringify({ query: READ_ONLY_SQL, read_only: true }),
+  });
+
+  // Table Editor: the role switcher needs two statements in one request — `set local role x` then
+  // the select — because each request is its own transaction and a role set in a previous one is
+  // gone. If multi-statement is rejected, the switcher cannot be built on this endpoint at all.
+  whoBaseline = await probe("POST query/read-only (current_user)", `/v1/projects/${ref}/database/query/read-only`, {
+    method: "POST",
+    body: JSON.stringify({ query: WHO_SQL }),
+  });
+  multiOk = await probe("POST query/read-only (two selects)", `/v1/projects/${ref}/database/query/read-only`, {
+    method: "POST",
+    body: JSON.stringify({ query: MULTI_SQL }),
+  });
+  roleMembership = await probe("POST query/read-only (pg_has_role)", `/v1/projects/${ref}/database/query/read-only`, {
+    method: "POST",
+    body: JSON.stringify({ query: ROLES_SQL }),
+  });
+  whoAsRole = await probe("POST query/read-only (set local role + select)", `/v1/projects/${ref}/database/query/read-only`, {
+    method: "POST",
+    body: JSON.stringify({ query: `set local role authenticated; ${WHO_SQL}` }),
+  });
+  whoAsRoleRW = await probe("POST query (read_only:true, set local role + select)", `/v1/projects/${ref}/database/query`, {
+    method: "POST",
+    body: JSON.stringify({ query: `set local role authenticated; ${WHO_SQL}`, read_only: true }),
+  });
+
+  // The whole Table Editor rests on this: can the query role actually read ROWS out of a user table
+  // that has RLS enabled? Catalog reads (pg_class) are unaffected by RLS, so the existing Database
+  // page proves nothing here. If the role neither bypasses RLS nor is granted by a policy, every
+  // protected table reads as empty and the feature is hollow.
+  roleAttrs = await probe("POST query/read-only (role attrs)", `/v1/projects/${ref}/database/query/read-only`, {
+    method: "POST",
+    body: JSON.stringify({ query: RLS_SELF_SQL }),
+  });
+  const victim = (await probe("POST query/read-only (find rls table)", `/v1/projects/${ref}/database/query/read-only`, {
+    method: "POST",
+    body: JSON.stringify({ query: FIND_RLS_TABLE_SQL }),
+  }))?.[0];
+  if (victim) {
+    const q = `"${victim.schema.replace(/"/g, '""')}"."${victim.name.replace(/"/g, '""')}"`;
+    rlsRead = await probe(`POST query/read-only (select from ${victim.schema}.${victim.name}, rls=${victim.rls})`, `/v1/projects/${ref}/database/query/read-only`, {
+      method: "POST",
+      body: JSON.stringify({ query: `select count(*)::int as n from ${q};` }),
+    });
+    rlsVictim = victim;
+  }
+
+  // Table Editor Definition tab synthesises CREATE TABLE from the catalog; Postgres has no
+  // pg_get_tabledef. Confirm the two builtins it leans on are reachable over a read-only token.
+  defBuiltins = await probe("POST query/read-only (pg_get_*def)", `/v1/projects/${ref}/database/query/read-only`, {
+    method: "POST",
+    body: JSON.stringify({ query: DEFDEF_SQL }),
   });
 
   // Everything the project Overview needs. 403 names a missing scope and is fixable by
@@ -105,3 +189,26 @@ if (projects?.length) {
   }, {});
   console.log(`project statuses          : ${JSON.stringify(byStatus)}`);
 }
+
+console.log("\n--- answers to the Table Editor questions ---");
+const who = (r) => r?.[0]?.who ?? "NO";
+console.log(`default query role        : ${whoBaseline ? `${who(whoBaseline)} (session ${whoBaseline[0]?.sess})` : "NO"}`);
+console.log(`multi-statement accepted  : ${multiOk ? `yes — returned ${JSON.stringify(multiOk)}` : "NO"}`);
+if (roleMembership) {
+  const can = roleMembership.filter((r) => r.can_switch).map((r) => r.role);
+  console.log(`roles this token can set  : ${can.length ? can.join(", ") : "none"}`);
+  console.log(`roles seen                : ${roleMembership.map((r) => `${r.role}=${r.can_switch}`).join(" ")}`);
+}
+console.log(`set local role authenticated (read-only): ${whoAsRole ? `yes — became ${who(whoAsRole)}` : "NO"}`);
+console.log(`set local role authenticated (query)   : ${whoAsRoleRW ? `yes — became ${who(whoAsRoleRW)}` : "NO"}`);
+if (roleAttrs?.[0]) {
+  const a = roleAttrs[0];
+  console.log(`role attrs                : super=${a.rolsuper} bypassrls=${a.rolbypassrls} canlogin=${a.rolcanlogin}`);
+}
+if (rlsVictim) {
+  const n = rlsRead?.[0]?.n;
+  console.log(`row read (${rlsVictim.schema}.${rlsVictim.name}, rls=${rlsVictim.rls}) : ${rlsRead ? `${n} rows visible` : "BLOCKED — Table Editor cannot read this table"}`);
+} else {
+  console.log(`row read                  : no public table found to test against`);
+}
+console.log(`pg_get_*def reachable     : ${defBuiltins ? "yes" : "NO — Definition tab needs another source"}`);

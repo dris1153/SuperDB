@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
-import { IconBrandGithub, IconDatabase } from "@tabler/icons-react";
+import { IconBrandGithub } from "@tabler/icons-react";
 import { signInWithGitHub } from "@/lib/auth-actions";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
+import { BrandMark } from "./brand-mark";
 
 export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
       <Card className="w-full max-w-sm p-6">
-        <div className="flex items-center gap-2 text-primary">
-          <IconDatabase size={20} stroke={1.5} />
+        <div className="flex items-center gap-2">
+          <BrandMark size={20} />
           <span className="text-lg text-foreground">SuperDB</span>
         </div>
         <p className="mt-1 text-sm text-subtle">{title}</p>

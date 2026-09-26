@@ -1,8 +1,10 @@
 import "server-only";
 import { recordEvent } from "./audit";
+import { forgetConnectionProjects } from "./projects-memo";
 import { normaliseTags } from "./tags";
 import { open, seal } from "./crypto";
 import { listOrgs } from "./mgmt-api";
+import { dropUser } from "./part-cache";
 import { refreshTokens, revoke, type OAuthTokens } from "./oauth";
 import { requireUser } from "./supabase/server";
 
@@ -57,7 +59,11 @@ function oauthColumns(tokens: OAuthTokens) {
 
 export async function listConnections(): Promise<Connection[]> {
   const { supabase } = await requireUser();
-  const { data, error } = await supabase.from("connections").select(SAFE_COLUMNS).order("created_at");
+  const { data, error } = await supabase
+    .from("connections")
+    .select(SAFE_COLUMNS)
+    .order("sort_order", { nullsFirst: false })
+    .order("created_at");
   if (error) throw new Error(error.message);
   return (data ?? []) as Connection[];
 }
@@ -66,6 +72,27 @@ export async function listConnections(): Promise<Connection[]> {
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
 type Row = Connection & { dek_wrapped: string; secret_cipher: string; expires_at: string | null };
+
+/**
+ * One refresh per connection at a time, within this process.
+ *
+ * A refresh token is single-use and Supabase rotates it, so concurrent refreshes of the same
+ * connection have exactly one winner. That used to be theoretical — a page render refreshed once —
+ * and the read endpoints made it ordinary: nine parts are nine requests, all of them resolving the
+ * same connection inside the same second. Sharing the in-flight promise means one upstream call and
+ * one audit event instead of nine, and nothing for the losers to mis-handle.
+ *
+ * Per process, so several instances can still race; the re-read below is what covers that.
+ *
+ * Pinned to `globalThis`, like `lib/part-cache.ts` and the owners memo: one compiled copy per bundle
+ * layer means one map per layer, and a route handler would not share its in-flight refresh with a
+ * server action — which is exactly the concurrent case this exists for. Single-flight that only works
+ * within one layer is not single-flight.
+ */
+const flight = globalThis as typeof globalThis & {
+  __superdbRefreshes?: Map<string, Promise<string>>;
+};
+const refreshes = (flight.__superdbRefreshes ??= new Map<string, Promise<string>>());
 
 /**
  * A failed refresh means the user revoked the app upstream. Record it and leave the row alone so the
@@ -79,8 +106,21 @@ async function accessTokenFor(
   if (row.kind !== "oauth" || !secret.refresh || !row.expires_at) return secret.access;
   if (Date.parse(row.expires_at) - Date.now() > REFRESH_MARGIN_MS) return secret.access;
 
+  const inFlight = refreshes.get(row.id);
+  if (inFlight) return inFlight;
+
+  const refresh = refreshOnce(supabase, row, secret.refresh).finally(() => refreshes.delete(row.id));
+  refreshes.set(row.id, refresh);
+  return refresh;
+}
+
+async function refreshOnce(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  row: Row,
+  refreshToken: string,
+): Promise<string> {
   try {
-    const tokens = await refreshTokens(secret.refresh);
+    const tokens = await refreshTokens(refreshToken);
     await supabase
       .from("connections")
       .update({ ...oauthColumns(tokens), synced_at: new Date().toISOString(), last_error: null })
@@ -94,6 +134,22 @@ async function accessTokenFor(
     return tokens.access_token;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+
+    // A refresh token is single-use: Supabase rotates it, so when several requests refresh the same
+    // connection at once exactly one wins and the rest fail on a token that is no longer current.
+    // That is not a revoked grant, and recording it as one would put a healthy connection into
+    // "Reconnect required" and 404 every read through it. Re-read the row: if someone else rotated
+    // it while this call was in flight, use what they stored.
+    const { data: fresh } = await supabase
+      .from("connections")
+      .select(`${SAFE_COLUMNS}, dek_wrapped, secret_cipher, expires_at`)
+      .eq("id", row.id)
+      .maybeSingle();
+
+    if (fresh && (fresh as Row).expires_at !== row.expires_at) {
+      return openSecret(fresh as Row).access;
+    }
+
     await supabase.from("connections").update({ last_error: message }).eq("id", row.id);
     await recordEvent(supabase, {
       connectionId: row.id,
@@ -117,6 +173,9 @@ export async function connectionsWithTokens(): Promise<(Connection & { token: st
   const { data, error } = await supabase
     .from("connections")
     .select(`${SAFE_COLUMNS}, dek_wrapped, secret_cipher, expires_at`)
+    // nulls last and created_at as tiebreak, so the order stays total even for a row the backfill
+    // missed or two that briefly share a number after a reorder.
+    .order("sort_order", { nullsFirst: false })
     .order("created_at");
   if (error) throw new Error(error.message);
 
@@ -195,6 +254,35 @@ export async function addOAuthConnection(tokens: OAuthTokens) {
 }
 
 /**
+ * Where a newly connected account goes: last. Reads the current maximum rather than counting rows,
+ * because a deleted connection leaves a gap and a count would collide with an existing number.
+ *
+ * Returns null when rows exist but none is numbered yet — no integer sorts after a null under
+ * `nulls last`, so the honest answer is to join the unnumbered group, where created_at still puts
+ * this one at the end.
+ *
+ * The error is checked rather than swallowed: falling back to a default here would silently place a
+ * new connection first, which is the one position a user notices and did not ask for.
+ */
+async function nextSortOrder(
+  supabase: Awaited<ReturnType<typeof requireUser>>["supabase"],
+  userId: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("connections")
+    .select("sort_order")
+    .eq("user_id", userId)
+    .order("sort_order", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+
+  if (!data) return 1;
+  const max = data.sort_order as number | null;
+  return max === null ? null : max + 1;
+}
+
+/**
  * Select-then-write: the unique index guards integrity, and this avoids upserting onto an expression.
  *
  * display_name and tags are set on insert only. They belong to the user, and folding them into the
@@ -237,8 +325,16 @@ async function write({
         kind,
         display_name: org.name,
         tags: normaliseTags(tags),
+        // Insert-only, like display_name and tags: re-authorizing must never move a connection the
+        // user has placed. A concurrent connect can pick the same number; nothing enforces
+        // uniqueness and the created_at tiebreak keeps the order total until one is re-dragged.
+        sort_order: await nextSortOrder(supabase, user.id),
       });
   if (error) throw new Error(error.message);
+
+  // Re-pasting a token or re-authorizing is usually somebody expecting to see something new — a
+  // project they just created upstream. The memo would otherwise hold the old list for its window.
+  if (existing) forgetConnectionProjects(existing.id);
 
   await recordEvent(supabase, {
     connectionId: existing?.id,
@@ -246,6 +342,36 @@ async function write({
     kind,
     event: "connected",
   });
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Far above any plausible number of connected accounts; a bound, not a product decision. */
+const MAX_REORDER = 500;
+
+/**
+ * Writes a whole ordering in one statement, through public.reorder_connections.
+ *
+ * An RPC rather than a loop of updates on purpose: rotateVault already loops independent writes with
+ * no transaction, and a failure partway through it leaves an inconsistent vault. One statement means
+ * a partial reorder cannot exist rather than merely being unlikely.
+ *
+ * The client's order is taken as given — it is a user preference with nothing to validate against,
+ * and RLS bounds the write to the caller's own rows.
+ */
+export async function reorderConnections(ids: string[]): Promise<void> {
+  // A server action's arguments are client input; the string[] type is erased at runtime. RLS bounds
+  // what a hostile array can reach, but a malformed uuid would surface as a raw Postgres error and
+  // an unbounded one makes array_position scan per row, so both are refused here instead.
+  if (!Array.isArray(ids) || ids.length > MAX_REORDER) {
+    throw new Error("Invalid connection order");
+  }
+  if (!ids.every((id) => typeof id === "string" && UUID.test(id))) {
+    throw new Error("Invalid connection order");
+  }
+
+  const { supabase } = await requireUser();
+  const { error } = await supabase.rpc("reorder_connections", { ids });
+  if (error) throw new Error(error.message);
 }
 
 /** The only path that may change display_name or tags after the first connect. */
@@ -273,7 +399,7 @@ export async function listTags(): Promise<string[]> {
 }
 
 export async function removeConnection(id: string) {
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const { data } = await supabase
     .from("connections")
     .select("kind, display_name, dek_wrapped, secret_cipher")
@@ -288,6 +414,15 @@ export async function removeConnection(id: string) {
 
   const { error } = await supabase.from("connections").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  // Before the read cache below, and for the same reason: a disconnect that leaves this account's
+  // projects on the board for another twenty seconds does not read as a disconnect.
+  forgetConnectionProjects(id);
+
+  // The read cache is keyed by project, not by connection, so there is no way to drop only what this
+  // token fetched. Everything of theirs goes: a disconnect that leaves five minutes of data fetched
+  // through the removed grant is not a disconnect.
+  dropUser(user.id);
 
   // Written after the delete so a failed delete is not logged as a success. connection_id survives
   // as a dangling reference on purpose — it is the row most worth keeping.

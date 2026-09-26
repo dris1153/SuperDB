@@ -1,6 +1,6 @@
 ---
 title: "Multi-user SuperDB: open signup + OAuth connections"
-status: pending
+status: in-progress
 created: 2026-08-24
 blockedBy: []
 blocks: []
@@ -64,3 +64,7 @@ direction points there, but Phases 1-3 will produce constraints that should shap
 ```
 /ck:cook --auto plans/260824-1218-multi-user-auth-and-oauth-connections/phase-01-authentication.md
 ```
+
+## Status
+
+Audited 2026-09-26: phase 2's file list names `lib/accounts.ts` and `app/(app)/accounts/page.tsx` as the things it replaced, and a `supabase/migrations/` directory that was never adopted — this repo has one idempotent `supabase/schema.sql`. Neither is missing work.

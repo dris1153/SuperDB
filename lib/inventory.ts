@@ -2,6 +2,11 @@ import "server-only";
 import { cache } from "react";
 import { connectionsWithTokens, type Connection, type ConnectionKind } from "./connections";
 import { getProject, listOrgs, listProjects, type Project } from "./mgmt-api";
+import { projectOrder } from "./project-order";
+import { projectsForConnection } from "./projects-memo";
+import { isProjectRef } from "./project-ref";
+import { requireUser } from "./supabase/server";
+import { bySavedOrder } from "./project-sort";
 
 export type InventoryProject = Project & {
   connectionId: string;
@@ -16,11 +21,15 @@ export type Inventory = {
   projects: InventoryProject[];
   connections: Connection[];
   errors: { owner: string; message: string }[];
+  /** Whether the user has dragged anything yet. The board cannot tell from the order alone. */
+  ordered: boolean;
 };
 
 /** Fans out across every connection. One broken token degrades its own row, not the page. */
 export async function loadInventory(): Promise<Inventory> {
-  const connections = await connectionsWithTokens();
+  // Alongside the tokens rather than after them: the order is a small keyed read against this app's
+  // own database, so pairing it here costs no wall-clock time.
+  const [connections, order] = await Promise.all([connectionsWithTokens(), projectOrder()]);
   const errors: Inventory["errors"] = [];
 
   const perConnection = await Promise.all(
@@ -31,7 +40,15 @@ export async function loadInventory(): Promise<Inventory> {
         return [];
       }
       try {
-        const [projects, orgs] = await Promise.all([listProjects(token), listOrgs(token)]);
+        // Memoised per connection for twenty seconds — these two are the slowest-changing reads in
+        // the app and the most often repeated, and `lib/projects-memo.ts` explains why the key is
+        // the connection rather than the token.
+        const { projects, orgs } = await projectsForConnection(connection.id, () =>
+          Promise.all([listProjects(token), listOrgs(token)]).then(([projects, orgs]) => ({
+            projects,
+            orgs,
+          })),
+        );
         const orgName = new Map(orgs.map((o) => [o.slug, o.name]));
         return projects.map<InventoryProject>((p) => ({
           ...p,
@@ -48,18 +65,28 @@ export async function loadInventory(): Promise<Inventory> {
     }),
   );
 
-  const projects = perConnection
-    .flat()
-    .sort(
-      (a, b) =>
-        a.owner.localeCompare(b.owner) || a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name),
-    );
+  // Sorted within a connection only, never across them: connectionsWithTokens returns the user's
+  // chosen sort_order and perConnection preserves it, so the board follows the order set on the
+  // connections page. Sorting by owner here again would silently override it — this is deliberate,
+  // not a missing sort.
+  const grouped = perConnection.flatMap((group) =>
+    group.sort((a, b) => a.orgName.localeCompare(b.orgName) || a.name.localeCompare(b.name)),
+  );
 
-  return { projects, connections: connections.map(({ token, ...c }) => c), errors };
+  // A project the user has placed by hand wins; see bySavedOrder for why unplaced ones go last.
+  // sort() is stable, so those keep the connection grouping above among themselves.
+  const projects = grouped.sort(bySavedOrder(order));
+
+  return {
+    projects,
+    connections: connections.map(({ token, ...c }) => c),
+    errors,
+    ordered: order.size > 0,
+  };
 }
 
-/** Project refs are 20 lowercase letters — validate before it reaches a URL we build. */
-export const isProjectRef = (ref: string) => /^[a-z]{20}$/.test(ref);
+/** Re-exported so existing callers keep working; the definition lives in a leaf to avoid a cycle. */
+export { isProjectRef };
 
 /**
  * Finds which connection owns a ref by asking all of them at once.
@@ -68,19 +95,85 @@ export const isProjectRef = (ref: string) => /^[a-z]{20}$/.test(ref);
  * Wrapped in cache() because the project layout and the page inside it both need this, and each call
  * fans out one request per connection — without deduplication every navigation would double them.
  */
+/**
+ * Which connection last answered for a ref, per user, for a minute.
+ *
+ * `cache()` below deduplicates within one request, which was enough while a page resolved the
+ * project once. The read endpoints turned that into one resolve *per part*, and each resolve asks
+ * every connection — three connections and ten cards is thirty upstream calls spent on authorisation
+ * alone, against an API that throttles.
+ *
+ * The project body is remembered with it, because otherwise every part still pays one `getProject`
+ * to prove what the previous part just proved — nine parts, nine calls, before any of them read
+ * anything. Never a token: the token comes from the caller's own RLS-scoped query each time, so a
+ * remembered entry cannot grant access to a connection the caller no longer has.
+ *
+ * A minute of staleness costs a project name or status that is a minute old on a page that is about
+ * to fetch both again anyway. A stale entry whose connection is gone falls back to the fan-out.
+ */
+const OWNER_TTL_MS = 60_000;
+
+// Pinned to `globalThis` for the same reason as `lib/part-cache.ts`: Next compiles a module once per
+// bundle layer, and this one is reached from a route handler, a server action and an RSC render. A
+// plain module-level Map gives each layer its own, so the entry the page shell warmed was not the one
+// the browser's part requests read — the memo simply missed, quietly, and paid the fan-out again.
+const memo = globalThis as typeof globalThis & {
+  __superdbOwners?: Map<string, { connectionId: string; project: Project; at: number }>;
+};
+const owners = (memo.__superdbOwners ??= new Map<
+  string,
+  { connectionId: string; project: Project; at: number }
+>());
+
+/**
+ * Corrects a remembered project's name after a rename, **in place**.
+ *
+ * Replacing the entry would not be enough, and deleting it would be worse. `resolveProject` is
+ * wrapped in React `cache()`, and a server action plus the re-render it triggers happen inside one
+ * request — so the layout that re-renders after the action has already memoised the object this memo
+ * handed out. Mutating that object is what the re-render sees; a fresh entry in the map is not,
+ * because nothing will read the map again until the next request.
+ *
+ * Deleting also costs the next resolve a full fan-out across every connection, which is the expense
+ * the memo exists to avoid.
+ */
+export async function renameRemembered(ref: string, name: string) {
+  const { user } = await requireUser();
+  const remembered = owners.get(`${user.id}:${ref}`);
+  if (remembered) remembered.project.name = name;
+}
+
 export const resolveProject = cache(async (ref: string) => {
   if (!isProjectRef(ref)) return null;
   const connections = await connectionsWithTokens();
 
-  const hits = await Promise.all(
-    connections.map(async ({ token, ...connection }) => {
-      if (!token) return null;
-      try {
-        return { token, connection, project: await getProject(token, ref) };
-      } catch {
-        return null;
-      }
-    }),
-  );
-  return hits.find((h) => h !== null) ?? null;
+  const { user } = await requireUser();
+  const key = `${user.id}:${ref}`;
+  const remembered = owners.get(key);
+
+  const ask = async (entry: (typeof connections)[number]) => {
+    const { token, ...connection } = entry;
+    if (!token) return null;
+    try {
+      return { token, connection, project: await getProject(token, ref) };
+    } catch {
+      return null;
+    }
+  };
+
+  if (remembered && Date.now() - remembered.at < OWNER_TTL_MS) {
+    const known = connections.find((c) => c.id === remembered.connectionId);
+    if (known?.token) {
+      const { token, ...connection } = known;
+      return { token, connection, project: remembered.project };
+    }
+    owners.delete(key);
+  }
+
+  const hits = await Promise.all(connections.map(ask));
+  const hit = hits.find((h) => h !== null) ?? null;
+  if (hit) {
+    owners.set(key, { connectionId: hit.connection.id, project: hit.project, at: Date.now() });
+  }
+  return hit;
 });

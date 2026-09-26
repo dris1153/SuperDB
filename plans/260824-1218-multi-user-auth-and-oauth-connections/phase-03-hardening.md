@@ -22,6 +22,14 @@ a user may do with their own databases; it only limits how far a compromise trav
 - [x] **TOTP MFA.** Opt-in per account, enforced once enrolled. `/settings` enrolls (QR + verify),
       `/mfa` challenges, `proxy.ts` redirects any session at `aal1` whose `nextLevel` is `aal2`.
       Implemented with server actions — no browser Supabase client was added.
+      **Rewritten** by
+      [260910-0042-navigation-latency](../260910-0042-navigation-latency/phase-03-proxy-auth-roundtrip.md):
+      the gate is now a locally-computed decision in `lib/mfa-gate.ts`, and factors come from the
+      proxy's own `getUser()` response instead of `session.user.factors`. That closes a real gap —
+      the cookie only updates on token refresh, so enrolling a factor in one browser left another
+      browser unchallenged for up to an hour. Decision logic is unchanged and unit-tested.
+      **Re-verify this checklist item against the new implementation before calling hardening done;
+      the blocking manual end-to-end check is still unrun.**
 - [x] **Audit log.** `public.connection_events`, written on connect / refresh / refresh_failed /
       disconnect. Append-only by RLS: a user can insert and read their own rows but not update or
       delete them, so a stolen session cannot erase its own tracks. `recordEvent` never throws — a

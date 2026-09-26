@@ -44,12 +44,9 @@ export function PausedProject({ project }: { project: Project }) {
   const [resumed, setResumed] = useState(false);
 
   const moving = isMoving(project.status);
-  const waiting = moving || resumed;
-
-  useEffect(() => {
-    // Once the server agrees the project has left the paused state, the status can speak for itself.
-    if (!isPaused(project.status)) setResumed(false);
-  }, [project.status]);
+  // The local flag only counts while the server still reports the project as paused. Once it does
+  // not, the status speaks for itself — which is derived state, not something an effect should reset.
+  const waiting = moving || (resumed && isPaused(project.status));
 
   /**
    * Restoring takes minutes, so the page checks back rather than leaving a stale screen. Ten seconds

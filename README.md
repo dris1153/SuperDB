@@ -1,13 +1,33 @@
+<div align="center">
+
+<img src="docs/images/logo.svg" width="88" height="88" alt="SuperDB logo: four database discs on one board" />
+
 # SuperDB
 
-Every Supabase project, across every one of your Supabase accounts, on one board.
+**Every Supabase project, across every one of your Supabase accounts, on one board.**
+
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org)
+[![React 19](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev)
+[![TypeScript 5.9](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tailwind CSS 4](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Supabase](https://img.shields.io/badge/Supabase-Auth_%2B_Postgres-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![pnpm](https://img.shields.io/badge/pnpm-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
+[![Node ≥ 22.18](https://img.shields.io/badge/Node-%E2%89%A5_22.18-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+
+[What it does](#what-it-does) · [Connecting](#connecting-an-account) · [Security](#security) ·
+[Self-hosting](#self-hosting) · [Development](#development) · [Docs](docs/README.md)
+
+</div>
 
 ![The SuperDB projects board: nine projects from two connected Supabase accounts, with search, owner, status and tag filters](docs/images/board.png)
 
 Supabase gives each account its own dashboard. If you hold five accounts, you hold five dashboards,
 five tabs, and no way to remember which one owns which project. SuperDB connects all of them to a
-single board and lets you name each account whatever you actually call it.
+single board, lets you name each account whatever you actually call it, and gives every project a
+workspace shaped like Supabase's own.
 
+> [!NOTE]
 > **A note on identity.** Supabase no longer issues user-scoped tokens, so `/v1/profile` refuses
 > every token this app can be handed — no automatic "which email owns this" exists any more, for
 > access tokens and OAuth grants alike. SuperDB works around it: a connection is named after its
@@ -16,37 +36,74 @@ single board and lets you name each account whatever you actually call it.
 
 ## What it does
 
-**Projects board** — every project from every connection in one grid, with counts across the top and
-filters for owner, status and tag. Each card carries its ref, the connection it came from, the
-organization and region, and whatever tags you gave it.
+### Across accounts
 
-**Per-project workspace** — a Supabase-style sidebar with Overview and Database built. The other
-eleven nav items are visible and marked "soon", so the shape of the thing is honest rather than
-hidden.
+- **Projects board** — every project from every connection in one grid, with counts across the top
+  and filters for owner, status and tag. Each card carries its ref, the connection it came from, the
+  organization and region, and whatever tags you gave it. Drag to order it your way.
+- **Naming and tags** — rename any connection; tag projects freely with a creatable picker.
+- **Credential vault** — store each Supabase account's sign-in method and email, plus the passwords
+  for that account and the mailbox behind it. Encrypted in your browser, never in plaintext on the
+  server. See [Security](#security).
+- **Open in Supabase** — every project page links to the same page in the original dashboard. The
+  account chip beside the project's name says which account holds it and copies what signs in to it:
+  email, account and mailbox passwords, the database password, the ref and the URL. The original
+  keeps one account signed in per browser, so a project from another account needs a sign-out first
+  — which is what the copy buttons are for.
+- **Account safety** — TOTP two-factor, an append-only connection event log, and self-service account
+  deletion that revokes every OAuth grant on the way out.
+
+### Inside a project
+
+A Supabase-style rail with the same sections, in the same order. What is built:
+
+| Section | What is there |
+|---|---|
+| **Overview** | Status, compute, branch, migration and backup tiles; the primary database card; the Connect sheet; service usage charts read from the project's logs |
+| **Table Editor** | Browse, filter, sort and edit rows; import and export; schema changes |
+| **SQL Editor** | CodeMirror with PostgreSQL highlighting, tabs, saved and favourite queries, templates, examples, running queries, a results grid and a chart |
+| **Database** | Schema Visualizer, Tables and their columns, Functions, Enumerated Types, Policies |
+| **Authentication** | Users, OAuth Apps, Emails (templates and SMTP), OAuth Server |
+| **Storage** | Buckets and files, S3, Analytics, Vectors |
+| **Project Settings** | General, API Keys, JWT Keys, Password Manager |
+
+Sections and pages not built yet stay visible and marked "soon", so the shape of the thing is honest
+rather than hidden — see [Not built yet](#not-built-yet).
 
 ![Project Overview: status, compute, branch, migration and backup tiles beside a Primary Database card showing disk, RAM, connections and size, above the Get connected grid and service usage charts](docs/images/overview.png)
 
 Disk and RAM appear here because this project is reached through an access token. Over OAuth those
 two cards explain themselves instead — see [Connecting an account](#connecting-an-account).
 
-**Connect sheet** — the same right-hand sheet Supabase shows. Framework covers ten frameworks with
-their real quickstart files, the shadcn toggle where Supabase publishes a registry item, and a Copy
-prompt button. Direct, Server, MCP and ORM (Prisma, Drizzle) are built too.
+### Writing to a database with no undo
+
+The Table Editor and the Database pages write as `postgres` with row-level security bypassed, so every
+write is previewed, confirmed, and recorded in the audit log. Row edits are confirmed against a
+re-checked row count, and `auth` and `storage` make you type the table name first. On the Database
+pages the statement you confirm is rebuilt on the server from what you chose and the live catalog,
+never taken from the page. [`docs/table-editor.md`](docs/table-editor.md) explains why the safety
+model has the shape it does, and [`docs/table-editor-measurements.md`](docs/table-editor-measurements.md)
+records what was measured against a live project rather than assumed.
+
+The SQL Editor is the one deliberate exception: it hands you arbitrary SQL, as Supabase's does. It
+runs everything read-only first, so a read never asks anything; only when Postgres refuses a write
+there does it ask once, naming the project, before running it for real — and audits it.
+
+### Connect sheet
+
+The same right-hand sheet Supabase shows. Framework covers ten frameworks with their real quickstart
+files, the shadcn toggle where Supabase publishes a registry item, and a Copy prompt button. Direct,
+Server, MCP and ORM (Prisma, Drizzle) are built too.
 
 ![The Connect sheet open on the Direct tab, offering direct connection, transaction pooler and session pooler, with a connection string and a field-by-field parameter table](docs/images/connect.png)
 
-The connection string keeps Supabase's `[YOUR-PASSWORD]` placeholder: the Management API does not
-return a database password, and resetting one is destructive, so that stays in Supabase's own
-dashboard.
-
-**Credential vault** — store the Supabase account's sign-in method and email, plus the passwords for
-that account and the mailbox behind it. Encrypted in your browser, never in plaintext on the server.
-See [Security](#security).
-
-**Naming and tags** — rename any connection; tag projects freely with a creatable picker.
-
-**Account safety** — TOTP two-factor, an append-only connection event log, and self-service account
-deletion that revokes every OAuth grant on the way out.
+The connection string on screen keeps Supabase's `[YOUR-PASSWORD]` placeholder. Postgres keeps only
+a one-way hash of that password and the Management API has no endpoint that returns it, so there is
+nothing to fill it with. Store your own under **Project Settings → Password Manager** and a second
+Copy button appears, putting a working string on the clipboard without ever showing the password.
+Supabase reveals that password once, when the project is created, so the same page can set a new
+one: generated in your browser, confirmed by typing the project name, and audited like every other
+write.
 
 ## Connecting an account
 
@@ -106,16 +163,17 @@ list that excludes the ciphertext.
 
 **Passwords — encrypted in your browser, zero-knowledge.** A master password you choose is stretched
 with PBKDF2-HMAC-SHA256 at 600,000 iterations into a non-extractable AES-GCM key held in IndexedDB.
-Passwords are sealed with it before they leave the page; the server stores an opaque blob and has no
-way to open it.
+Account passwords and database passwords are sealed with it before they leave the page; the server
+stores an opaque blob and has no way to open it.
 
+> [!WARNING]
 > Forget the master password and the stored passwords are gone. There is no recovery, by
 > construction — a reset path would mean the server could decrypt them, which is the exact property
 > being avoided.
 
 **Everything else**
 
-- Row level security on all four tables, `revoke all from anon` on each. A row is reachable only by
+- Row level security on all seven tables, `revoke all from anon` on each. A row is reachable only by
   the authenticated user who created it.
 - TOTP two-factor at AAL2. Supabase issues no recovery codes; losing every enrolled factor means
   losing the account.
@@ -123,23 +181,27 @@ way to open it.
   deliberately outlive the connection they describe — a deleted connection is the event most worth
   keeping.
 - Account deletion runs through a `security definer` function scoped to `auth.uid()`, so the app
-  never holds a `service_role` key.
+  never holds its own project's `service_role` key.
 
 ## Self-hosting
 
 ### 1. A Supabase project to hold SuperDB's own data
 
 Create one (or reuse one), open the SQL editor, and run [`supabase/schema.sql`](supabase/schema.sql).
-It is idempotent — re-run it after a pull. It creates:
+It is idempotent — re-run it after a pull. [`docs/deploying-the-schema.md`](docs/deploying-the-schema.md)
+covers checking what is already there. It creates:
 
 | Table | Holds |
 |---|---|
-| `connections` | one row per connected Supabase account: encrypted tokens, display name, tags |
+| `connections` | one row per connected Supabase account: encrypted tokens, display name, tags, order |
 | `connection_secrets` | sign-in method, account email, and the client-encrypted password blob |
 | `vault` | the master password's salt and iteration count — never the key |
 | `connection_events` | append-only connection audit log |
+| `project_order` | your order of the projects board |
+| `project_secrets` | each project's client-encrypted database password |
+| `saved_queries` | the SQL Editor's saved and favourite queries |
 
-plus `delete_own_account()`.
+plus `delete_own_account()`, `reorder_connections()` and `reorder_projects()`.
 
 ### 2. Authentication
 
@@ -215,9 +277,13 @@ call them; the organization name is only the default.
 
 ## Development
 
+Needs Node 22.18 or newer: the tests are TypeScript run directly by `node --test`, which relies on
+Node's built-in type stripping.
+
 ```bash
 pnpm dev          # next dev on :3000
-pnpm test         # node:test, 33 tests — crypto, vault, tags, paths, prometheus
+pnpm test         # node:test, 623 tests — crypto, vault, SQL and DDL building, parsing, CSV, URLs
+pnpm lint         # eslint
 pnpm typecheck    # tsc --noEmit
 pnpm build
 ```
@@ -231,7 +297,12 @@ Supabase changes the Management API:
   status per endpoint. Run it with both kinds and diff the two tables.
 
 Everything the app knows about the Management API lives in `lib/mgmt-api.ts`; adding an endpoint
-means adding a function there and a call site.
+means adding a function there and a call site. The project pages read through one route,
+`/api/projects/[ref]/[part]`, whose whitelist is `lib/project-part-names.ts` and whose readers are
+`lib/project-parts.ts`.
+
+[`docs/`](docs/README.md) holds the durable notes — the table editor's safety model, what the
+Management, Auth and logs APIs actually do, the schema, and the secret-rotation runbook.
 
 ## Deploy
 
@@ -239,22 +310,32 @@ Works on Vercel as-is. Set the environment variables in the project settings, ad
 to *Authentication → URL Configuration* in the Supabase project, and add `<origin>/api/connect/callback`
 to the OAuth app's redirect URIs.
 
-`docs/secret-rotation-runbook.md` covers rotating `ENCRYPTION_KEY` and the OAuth client secret.
+[`docs/secret-rotation-runbook.md`](docs/secret-rotation-runbook.md) covers rotating `ENCRYPTION_KEY`
+and the OAuth client secret.
 
 ## Stack
 
 Next.js 16 (App Router, server components, `proxy.ts`) · React 19 · Supabase Auth + Postgres ·
-Tailwind v4 · shadcn/ui on Radix · Tabler Icons · Shiki for syntax highlighting. No ORM and no
-data-fetching library — around 7,400 lines across `app/`, `lib/` and `components/`.
+Tailwind v4 · shadcn/ui on Radix · TanStack Query · CodeMirror 6 · React Flow with dagre ·
+react-data-grid · Recharts · Shiki · Tabler Icons. No ORM — around 44,000 lines across `app/`, `lib/`
+and `components/`.
 
 Theme follows `DESIGN.md` for palette and typography, but uses the Supabase *dashboard's* density
 (6px radius, compact tables) rather than the landing page's pill buttons and 64px section gaps.
 
 ## Not built yet
 
-Eleven of the thirteen project nav items — Table Editor, SQL Editor, Auth, Storage, Edge Functions,
-Realtime, Advisors, Observability, Logs, Project Settings — are visible and disabled. Also: six mobile
-and non-JS frameworks listed in the Connect sheet as "soon" (Flask, Expo, Flutter, Ionic, Swift,
-Android Kotlin), master-password rotation from the UI (the server action exists),
-moving `ENCRYPTION_KEY` into a KMS, pause / restore / restart actions, and background sync with
-cached history.
+- **Project sections** — Edge Functions, Realtime, Advisors, Observability and Logs are visible in
+  the rail and disabled.
+- **Pages inside built sections** — Database: Triggers, Extensions, Indexes, Publications, Roles,
+  Settings, Backups, Migrations. Authentication: Sign In / Providers, Sessions, Rate Limits,
+  Multi-Factor, URL Configuration, Attack Protection, Auth Hooks and the rest of its list. Project
+  Settings: Infrastructure, Database, API, Domains.
+- **Elsewhere** — six mobile and non-JS frameworks listed in the Connect sheet as "soon" (Flask,
+  Expo, Flutter, Ionic, Swift, Android Kotlin), master-password rotation from the UI (the server
+  action exists), moving `ENCRYPTION_KEY` into a KMS, pause / restore / restart actions, and
+  background sync with cached history.
+
+## License
+
+[MIT](LICENSE) © 2026 dris1153

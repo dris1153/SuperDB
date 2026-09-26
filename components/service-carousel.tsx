@@ -1,11 +1,54 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 import { count as compact } from "@/lib/format";
 import type { ServiceCard } from "@/lib/logs-sql";
-import { StackedBars } from "./stacked-bars";
 import { Card } from "./ui/card";
+import { Skeleton } from "./ui/skeleton";
+
+// Charts are recharts now, and recharts is large. Loaded on demand so it stays out of the project
+// page's first load; the placeholder is the same height, so nothing moves when it arrives.
+const StackedBars = dynamic(() => import("./stacked-bars").then((m) => m.StackedBars), {
+  ssr: false,
+  loading: () => <Skeleton className="h-24 w-full" />,
+});
+
+/**
+ * What the row looks like before the metrics land.
+ *
+ * Next to `ServiceTile` on purpose: a placeholder that lives in another file is a second copy of
+ * this layout, and the copy is the one that goes stale. Three cards rather than six — the row
+ * scrolls, so the rest are off-screen anyway.
+ */
+export function ServiceCarouselSkeleton() {
+  return (
+    <div aria-hidden className="flex gap-3 overflow-hidden">
+      {[0, 1, 2].map((card) => (
+        <Card key={card} className="w-72 shrink-0 gap-0 p-4">
+          <div className="flex items-start justify-between gap-3">
+            {/* Sized to the line boxes they replace, not to the glyphs: `text-2xl` is 32px and the
+                label above it is 16px, which is where this was four pixels short. */}
+            <div className="min-w-0 space-y-1">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-8 w-16" />
+            </div>
+            <div className="flex shrink-0 gap-4">
+              <Skeleton className="h-9 w-14" />
+              <Skeleton className="h-9 w-14" />
+            </div>
+          </div>
+          <Skeleton className="mt-4 h-24 w-full" />
+          <div className="mt-1 flex justify-between">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 /** How far the row may reach past its container on each side. */
 const MAX_BLEED = 320;

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 export function env() {
   const url = process.env.SUPABASE_URL;
@@ -24,9 +25,13 @@ export async function createClient() {
   });
 }
 
-export async function requireUser() {
+/**
+ * Cached per request because getUser() is a network round trip and this has 19 call sites: the app
+ * layout, getVaultMeta and connectionsWithTokens alone made three of them per navigation.
+ */
+export const requireUser = cache(async () => {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) throw new Error("Not authenticated");
   return { supabase, user: data.user };
-}
+});

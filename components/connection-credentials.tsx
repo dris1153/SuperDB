@@ -1,31 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { decryptJson, encryptJson } from "@/lib/vault-crypto";
+import { useState } from "react";
 import { saveConnectionSecret, type ConnectionSecret } from "@/lib/vault-actions";
-import { useVault } from "./vault-provider";
+import { METHODS, type Method } from "@/lib/credential-methods";
+import { useVaultSecret } from "./use-vault-secret";
 import { VaultGate } from "./vault-gate";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 type Passwords = { supabase_password?: string; email_password?: string };
-type Method = NonNullable<ConnectionSecret["supabase_login_method"]>;
-
-/**
- * Mirrors the Supabase dashboard sign-in page, which offers GitHub, ChatGPT, SSO and email+password.
- * There is deliberately no Google option — it does not exist there.
- *
- * Which passwords are worth storing follows from the method: a social sign-in needs no password here
- * (that account is managed wherever you manage it), email+password needs both the Supabase password
- * and the one for the mailbox behind it, and SSO needs only the identity provider's.
- */
-const METHODS: { value: Method; label: string; supabasePassword: boolean; emailPassword: boolean }[] = [
-  { value: "email", label: "Email + password", supabasePassword: true, emailPassword: true },
-  { value: "github", label: "GitHub", supabasePassword: false, emailPassword: false },
-  { value: "chatgpt", label: "ChatGPT", supabasePassword: false, emailPassword: false },
-  { value: "sso", label: "SSO", supabasePassword: false, emailPassword: true },
-];
 
 const FIELD = "mb-1 block text-xs text-subtle";
 
@@ -36,6 +21,12 @@ const EMAIL_LABEL: Record<Method, string> = {
   sso: "SSO account email",
 };
 
+/**
+ * The vault gate sits around the password fields only. Method and email are plaintext in the
+ * database by design — schema.sql calls them out as "what answers whose account is this org" — so
+ * gating them behind the master password hid information that was never secret and made a saved
+ * credential look lost.
+ */
 export function ConnectionCredentials({
   connectionId,
   secret,
@@ -43,51 +34,27 @@ export function ConnectionCredentials({
   connectionId: string;
   secret: ConnectionSecret | null;
 }) {
-  return (
-    <VaultGate>
-      <CredentialsForm connectionId={connectionId} secret={secret} />
-    </VaultGate>
-  );
-}
+  const {
+    value: passwords,
+    setValue: setPasswords,
+    decryptFailed,
+    message,
+    setMessage,
+    seal,
+  } = useVaultSecret<Passwords>(secret?.vault_blob);
 
-function CredentialsForm({
-  connectionId,
-  secret,
-}: {
-  connectionId: string;
-  secret: ConnectionSecret | null;
-}) {
-  const { key } = useVault();
   const [method, setMethod] = useState<Method>(secret?.supabase_login_method ?? "email");
   const [email, setEmail] = useState(secret?.supabase_email ?? "");
-  const [passwords, setPasswords] = useState<Passwords>({});
   const [reveal, setReveal] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Decryption happens here, never on the server — it never held the plaintext to begin with.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!key || !secret?.vault_blob) return;
-      try {
-        const decrypted = await decryptJson<Passwords>(key, secret.vault_blob);
-        if (!cancelled) setPasswords(decrypted);
-      } catch {
-        if (!cancelled) setStatus("Stored credentials could not be decrypted with this vault key.");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [key, secret?.vault_blob]);
-
   const shape = METHODS.find((m) => m.value === method)!;
+  const status = message;
 
   async function save() {
-    if (!key) return;
+    if (decryptFailed) return;
     setBusy(true);
-    setStatus(null);
+    setMessage(null);
     try {
       // Only keep what this method actually uses, so switching away does not leave a stale password
       // encrypted in the blob.
@@ -104,11 +71,11 @@ function CredentialsForm({
         connectionId,
         supabaseLoginMethod: method,
         supabaseEmail: email,
-        vaultBlob: Object.keys(kept).length > 0 ? await encryptJson(key, kept) : null,
+        vaultBlob: await seal(kept),
       });
-      setStatus("Saved.");
+      setMessage("Saved.");
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : "Could not save");
+      setMessage(e instanceof Error ? e.message : "Could not save");
     } finally {
       setBusy(false);
     }
@@ -145,62 +112,78 @@ function CredentialsForm({
         />
       </div>
 
-      {shape.supabasePassword ? (
-        <div>
-          <label className={FIELD} htmlFor={`sb-pw-${connectionId}`}>
-            Supabase password
-          </label>
-          <Input
-            id={`sb-pw-${connectionId}`}
-            type={reveal ? "text" : "password"}
-            value={passwords.supabase_password ?? ""}
-            onChange={(e) => setPasswords((p) => ({ ...p, supabase_password: e.target.value }))}
-            autoComplete="off"
-            className="font-mono"
-          />
-        </div>
-      ) : null}
-
-      {shape.emailPassword ? (
-        <div>
-          <label className={FIELD} htmlFor={`em-pw-${connectionId}`}>
-            Email password
-          </label>
-          <Input
-            id={`em-pw-${connectionId}`}
-            type={reveal ? "text" : "password"}
-            value={passwords.email_password ?? ""}
-            onChange={(e) => setPasswords((p) => ({ ...p, email_password: e.target.value }))}
-            autoComplete="off"
-            className="font-mono"
-          />
-          <p className="mt-1 text-xs text-subtle">
-            The password for the mailbox itself, not for Supabase.
-          </p>
-        </div>
-      ) : null}
-
       {shape.supabasePassword || shape.emailPassword ? (
-        <label className="flex items-center gap-2 text-xs text-subtle">
-          <input type="checkbox" checked={reveal} onChange={(e) => setReveal(e.target.checked)} />
-          Show passwords
-        </label>
+        <VaultGate>
+          {shape.supabasePassword ? (
+            <div>
+              <label className={FIELD} htmlFor={`sb-pw-${connectionId}`}>
+                Supabase password
+              </label>
+              <Input
+                id={`sb-pw-${connectionId}`}
+                type={reveal ? "text" : "password"}
+                value={passwords.supabase_password ?? ""}
+                onChange={(e) => setPasswords({ ...passwords, supabase_password: e.target.value })}
+                autoComplete="off"
+                className="font-mono"
+              />
+            </div>
+          ) : null}
+
+          {shape.emailPassword ? (
+            <div className="mt-3">
+              <label className={FIELD} htmlFor={`em-pw-${connectionId}`}>
+                Email password
+              </label>
+              <Input
+                id={`em-pw-${connectionId}`}
+                type={reveal ? "text" : "password"}
+                value={passwords.email_password ?? ""}
+                onChange={(e) => setPasswords({ ...passwords, email_password: e.target.value })}
+                autoComplete="off"
+                className="font-mono"
+              />
+              <p className="mt-1 text-xs text-subtle">
+                The password for the mailbox itself, not for Supabase.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="mt-3 flex items-center gap-2">
+            <Checkbox
+              id={`reveal-${connectionId}`}
+              checked={reveal}
+              onCheckedChange={(v) => setReveal(v === true)}
+            />
+            <label htmlFor={`reveal-${connectionId}`} className="text-xs text-subtle">
+              Show passwords
+            </label>
+          </div>
+
+          {shape.emailPassword ? (
+            <p className="mt-3 text-xs text-warn">
+              Encrypted here before it is sent; the server only ever holds ciphertext. Think twice about
+              the mailbox password — whoever has it can reset every other service you own.
+            </p>
+          ) : null}
+        </VaultGate>
       ) : (
         <p className="text-xs text-subtle">
           Nothing to store for {shape.label} beyond the address — that account lives wherever you manage it.
         </p>
       )}
 
-      {shape.emailPassword ? (
-        <p className="text-xs text-warn">
-          Encrypted here before it is sent; the server only ever holds ciphertext. Think twice about the
-          mailbox password — whoever has it can reset every other service you own.
+      {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
+
+      {decryptFailed ? (
+        <p className="text-xs text-destructive">
+          Saving is disabled. A password is stored for this connection but cannot be read with the
+          current vault key, and saving would replace it with nothing — there is no undo. Unlock with
+          the master password it was encrypted under to edit it.
         </p>
       ) : null}
 
-      {status ? <p className="text-sm text-muted-foreground">{status}</p> : null}
-
-      <Button onClick={save} disabled={busy}>
+      <Button onClick={save} disabled={busy || decryptFailed}>
         {busy ? "Saving…" : "Save credentials"}
       </Button>
     </div>

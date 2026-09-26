@@ -189,10 +189,11 @@
     font-weight: 500;
   }
 
-  /* Tailwind v4 Preflight drops the native pointer cursor on buttons. */
+  /* Tailwind v4 Preflight drops the native pointer cursor on buttons. A checkbox is a button too, so
+     it is already covered; the label beside it is what needs naming. */
   button:not(:disabled),
   [role="button"]:not(:disabled),
-  label:has(> input[type="checkbox"]),
+  [role="checkbox"]:not([data-disabled]) + label,
   select:not(:disabled),
   summary {
     cursor: pointer;
@@ -204,6 +205,85 @@
   ::selection {
     background: #006239; /* Midnight Emerald */
     color: var(--foreground);
+  }
+}
+
+/*
+ * The loading placeholder's surface: a band of the border colour sweeping across the muted ground.
+ *
+ * The gradient is three times the element's width, so at both ends of the animation the band sits
+ * entirely off the element — which is what makes the loop invisible. A 200% sweep parks it on an
+ * edge and flicks back, and that flick is the thing that reads as cheap on a dark ground.
+ *
+ * `transparent` rather than a second copy of the ground colour: the stops composite over
+ * `background-color`, so a caller can tint the base without the band going out of step with it.
+ *
+ * The reduced-motion guard lives here rather than on every call site. It used to be a
+ * `motion-reduce:animate-none` class that four placeholders had simply forgotten.
+ */
+@utility skeleton {
+  background-color: var(--muted);
+  background-image: linear-gradient(90deg, transparent 40%, var(--border) 50%, transparent 60%);
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-sweep 1.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/*
+ * The same sweep over ruled rows, for the placeholders that stand in for a grid.
+ *
+ * One element rather than N: the stripes are a repeating gradient, so the placeholder fills whatever
+ * height it is given without counting rows against a viewport nobody has measured yet. `--row` is
+ * set by the caller from the grid's own row height, so the rules land where the real rows will.
+ *
+ * Two background layers, and the keyframe pins the second: animating `background-position` alone
+ * would drag the stripes along with the band.
+ */
+@utility skeleton-rows {
+  --row: 36px;
+  background-image:
+    linear-gradient(90deg, transparent 40%, var(--border) 50%, transparent 60%),
+    repeating-linear-gradient(
+      to bottom,
+      var(--muted) 0,
+      var(--muted) calc(var(--row) - 1px),
+      var(--border) calc(var(--row) - 1px),
+      var(--border) var(--row)
+    );
+  background-size:
+    300% 100%,
+    100% 100%;
+  background-repeat: no-repeat, repeat;
+  animation: skeleton-sweep-rows 1.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@keyframes skeleton-sweep-rows {
+  from {
+    background-position:
+      100% 0,
+      0 0;
+  }
+  to {
+    background-position:
+      0% 0,
+      0 0;
   }
 }
 
@@ -227,4 +307,24 @@
 
 [data-sonner-toast][data-styled="true"] [data-icon] {
   margin-top: 6px;
+}
+
+/* react-data-grid ships its own palette through --rdg-* custom properties, declared inside
+   `@layer rdg.Root`. Unlayered rules beat layered ones regardless of specificity, so this plain
+   block wins without !important. Only the variables are touched — never the vendored stylesheet. */
+.superdb-grid {
+  --rdg-color: var(--foreground);
+  --rdg-background-color: var(--background);
+  --rdg-header-background-color: var(--card);
+  --rdg-header-draggable-background-color: var(--muted);
+  --rdg-row-hover-background-color: var(--muted);
+  --rdg-row-selected-background-color: var(--muted);
+  --rdg-row-selected-hover-background-color: var(--accent);
+  --rdg-border-color: var(--border);
+  --rdg-summary-border-color: var(--border);
+  --rdg-selection-color: var(--primary);
+  --rdg-font-size: 0.8125rem;
+  /* The default is a fixed 350px; the grid has to fill whatever the page gives it. */
+  block-size: 100%;
+  border: none;
 }
