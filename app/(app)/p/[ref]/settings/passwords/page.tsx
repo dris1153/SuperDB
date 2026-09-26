@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { projectSecret } from "@/lib/project-secrets";
 import { PasswordManager } from "@/components/project-settings/password-manager";
 import { PageHeader } from "@/components/page-header";
+
+export const metadata: Metadata = { title: "Password Manager" };
 
 export const dynamic = "force-dynamic";
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { ProjectStatus } from "@/components/status";
@@ -5,6 +6,8 @@ import { DatabaseApiKeys } from "@/components/project-database/api-keys";
 import { DatabaseServices } from "@/components/project-database/services";
 import { DatabaseStats } from "@/components/project-database/stats";
 import { DatabaseTables } from "@/components/project-database/tables-card";
+
+export const metadata: Metadata = { title: "Database" };
 
 export const dynamic = "force-dynamic";
 

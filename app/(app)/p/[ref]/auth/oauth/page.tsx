@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { OAuthApps } from "@/components/auth/oauth-apps";
+
+export const metadata: Metadata = { title: "OAuth Apps" };
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { ApiKeys } from "@/components/project-settings/api-keys";
 import { PageHeader } from "@/components/page-header";
+
+export const metadata: Metadata = { title: "API Keys" };
 
 export const dynamic = "force-dynamic";
 

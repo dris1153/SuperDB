@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { GeneralSettings } from "@/components/project-settings/general";
 import { PageHeader } from "@/components/page-header";
+
+export const metadata: Metadata = { title: "Project Settings" };
 
 export const dynamic = "force-dynamic";
 

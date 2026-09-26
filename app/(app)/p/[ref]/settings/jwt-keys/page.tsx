@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { JwtKeys } from "@/components/project-settings/jwt-keys";
 import { PageHeader } from "@/components/page-header";
+
+export const metadata: Metadata = { title: "JWT Keys" };
 
 export const dynamic = "force-dynamic";
 

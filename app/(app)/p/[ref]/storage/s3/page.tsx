@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { PageHeader } from "@/components/page-header";
 import { S3Config } from "@/components/storage/s3-config";
+
+export const metadata: Metadata = { title: "S3" };
 
 export const dynamic = "force-dynamic";
 

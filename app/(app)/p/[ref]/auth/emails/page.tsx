@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { PageHeader } from "@/components/page-header";
 import { EmailsPage } from "@/components/auth/emails-page";
+
+export const metadata: Metadata = { title: "Emails" };
 
 export const dynamic = "force-dynamic";
 

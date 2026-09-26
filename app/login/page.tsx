@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { signInWithPassword } from "@/lib/auth-actions";
 import { AuthCard, GitHubButton, OrDivider } from "@/components/auth-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;

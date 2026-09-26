@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { UsersTable } from "@/components/auth/users-table";
+
+export const metadata: Metadata = { title: "Users" };
 
 export const dynamic = "force-dynamic";
 

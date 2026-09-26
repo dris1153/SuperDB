@@ -1,6 +1,15 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { FileBrowser } from "@/components/storage/file-browser";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ ref: string; bucket: string }>;
+}): Promise<Metadata> {
+  return { title: (await params).bucket };
+}
 
 export const dynamic = "force-dynamic";
 

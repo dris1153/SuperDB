@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { IconShieldCheck, IconShieldOff } from "@tabler/icons-react";
 import { requireUser } from "@/lib/supabase/server";
@@ -19,6 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+export const metadata: Metadata = { title: "Settings" };
 
 export const dynamic = "force-dynamic";
 

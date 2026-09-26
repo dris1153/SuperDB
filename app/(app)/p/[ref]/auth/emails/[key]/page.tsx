@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { templateFor } from "@/lib/auth-config";
 import { TemplateEditor } from "@/components/auth/template-editor";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ key: string }>;
+}): Promise<Metadata> {
+  return { title: templateFor((await params).key)?.label ?? "Emails" };
+}
 
 export const dynamic = "force-dynamic";
 

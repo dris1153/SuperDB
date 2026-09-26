@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { PageHeader } from "@/components/page-header";
 import { StorageFiles } from "@/components/storage/storage-files";
+
+export const metadata: Metadata = { title: "Storage" };
 
 export const dynamic = "force-dynamic";
 

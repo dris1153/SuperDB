@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { OAuthServerPage } from "@/components/auth/oauth-server-settings";
+
+export const metadata: Metadata = { title: "OAuth Server" };
 
 export const dynamic = "force-dynamic";
 

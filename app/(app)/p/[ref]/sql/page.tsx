@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { SqlWorkspace } from "@/components/sql-editor/workspace";
+
+export const metadata: Metadata = { title: "SQL Editor" };
 
 export const dynamic = "force-dynamic";
 

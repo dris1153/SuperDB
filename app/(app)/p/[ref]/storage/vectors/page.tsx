@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { PageHeader } from "@/components/page-header";
 import { BucketKind } from "@/components/storage/bucket-kind";
+
+export const metadata: Metadata = { title: "Vectors" };
 
 export const dynamic = "force-dynamic";
 

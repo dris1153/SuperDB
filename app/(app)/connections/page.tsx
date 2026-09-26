@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -48,6 +49,8 @@ import {
   type SortColumn,
 } from "@/lib/connection-sort";
 import { SortableConnections, type ConnectionRow } from "@/components/sortable-connections";
+
+export const metadata: Metadata = { title: "Connections" };
 
 export const dynamic = "force-dynamic";
 

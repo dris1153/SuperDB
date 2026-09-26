@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { verifyChallenge } from "@/lib/mfa-actions";
 import { AuthCard } from "@/components/auth-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+export const metadata: Metadata = { title: "Two-factor authentication" };
 
 export const dynamic = "force-dynamic";
 

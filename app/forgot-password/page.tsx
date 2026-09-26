@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { requestPasswordReset } from "@/lib/auth-actions";
 import { AuthCard } from "@/components/auth-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+export const metadata: Metadata = { title: "Forgot password" };
 
 export default async function ForgotPasswordPage({
   searchParams,

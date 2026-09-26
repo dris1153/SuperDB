@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { signUpWithPassword } from "@/lib/auth-actions";
 import { AuthCard, GitHubButton, OrDivider } from "@/components/auth-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+export const metadata: Metadata = { title: "Sign up" };
 
 export default async function SignupPage({
   searchParams,

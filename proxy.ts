@@ -81,5 +81,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\.(?:svg|png|jpg|webp)$).*)"],
+  // Generated metadata routes have no extension, and a signed-out preview bot or manifest fetch
+  // must get the image, not /login.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|icon/|apple-icon|opengraph-image|manifest.webmanifest|.*\.(?:svg|png|jpg|webp)$).*)",
+  ],
 };
