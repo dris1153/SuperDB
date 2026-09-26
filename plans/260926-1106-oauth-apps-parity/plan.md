@@ -33,9 +33,9 @@ is describing.
 - **Filtering happens in the browser, and that is correct here.** `GET /admin/oauth/clients`
   returns every client in one response with no paging — the opposite of the users list, where
   filtering client-side would have meant paging an entire project into the browser to search it.
-- **The filter options come from the data, not from a list written here.** `registration_type` was
-  measured as `manual`; `dynamic` exists in the API's vocabulary but has never been seen from this
-  app. Deriving the options from the rows cannot go stale.
+- ~~**The filter options come from the data, not from a list written here.**~~ Reversed the same
+  day — see below. On a project with no clients, which is where this page is first opened, a list
+  derived from the rows offers nothing.
 - **No per-column sorting.** The original has sort arrows; a list that is usually empty and at most a
   few rows does not need them, and an arrow that sorts three rows is furniture.
 - **Both buttons leave the app, and say so.** `Docs` and `OAuth Server Settings` lead to pages this
@@ -76,3 +76,25 @@ project route, so this page is covered.
 ## Not verified
 
 The browser. Checked: 560 tests, typecheck, lint, build.
+
+## Both filters showed nothing, and it was this plan's own doing
+
+**The popup opened and was never placed.** `SelectContent` defaults to `position="item-aligned"`,
+and Radix only positions it when the trigger holds a `SelectValue` —
+`@radix-ui/react-select/dist/index.mjs:540` checks `context.valueNode` before doing anything. To
+show the label while nothing was chosen, the trigger rendered a plain `<span>` in its place, which is
+the initial state, so neither filter ever appeared.
+
+**And a second mistake was waiting behind it.** Registration Type derived its options from the
+rows. With no clients that list is empty, so even a working `Select` would have offered only "All".
+The original shows Manual and Dynamic regardless, and `dynamic` is grounded — `/config/auth` carries
+`oauth_server_allow_dynamic_registration`.
+
+**Replaced with what the original actually has**: `components/auth/checkbox-filter.tsx`, a popover
+of checkboxes with a title, applied on Save. Several can be ticked; none ticked means no filter;
+ticking is a draft until Save, and Clear applies the empty selection immediately rather than waiting
+for a second click.
+
+**Checked for the same bug elsewhere**: every `SelectTrigger` in `components/` and `app/` scanned
+for one that omits `SelectValue` or renders it conditionally. None left — the removed filter was the
+only one.

@@ -4,21 +4,25 @@ import { useMemo, useState, useTransition } from "react";
 import { IconArrowUpRight, IconInfoSquareRounded, IconPlus, IconSearch } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { timestamp } from "@/lib/format";
-import { CLIENT_TYPES, type OAuthClient } from "@/lib/oauth-clients";
+import { REGISTRATION_TYPES, type OAuthClient } from "@/lib/oauth-clients";
 import { removeClient } from "@/lib/oauth-client-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Empty } from "@/components/ui/empty-state";
 import { isWaiting, reasonOf, useProjectPart, useRefetchPart } from "@/components/use-project-part";
+import { CheckboxFilter } from "./checkbox-filter";
 import { CreateOAuthAppDialog } from "./oauth-app-dialog";
 
 type ClientsPart = { enabled: boolean; clients: OAuthClient[] };
 
-const ALL = "all";
+/** Public first, as the original lists them. */
+const CLIENT_TYPE_OPTIONS = [
+  { value: "public", label: "Public" },
+  { value: "confidential", label: "Confidential" },
+];
 
 /**
  * The apps that can sign users in with this project, laid out as the original has it.
@@ -37,8 +41,10 @@ export function OAuthApps({ projectRef }: { projectRef: string }) {
   const refetch = useRefetchPart(projectRef, "oauth-clients");
 
   const [search, setSearch] = useState("");
-  const [registration, setRegistration] = useState(ALL);
-  const [clientType, setClientType] = useState(ALL);
+  // Empty means no filter. Several ticked means any of them — a client is one type or the other,
+  // so ticking both is the same as ticking neither, which is also what the original does.
+  const [registration, setRegistration] = useState<string[]>([]);
+  const [clientType, setClientType] = useState<string[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [busy, start] = useTransition();
 
@@ -46,18 +52,11 @@ export function OAuthApps({ projectRef }: { projectRef: string }) {
   const enabled = data?.enabled ?? false;
   const clients = useMemo(() => data?.clients ?? [], [data]);
 
-  // From the rows rather than a list written here: `manual` is the only value measured, and a
-  // hard-coded list would offer options nobody has and miss ones Supabase adds.
-  const registrations = useMemo(
-    () => [...new Set(clients.map((c) => c.registration_type).filter((r): r is string => !!r))],
-    [clients],
-  );
-
   const needle = search.trim().toLowerCase();
   const shown = clients.filter(
     (c) =>
-      (registration === ALL || c.registration_type === registration) &&
-      (clientType === ALL || c.client_type === clientType) &&
+      (registration.length === 0 || registration.includes(c.registration_type ?? "")) &&
+      (clientType.length === 0 || clientType.includes(c.client_type)) &&
       (!needle ||
         (c.client_name ?? "").toLowerCase().includes(needle) ||
         c.client_id.toLowerCase().includes(needle)),
@@ -129,17 +128,19 @@ export function OAuthApps({ projectRef }: { projectRef: string }) {
                   />
                 </div>
 
-                <Filter
+                <CheckboxFilter
+                  label="Registration Type"
+                  title="Select registration type"
+                  options={[...REGISTRATION_TYPES]}
                   value={registration}
                   onChange={setRegistration}
-                  label="Registration Type"
-                  options={registrations}
                 />
-                <Filter
+                <CheckboxFilter
+                  label="Client Type"
+                  title="Select client type"
+                  options={CLIENT_TYPE_OPTIONS}
                   value={clientType}
                   onChange={setClientType}
-                  label="Client Type"
-                  options={[...CLIENT_TYPES]}
                 />
               </div>
 
@@ -233,35 +234,6 @@ const Head = ({ children }: { children: React.ReactNode }) => (
     {children}
   </TableHead>
 );
-
-function Filter({
-  value,
-  onChange,
-  label,
-  options,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  label: string;
-  options: string[];
-}) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-8 w-auto gap-2 border-dashed">
-        {/* The label stays visible until something is chosen, as the original's does. */}
-        {value === ALL ? <span>{label}</span> : <SelectValue />}
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ALL}>All</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option} value={option} className="capitalize">
-            {option}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 /** A button that leaves the app, and shows that it does rather than pretending to navigate. */
 function External({ href, children }: { href: string; children: React.ReactNode }) {

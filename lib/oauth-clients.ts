@@ -38,6 +38,20 @@ export function clientsFrom(body: unknown): OAuthClient[] {
 }
 
 export const CLIENT_TYPES = ["confidential", "public"] as const;
+
+/**
+ * How a client came to exist, for the filter.
+ *
+ * A fixed list rather than one read off the rows, and the second version of that decision: the first
+ * derived the options from the clients present, which on a project with none — the common case, and
+ * the one somebody first opens this page in — offered no options at all. `manual` is what this app's
+ * own creates come back as, measured. `dynamic` is the other half of the API's vocabulary and is not
+ * hypothetical: `/config/auth` carries `oauth_server_allow_dynamic_registration`, which turns it on.
+ */
+export const REGISTRATION_TYPES = [
+  { value: "manual", label: "Manual" },
+  { value: "dynamic", label: "Dynamic" },
+] as const;
 export type ClientType = (typeof CLIENT_TYPES)[number];
 
 export const isClientType = (value: unknown): value is ClientType =>
