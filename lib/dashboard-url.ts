@@ -19,6 +19,7 @@ const PREFIXES: [string, string][] = [
   ["/auth/oauth", "auth/oauth-apps"],
   ["/auth/oauth-server", "auth/oauth-server"],
   ["/auth/emails", "auth/templates"],
+  ["/auth/urls", "auth/url-configuration"],
   ["/database/schemas", "database/schemas"],
   ["/database/tables", "database/tables"],
   ["/database/functions", "database/functions"],

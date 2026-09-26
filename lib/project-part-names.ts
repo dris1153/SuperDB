@@ -61,6 +61,8 @@ export const PART_NAMES = [
   "auth-config",
   // The OAuth Server page: its three `/config/auth` fields, `site_url`, and the public endpoints.
   "oauth-server",
+  // URL Configuration: `site_url` and the redirect allow list, nothing else of `/config/auth`.
+  "auth-urls",
   // The Schema Visualizer: one schema's tables, columns and foreign keys, and its DDL for Copy as SQL.
   "schema-graph",
   "schema-definition",

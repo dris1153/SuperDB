@@ -63,7 +63,7 @@ A Supabase-style rail with the same sections, in the same order. What is built:
 | **Table Editor** | Browse, filter, sort and edit rows; import and export; schema changes |
 | **SQL Editor** | CodeMirror with PostgreSQL highlighting, tabs, saved and favourite queries, templates, examples, running queries, a results grid and a chart |
 | **Database** | Schema Visualizer, Tables and their columns, Functions, Enumerated Types, Policies |
-| **Authentication** | Users, OAuth Apps, Emails (templates and SMTP), OAuth Server |
+| **Authentication** | Users, OAuth Apps, Emails (templates and SMTP), OAuth Server, URL Configuration |
 | **Storage** | Buckets and files, S3, Analytics, Vectors |
 | **Project Settings** | General, API Keys, JWT Keys, Password Manager |
 
@@ -329,7 +329,7 @@ Theme follows `DESIGN.md` for palette and typography, but uses the Supabase *das
   the rail and disabled.
 - **Pages inside built sections** — Database: Triggers, Extensions, Indexes, Publications, Roles,
   Settings, Backups, Migrations. Authentication: Sign In / Providers, Sessions, Rate Limits,
-  Multi-Factor, URL Configuration, Attack Protection, Auth Hooks and the rest of its list. Project
+  Multi-Factor, Attack Protection, Auth Hooks and the rest of its list. Project
   Settings: Infrastructure, Database, API, Domains.
 - **Elsewhere** — six mobile and non-JS frameworks listed in the Connect sheet as "soon" (Flask,
   Expo, Flutter, Ionic, Swift, Android Kotlin), master-password rotation from the UI (the server

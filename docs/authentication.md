@@ -106,6 +106,25 @@ endpoints card. Measured on a scratch project, 2026-09-26:
 confirm says "deactivated" as the original does. The discovery document answers 200 with no key while
 the server is off; the endpoints come from its `issuer` rather than from a URL assembled here.
 
+## URL Configuration
+
+`site_url` and `uri_allow_list` — the `auth-urls` part picks only those two. The allow list is one
+comma-joined string, and the API checks almost nothing about it. Measured on a scratch project,
+2026-09-27, restored after:
+
+```
+uri_allow_list "a, b,b"            200, reads back "a,b,b"  — spaces stripped, duplicates kept
+uri_allow_list "not a url at all"  200, reads back "notaurlatall"
+uri_allow_list ~9,000 characters   400 "…large values: URI_ALLOW_LIST"   (~1,900 was accepted)
+site_url "https://*.example.com"   200     site_url "not a url"  200     site_url ""  400
+```
+
+So `lib/auth-urls.ts` does the checking, as the original does in its client: its URL patterns
+(ported verbatim, odd corners included), no duplicates, 2 KiB in all. The Site URL must also parse
+as a URL with no `*` — stricter than the original, which only requires it to be non-empty.
+**Add and remove send only the change**: the server action reads the list, applies it and PATCHes,
+so a URL added in the Supabase dashboard since the page loaded is not overwritten.
+
 ## A user's audit trail
 
 **Both log sources answer, and an earlier version of this page said otherwise.** It claimed

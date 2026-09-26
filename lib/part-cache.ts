@@ -59,6 +59,7 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   // Written from the page that shows it, so a cached copy would show the state before the save.
   "auth-config": 0,
   "oauth-server": 0,
+  "auth-urls": 0,
   // Read on opening the page and on a click; a cached copy would outlive the migration just run.
   "schema-graph": 0,
   "schema-definition": 0,
