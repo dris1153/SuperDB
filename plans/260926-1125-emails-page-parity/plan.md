@@ -1,6 +1,6 @@
 ---
 title: "Emails, against the original: three screens where there was one"
-status: pending
+status: in-progress
 created: 2026-09-26
 blockedBy: []
 blocks: []
@@ -23,9 +23,9 @@ SMTP form. The original splits that into three:
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [The shell and the template lists](phase-01-lists.md) | pending | ~3h | — |
-| 2 | [A page per template](phase-02-editor.md) | pending | ~5h | 1 |
-| 3 | [SMTP Settings](phase-03-smtp.md) | pending | ~3h | 1 |
+| 1 | [The shell and the template lists](phase-01-lists.md) | **in-progress** | ~3h | — |
+| 2 | [A page per template](phase-02-editor.md) | **in-progress** | ~5h | 1 |
+| 3 | [SMTP Settings](phase-03-smtp.md) | **in-progress** | ~3h | 1 |
 
 ## What is already known
 

@@ -65,41 +65,10 @@ API returns no such field, so it is derived from the providers list.
 
 ## Emails
 
-`/config/auth` returns 243 fields. This page shows about twenty-five, and the part picks rather than
-passes through — the rest carries every configured OAuth provider's client secret.
-
-**PATCH merges by key**, so each save sends only what it changed. Three things about that endpoint
-are worth knowing before touching it:
-
-- **A refusal is not always a no-op.** A PATCH carrying a template field *and* a notification field
-  answered 400 for the template and **applied the notification anyway**. Each action here saves one
-  kind of field, so a reported failure means that kind did not land.
-- **An unknown field is accepted and ignored.** `{superdb_not_a_field: true}` answers 200. Nothing
-  upstream catches a typo, which is why `lib/auth-config.ts` is a catalogue and field names are
-  never taken from the caller.
-- **Template editing is gated by plan.** On a free project using the default mail provider, a PATCH
-  to any template field answers `400 "Email template modification is not available for free tier
-  projects using the default email provider."` `/config/auth` does not report which plan a project
-  is on, so the save is attempted and the API's own sentence is what shows.
-
-`smtp_pass` goes one way: written, never read back, never in a part, and never in the audit line —
-which records that SMTP changed, not what it changed to. An empty password box means "leave it",
-not "clear it".
-
-The seven security notifications each also have a subject and a body of their own
-(`mailer_subjects_password_changed_notification` and friends). This page toggles them; editing those
-bodies is a later addition.
-
-## Sending mail
-
-`POST /admin/generate_link {type, email}` mints a link **and sends the mail** — the call came back
-with `recovery_sent_at` set on the user. `invite` creates the user as well.
-
-**It does not spend the project's hourly allowance.** `rate_limit_email_sent` was 2 on the measured
-project, and the page was designed around warning about that — then nine consecutive sends all
-answered 200. The limit governs user-initiated mail; the admin endpoint is not what it guards. The
-buttons therefore say what is true: the mail goes out at once, cannot be recalled, and nothing here
-limits how many. The 429 branch stays for projects configured differently.
+Templates, SMTP and the mail-sending actions have a page of their own:
+[Authentication emails](./auth-emails.md). The short version: `/config/auth` merges by key, can
+refuse one field and apply another in the same call, ignores unknown fields, has no API for
+resetting a template, and wants `smtp_port` as a string but `smtp_max_frequency` as a number.
 
 ## OAuth apps
 

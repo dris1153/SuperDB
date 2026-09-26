@@ -3,7 +3,8 @@
 import { resolveProject } from "./inventory";
 import { updateAuthConfig } from "./mgmt-api";
 import { attempt } from "./safe";
-import { isNotificationField, templateFor, SMTP_FIELDS } from "./auth-config";
+import { isNotificationField, SMTP_CLEAR, smtpPatchFrom, templateFor } from "./auth-config";
+import { TEMPLATE_DEFAULTS } from "./auth-template-defaults";
 import { recordWrite } from "./write-audit";
 
 export type ConfigResult = { ok: true } | { ok: false; reason: string };
@@ -95,10 +96,14 @@ export async function saveNotifications(
 /**
  * SMTP, including the password — which goes one way only.
  *
- * `smtp_pass` is written and never read back: the config returns it as null, the part does not ask
- * for it, and the audit line below records that SMTP changed rather than what it changed to. An
- * empty password field means "leave it as it is", not "clear it" — clearing a working SMTP password
- * by tabbing past a blank box is not a mistake worth making available.
+ * The PATCH body is built by `smtpPatchFrom` in `lib/auth-config.ts`, which is pure and tested,
+ * because the two numeric-looking fields want opposite types: `smtp_port` a string and
+ * `smtp_max_frequency` a number. Measured — and the first version of this sent both as numbers and
+ * so never saved a port.
+ *
+ * `smtp_pass` comes back from the config as a 64-character stand-in when one is set, never as the
+ * password; the part reduces it to a yes or no. The audit line records that SMTP changed rather than
+ * what it changed to.
  */
 export async function saveSmtp(
   projectRef: string,
@@ -107,37 +112,13 @@ export async function saveSmtp(
 ): Promise<ConfigResult> {
   if (typeof settings !== "object" || settings === null) return { ok: false, reason: "Nothing to save." };
 
-  const body: Record<string, unknown> = {};
-  for (const [field, value] of Object.entries(settings)) {
-    if (!(SMTP_FIELDS as readonly string[]).includes(field)) {
-      return { ok: false, reason: "That is not an SMTP setting." };
-    }
-    if (typeof value !== "string" || value.length > 500) {
-      return { ok: false, reason: "That value is not text." };
-    }
-
-    // The two numeric ones, sent as numbers or not at all: the API rejects a string port, and an
-    // empty box means "unset" rather than zero.
-    if (field === "smtp_port" || field === "smtp_max_frequency") {
-      if (value.trim() === "") {
-        body[field] = null;
-        continue;
-      }
-      const n = Number(value);
-      if (!Number.isInteger(n) || n < 0) return { ok: false, reason: `${field} is a whole number.` };
-      body[field] = n;
-      continue;
-    }
-
-    body[field] = value.trim() === "" ? null : value.trim();
-  }
-
-  if (typeof password === "string" && password !== "") body.smtp_pass = password;
+  const built = smtpPatchFrom(settings, password);
+  if (!built.ok) return built;
 
   const found = await resolveProject(projectRef);
   if (!found) return { ok: false, reason: "Project not found." };
 
-  const result = await attempt(() => updateAuthConfig(found.token, projectRef, body));
+  const result = await attempt(() => updateAuthConfig(found.token, projectRef, built.body));
 
   await recordWrite({
     ref: projectRef,
@@ -145,8 +126,65 @@ export async function saveSmtp(
     // Never the values: this line is read by whoever holds the connection, and one of them is a
     // credential for somebody's mail server.
     outcome: result.ok
-      ? `saved${body.smtp_pass ? ", including the password" : ""}`
+      ? `saved${built.body.smtp_pass ? ", including the password" : ""}`
       : `save failed: ${result.reason.slice(0, 200)}`,
+  });
+
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+}
+
+/**
+ * Turning custom SMTP off, which there is no flag for — "on" is `smtp_host` being set.
+ *
+ * Measured on a scratch project: nulling every `smtp_*` field answers 200 and reads back null, with
+ * `smtp_max_frequency` left at 60. The confirm in front of this is the only safety: the password is
+ * write-only and cannot be shown again, and on a free project template edits are refused from the
+ * moment this succeeds.
+ */
+export async function clearSmtp(projectRef: string): Promise<ConfigResult> {
+  const found = await resolveProject(projectRef);
+  if (!found) return { ok: false, reason: "Project not found." };
+
+  const result = await attempt(() => updateAuthConfig(found.token, projectRef, { ...SMTP_CLEAR }));
+
+  await recordWrite({
+    ref: projectRef,
+    what: "SMTP settings",
+    outcome: result.ok ? "custom SMTP turned off" : `turning off failed: ${result.reason.slice(0, 200)}`,
+  });
+
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+}
+
+/**
+ * A template back to Supabase's own text.
+ *
+ * **There is no API for this, and the obvious ones are dangerous.** Measured: `""` answers 200 and
+ * writes an *empty* subject and body — blank mail to every recipient — and `null` answers 400. What
+ * works is writing the default text back: the server decides "customised" by comparing against it,
+ * and the flag returned to false when the probe did exactly that. The text comes from
+ * `lib/auth-template-defaults.ts`, read off a project that had customised nothing.
+ */
+export async function resetEmailTemplate(projectRef: string, key: string): Promise<ConfigResult> {
+  const template = templateFor(key);
+  if (!template) return { ok: false, reason: "That is not a template." };
+
+  const subject = TEMPLATE_DEFAULTS[template.subject];
+  const body = TEMPLATE_DEFAULTS[template.body];
+  // Never write an empty template on the strength of a missing default.
+  if (!subject || !body) return { ok: false, reason: "There is no default on record for that template." };
+
+  const found = await resolveProject(projectRef);
+  if (!found) return { ok: false, reason: "Project not found." };
+
+  const result = await attempt(() =>
+    updateAuthConfig(found.token, projectRef, { [template.subject]: subject, [template.body]: body }),
+  );
+
+  await recordWrite({
+    ref: projectRef,
+    what: `${template.label} email template`,
+    outcome: result.ok ? "reset to the default" : `reset failed: ${result.reason.slice(0, 200)}`,
   });
 
   return result.ok ? { ok: true } : { ok: false, reason: result.reason };

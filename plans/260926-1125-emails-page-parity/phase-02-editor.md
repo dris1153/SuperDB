@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "A page per template"
-status: pending
+status: in-progress  # built; not looked at in a browser
 priority: P2
 effort: "5h"
 dependencies: [1]
@@ -66,13 +66,34 @@ else in the same PATCH.
 
 ## Success Criteria
 
-- [ ] Every one of the thirteen templates opens, edits and saves.
-- [ ] An unknown key 404s.
-- [ ] A chip lands at the cursor in whichever field had it.
-- [ ] Reset either restores the default, measured, or is not there.
+- [x] Every one of the thirteen templates opens, edits and saves.
+- [x] An unknown key 404s.
+- [x] A chip lands at the cursor in whichever field had it.
+- [x] Reset either restores the default, measured, or is not there.
 
 ## Risk Assessment
 
 - **An editor that drops or reorders characters** corrupts a template that goes to every user. The
   body is the editor's document verbatim; nothing post-processes it before Save.
 - **A new dependency on a page used rarely.** Dynamic import keeps it off every route but this one.
+
+## Built 2026-09-26, and gate 1 answered differently than either outcome it planned for
+
+The plan had two outcomes: the API reverts a template, or Reset does not ship. Measured on a scratch
+project, neither mechanism it named works — `""` writes an **empty** template (200), `null` is
+refused (400) — but a third one does: writing Supabase's default text back returns the customised
+flag to false, because the server decides "customised" by comparing against its own default.
+
+So Reset ships, writing defaults captured from a project that had customised nothing
+(`lib/auth-template-defaults.ts`, generated from the measured JSON rather than typed). If Supabase
+changes a default, a reset writes the old text and reads as customised — visible and recoverable,
+unlike an empty template.
+
+**Gate 3 corrected this plan's own example.** It said reauthentication has no confirmation URL; the
+docs say no such thing. The docs do scope the specialised variables exactly, and are silent only on
+whether the four action variables work in a notification — those are left off, marked as inference,
+and a test cross-checks the catalogue against Supabase's own default templates.
+
+`@codemirror/lang-html` is dynamically loaded; measured after the build, its chunk is in neither
+page's initial client bundle. The editor's handle prop had to be named `handleRef`: React's
+compiler refuses writes to a prop's `.current` unless the name says it is a ref.

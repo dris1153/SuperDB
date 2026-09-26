@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "SMTP Settings"
-status: pending
+status: in-progress  # built; not looked at in a browser
 priority: P2
 effort: "3h"
 dependencies: [1]
@@ -63,13 +63,29 @@ switch clears it.
 
 ## Success Criteria
 
-- [ ] The switch reflects the project's real state.
-- [ ] Turning it off and saving clears SMTP only after the confirm, and says what it cost.
-- [ ] A blank password leaves the stored one alone.
-- [ ] Every field has its help text.
+- [x] The switch reflects the project's real state.
+- [x] Turning it off and saving clears SMTP only after the confirm, and says what it cost.
+- [x] A blank password leaves the stored one alone.
+- [x] Every field has its help text.
 
 ## Risk Assessment
 
 - **This is the one switch on the page that can stop a project's mail**, and it is next to fields
   people edit routinely. The confirm is the mitigation, and it names the password.
 - **The project that has working SMTP must not be the one measured against.**
+
+## Built 2026-09-26 — and a bug in the shipped form found on the way
+
+**The existing SMTP save never saved a port.** Measured: `smtp_port` 587 answers
+`400 "expected string, received number"`, and the form built in the Authentication plan sent both
+numeric fields as numbers. `smtp_max_frequency` wants the opposite — a string answers
+`400 "expected number"`. `smtpPatchFrom` builds the body now, and a test pins both types. The old
+comment said the API rejected a *string* port; it had the fact backwards.
+
+**This phase's assumption about the password was also wrong.** It said the config returns
+`smtp_pass` as null whether or not one is set. That was measured on a project without one; on the
+project with Resend it comes back as 64 characters. So a stored password is knowable, and the help
+line states it rather than hedging — while the value itself stays on the server.
+
+Gate 2 held: clearing answers 200, reads back null, leaves `smtp_max_frequency` at 60. Measured on
+ZKVault and restored; the project with working SMTP was read, never written.

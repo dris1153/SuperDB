@@ -23,9 +23,11 @@ Screens that talk to a connected project rather than to this app's own database.
 reach APIs the Management API does not cover, and both are written down mostly because what the
 upstream APIs actually do is not what their shape suggests.
 
-- **[Authentication](./authentication.md)** — users, email templates and SMTP, OAuth apps, and a
-  user's audit trail. Why users need a `service_role` key at all, what `?filter=` does that
-  `?email=` does not, and five claims the build disproved.
+- **[Authentication](./authentication.md)** — users, OAuth apps, and a user's audit trail. Why
+  users need a `service_role` key at all, what `?filter=` does that `?email=` does not, and the
+  claims the build disproved.
+- **[Authentication emails](./auth-emails.md)** — templates and SMTP. A config endpoint with no reset,
+  no enabled flag, and two numeric fields that want opposite types.
 - **[Logs](./logs.md)** — the service cards on the project overview. One log stream rather than a
   table per service, a hard 1000-row cap that makes figures aggregates rather than counts, and the
   short list of SQL the endpoint will accept.

@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "The shell and the template lists"
-status: pending
+status: in-progress  # built; not looked at in a browser
 priority: P2
 effort: "3h"
 dependencies: []
@@ -57,11 +57,22 @@ is what middle-click and a new tab expect.
 
 ## Success Criteria
 
-- [ ] Thirteen templates in the catalogue, each field name matching the measured ones.
-- [ ] The tab survives a reload.
-- [ ] Moving a switch enables Save; saving sends only the switches.
+- [x] Thirteen templates in the catalogue, each field name matching the measured ones.
+- [x] The tab survives a reload.
+- [x] Moving a switch enables Save; saving sends only the switches.
 
 ## Risk Assessment
 
 - **Deleting the inline editor before phase 2 lands leaves templates uneditable.** Phases 1 and 2
   ship together, or the old editor stays until the new one exists.
+
+## Built 2026-09-26
+
+Thirteen templates in `lib/auth-config.ts`, each with the original's description and — for the seven
+security ones — the switch that sends it. `NOTIFICATIONS` is derived from the catalogue now, so the
+switches and the templates cannot disagree. A test checks every field name against the 26 defaults
+read off a live config, because the API accepts an unknown field silently and nothing else would
+notice a typo.
+
+The tab lives in the URL through the history API, as `interval-picker.tsx` keeps its range. Rows are
+links. A `Customised` badge shows the server's own flag.
