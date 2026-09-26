@@ -8,8 +8,8 @@ import type { Method } from "./credential-methods";
  * What it takes to open a project in the original: whose account it lives in and how that account
  * signs in. The two blobs are ciphertext the server cannot read; they decrypt in the browser.
  *
- * Read by the Overview page and served as the `access` part — a GET, not a server action: actions
- * run one at a time per client, so a long `runSql` would hold the popover on its skeleton.
+ * Served as the `access` part — a GET, not a server action: actions run one at a time per client,
+ * so a long `runSql` would hold the popover on its skeleton.
  */
 export type ProjectAccess = {
   connectionId: string;

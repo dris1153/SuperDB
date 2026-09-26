@@ -124,6 +124,13 @@ export async function readPartOnce<T>(ref: string, part: Part, params?: PartPara
   return body.data as T;
 }
 
+/** Reads a part ahead of the component that shows it; a fresh copy already cached is left alone. */
+export function usePrefetchPart(ref: string, part: Part, params?: PartParams) {
+  const client = useQueryClient();
+  const queryKey = ["project", ref, part, queryOf(params)];
+  return () => client.prefetchQuery({ queryKey, queryFn: () => fetchPart(ref, part, params) });
+}
+
 /** For when the server says the caller's copy is out of date; the next read is the only fix. */
 export function useRefetchPart(ref: string, part: Part, params?: PartParams) {
   const client = useQueryClient();

@@ -56,9 +56,9 @@ See [Security](#security).
 
 **Open in Supabase** — every project page links to the same page in the original dashboard. The
 account chip beside the project's name says which account holds it and copies what signs in to it:
-email, account and mailbox passwords, the database password, the ref and the URL. The same panel sits
-on the project's Overview. The original keeps one account signed in per browser, so a project from
-another account needs a sign-out first — which is what the copy buttons are for.
+email, account and mailbox passwords, the database password, the ref and the URL. The original keeps
+one account signed in per browser, so a project from another account needs a sign-out first — which
+is what the copy buttons are for.
 
 **Naming and tags** — rename any connection; tag projects freely with a creatable picker.
 

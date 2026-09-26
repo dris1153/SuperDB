@@ -81,3 +81,12 @@ sign-in to hand. This puts both one click from any project page.
 - Review: no security findings; the three medium ones (lazy chunk failure, server-action queueing,
   no refetch on reopen) are fixed. **Not clicked signed in**: the part against a real project, and
   `/connections?edit=<id>`.
+
+## Revised 2026-09-26
+
+- **Overview card removed** at the user's request; the topbar popover is the one place. Overview reads
+  the DB password blob as before, and its first load is back to +3.7KB (the topbar islands).
+- **First open was slow** — chunk load, then the part request, in series. Both now start together
+  once the project page is idle (`requestIdleCallback`, a timer on Safari); measured in a throwaway
+  route: chunks and `/access` requested ~140ms after load, before any click.
+- First-load JS: `/p/[ref]/settings` 659,454 bytes, Overview 838,018.
