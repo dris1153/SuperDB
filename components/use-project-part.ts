@@ -117,6 +117,13 @@ export function useSetPart<T>(ref: string, part: Part, params?: PartParams) {
   };
 }
 
+/** One read for an action — a Copy button — rather than for something on screen. Throws the refusal. */
+export async function readPartOnce<T>(ref: string, part: Part, params?: PartParams): Promise<T> {
+  const body = await fetchPart(ref, part, params);
+  if (!body.ok) throw new Error(body.reason);
+  return body.data as T;
+}
+
 /** For when the server says the caller's copy is out of date; the next read is the only fix. */
 export function useRefetchPart(ref: string, part: Part, params?: PartParams) {
   const client = useQueryClient();

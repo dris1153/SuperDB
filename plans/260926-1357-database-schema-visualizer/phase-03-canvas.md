@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "The canvas"
-status: pending
+status: in-progress  # drawn from real data; interactions unclicked
 priority: P2
 effort: "5h"
 dependencies: [1, 2]
@@ -29,6 +29,6 @@ library reaches another route.
 
 ## Success Criteria
 
-- [ ] The SuperDB `public` schema draws its 8 tables and 9 relationships, `auth.users.id` once.
+- [x] The SuperDB `public` schema draws its 8 tables and 9 relationships, `auth.users.id` once.
 - [ ] Dragging a node survives a reload; Auto layout undoes that after confirming.
-- [ ] Other routes' first-load JS unchanged — measured after the build.
+- [x] Other routes' first-load JS unchanged — measured after the build.

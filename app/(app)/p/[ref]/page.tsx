@@ -6,6 +6,7 @@ import { PausedProject } from "@/components/paused-project";
 import { CopyButton } from "@/components/copy-button";
 import { ConnectPanel } from "@/components/project-overview/connect-panel";
 import { DatabaseCard } from "@/components/project-overview/database-card";
+import { ProjectServices } from "@/components/project-overview/services";
 import { OverviewTiles } from "@/components/project-overview/tiles";
 import { UsagePanel } from "@/components/project-overview/usage-panel";
 
@@ -52,6 +53,7 @@ export default async function ProjectOverviewPage({ params }: { params: Promise<
           </header>
 
           <OverviewTiles projectRef={ref} status={project.status} />
+          <ProjectServices projectRef={ref} />
         </div>
 
         {/* Dotted canvas with the database card floating inside it, as the dashboard does.

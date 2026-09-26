@@ -21,7 +21,6 @@ export const PART_NAMES = [
   "health",
   "overview",
   "tables",
-  "api-keys",
   "metrics",
   "logs",
   // The table editor. `tables` above is the database page's inventory of the whole database; these
@@ -34,8 +33,7 @@ export const PART_NAMES = [
   "definition",
   // The SQL editor's sidebar. Its own table in this app's database, not the project's.
   "saved-queries",
-  // The API keys settings page. Wider than `api-keys`, which is the four fields the database page
-  // shows — and deliberately a separate name so the two shapes cannot be confused for each other.
+  // The API keys settings page: every key's type and prefix, and the value of the public two only.
   "api-key-rows",
   // Whether this project still issues the legacy anon and service_role JWTs. One flag, both keys.
   "legacy-api-keys",
@@ -64,6 +62,9 @@ export const PART_NAMES = [
   "auth-config",
   // The OAuth Server page: its three `/config/auth` fields, `site_url`, and the public endpoints.
   "oauth-server",
+  // The Schema Visualizer: one schema's tables, columns and foreign keys, and its DDL for Copy as SQL.
+  "schema-graph",
+  "schema-definition",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

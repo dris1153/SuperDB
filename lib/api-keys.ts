@@ -19,9 +19,8 @@ export const isMasked = (value: string | null | undefined): boolean => !!value?.
  * Security, and `secret` is its replacement. Those carry no value here at all; the page shows their
  * prefix and fetches the rest only when someone asks for it.
  *
- * This is the same line `KeySummary` in `project-parts.ts` draws, drawn once more at a different
- * width. `service_role` arrives from the API **complete and unmasked with no special permission**,
- * so every reader that touches this response has to drop it deliberately.
+ * `service_role` arrives from the API **complete and unmasked with no special permission**, so every
+ * reader that touches this response has to drop it deliberately.
  */
 export type KeyRow = {
   id: string | null;

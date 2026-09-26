@@ -12,7 +12,7 @@ import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-pa
  * "the project may be paused" — whether or not anything had been asked. The refusal now carries
  * what the API said, and "nothing came back" stays a separate answer.
  */
-export function DatabaseServices({ projectRef }: { projectRef: string }) {
+export function ProjectServices({ projectRef }: { projectRef: string }) {
   const health = useProjectPart<ServiceHealth[]>(projectRef, "health");
 
   return (

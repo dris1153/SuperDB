@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Copy and download"
-status: pending
+status: in-progress  # SQL verified live; downloads unclicked
 priority: P2
 effort: "3h"
 dependencies: [3]
@@ -22,6 +22,6 @@ dependencies: [3]
 
 ## Success Criteria
 
-- [ ] The SQL copied for one table equals the Table Editor's definition of it.
-- [ ] Markdown for a name containing `|` stays a valid table.
+- [x] The SQL copied for one table equals the Table Editor's definition of it.
+- [x] Markdown for a name containing `|` stays a valid table.
 - [ ] PNG and SVG download and open.

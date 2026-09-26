@@ -1,7 +1,6 @@
 import "server-only";
 import { dbOverview } from "./db-introspect";
 import { resolveProject } from "./inventory";
-import type { ApiKey } from "./mgmt-api";
 import {
   getLegacyKeys,
   getDiskUtil,
@@ -40,6 +39,7 @@ async function oneUserAsPage(ref: string, id: string): Promise<UserPage> {
 }
 import { pickEmailConfig, type EmailConfig } from "./auth-config";
 import { pickOAuthServer, type OAuthServerConfig } from "./oauth-server";
+import { readGraph } from "./schema-graph-sql";
 import { buildUserLogsSql, parseUserLog, sortEvents, type UserEvent, type UserLogRow } from "./auth-audit";
 import { avatarOf, displayNameOf, isUserId, isUserSort, providersOf, PER_PAGE } from "./auth-users";
 import {
@@ -65,7 +65,7 @@ import { describeTable, listPolicies, listSchemas, listTablesIn, type Policy } f
 import { bucketNameProblem, countBucketPolicies, type BucketRow } from "./buckets";
 import type { StorageObject } from "./storage-objects";
 import { listObjects, listStorageBuckets } from "./storage-api";
-import { tableDefinition } from "./table-ddl";
+import { schemaDefinition, tableDefinition } from "./table-ddl";
 import { rowCount, selectRows, type RowCount } from "./table-rows";
 import { parseFilters } from "./table-filter";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseSort } from "./table-view";
@@ -87,8 +87,8 @@ import { requireUser } from "./supabase/server";
  *
  * **A reader that reaches a credential must pick its fields, not pass the response through.**
  * `listApiKeys` returns the real key values even at `reveal=false` — measured, and recorded on the
- * `ApiKey` type in `mgmt-api.ts` — so the flag is not a boundary and never was. The `api-keys`
- * reader names the four fields the UI shows, and the secret never leaves the server.
+ * `ApiKey` type in `mgmt-api.ts` — so the flag is not a boundary and never was. The `api-key-rows`
+ * reader draws that line through `toRow`, and a secret key's value never leaves the server.
  *
  * The rest pass through what the app already models, which is a weaker claim and worth stating as
  * one: their bodies were read and none carries a credential the page does not already show. The
@@ -99,17 +99,6 @@ import { requireUser } from "./supabase/server";
  */
 
 type Reader = (token: string, ref: string, search: URLSearchParams) => Promise<unknown>;
-
-/**
- * What an API key looks like once it has left the server.
- *
- * `api_key?: never` is the point of the type. Without it, `ApiKey[]` is structurally assignable to a
- * `Pick<...>[]`, so annotating the reader would not stop someone returning the upstream array
- * verbatim — and the upstream array carries the real key value even at `reveal=false`. With it, that
- * mistake does not compile, which is the only thing standing between a service-role secret and a
- * browser that no test can reach.
- */
-export type KeySummary = Pick<ApiKey, "id" | "name" | "prefix"> & { api_key?: never };
 
 /**
  * `Record<Exclude<Part, "identity">, Reader>` rather than a loose object: a name in
@@ -130,23 +119,10 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   overview: (t, ref) => dbOverview(t, ref),
   tables: (t, ref) => listTables(t, ref),
   /**
-   * The four fields the UI shows, picked by hand.
-   *
-   * **What `reveal=false` actually does, measured 2026-09-25:** it masks the *new* `secret` key and
-   * leaves the legacy `service_role` JWT complete — the one that bypasses RLS. So the flag is a
-   * boundary for one key type and not for the other, which is another way of saying it was never
-   * the boundary here. This list is.
-   */
-  "api-keys": async (t, ref): Promise<KeySummary[]> =>
-    (await listApiKeys(t, ref)).map(({ id, name, prefix }) => ({ id, name, prefix })),
-
-  /**
    * The settings page's wider shape: type, description and prefix for every key, plus the value of
    * the two that are meant to be public.
    *
-   * A second name rather than a wider `api-keys`, because the narrow one is what four other places
-   * already rely on and widening it in place would hand them fields they never asked to be trusted
-   * with. `toRow` is where the line is drawn, and it has tests.
+   * `toRow` is where the line is drawn, and it has tests.
    */
   "api-key-rows": async (t, ref): Promise<KeyRow[]> => (await listApiKeys(t, ref)).map(toRow),
 
@@ -276,6 +252,10 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   },
 
   "schema-tables": (t, ref, search) => listTablesIn(t, ref, schemaOf(search)),
+
+  "schema-graph": (t, ref, search) => readGraph(t, ref, schemaOf(search)),
+
+  "schema-definition": (t, ref, search) => schemaDefinition(t, ref, schemaOf(search)),
 
   columns: (t, ref, search) => describeTable(t, ref, schemaOf(search), tableOf(search)),
 
@@ -587,7 +567,7 @@ export async function readPart(
 }
 
 /** Identity is the one part that needs no upstream call: `resolveProject` already has it. */
-/** What the `identity` part answers with. `import type` from here is erased, as `KeySummary` is. */
+/** What the `identity` part answers with. `import type` from here is erased. */
 export type Identity = NonNullable<Awaited<ReturnType<typeof readIdentity>>>;
 
 export async function readIdentity(ref: string) {

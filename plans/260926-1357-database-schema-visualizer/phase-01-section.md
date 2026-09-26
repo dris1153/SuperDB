@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "The section: nav, redirect, what happens to the dashboard"
-status: pending
+status: in-progress  # built; not seen signed in
 priority: P2
 effort: "2h"
 dependencies: []

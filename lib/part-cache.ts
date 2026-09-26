@@ -37,7 +37,6 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   disk: 60_000,
   pooler: 60_000,
   health: 60_000,
-  "api-keys": 60_000,
 
   // Live figures — database size, connection count, the table inventory.
   overview: 30_000,
@@ -58,6 +57,9 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   // Written from the page that shows it, so a cached copy would show the state before the save.
   "auth-config": 0,
   "oauth-server": 0,
+  // Read on opening the page and on a click; a cached copy would outlive the migration just run.
+  "schema-graph": 0,
+  "schema-definition": 0,
   "oauth-clients": 0,
   // Read once when the tab is opened. The logs endpoint throttles, so nothing polls it.
   "auth-user-logs": 0,

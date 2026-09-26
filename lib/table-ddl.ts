@@ -1,6 +1,6 @@
 import "server-only";
 import { readOnlyQuery } from "./mgmt-api";
-import { quoteLiteral, quoteQualified } from "./sql-ident";
+import { quoteLiteral } from "./sql-ident";
 
 /**
  * Reconstructs `CREATE TABLE` from the catalog.
@@ -18,20 +18,19 @@ const UNSUPPORTED = "unsupported";
 
 export type TableDefinition = { ddl: string; complete: boolean };
 
-const ddlSql = (schema: string, table: string) => {
-  const qualified = quoteQualified(schema, table);
-  const q = quoteLiteral(qualified);
+// The name as `quoteQualified` writes it, built in SQL so one statement can cover a whole schema.
+const qualifiedName = `'"' || pg_catalog.replace(n.nspname, '"', '""') || '"."' || pg_catalog.replace(c.relname, '"', '""') || '"'`;
 
-  return `
+const ddlSql = (where: string) => `
 select
   case
     when c.relkind in ('v', 'm') then
       'create ' || case when c.relkind = 'm' then 'materialized ' else '' end
-      || 'view ' || ${q} || ' as' || E'\\n'
+      || 'view ' || ${qualifiedName} || ' as' || E'\\n'
       || pg_catalog.pg_get_viewdef(c.oid, true)
     when c.relkind not in ('r', 'p') then '${UNSUPPORTED}'
     else
-      'create table ' || ${q} || ' (' || E'\\n'
+      'create table ' || ${qualifiedName} || ' (' || E'\\n'
       || coalesce((
            select string_agg(
              '  ' || pg_catalog.quote_ident(a.attname) || ' '
@@ -69,10 +68,10 @@ select
              and not exists (select 1 from pg_catalog.pg_constraint k where k.conindid = i.indexrelid)
          ), '')
       || case when c.relrowsecurity
-              then E'\\n\\nalter table ' || ${q} || ' enable row level security;' else '' end
+              then E'\\n\\nalter table ' || ${qualifiedName} || ' enable row level security;' else '' end
       || coalesce((
            select E'\\n' || string_agg(
-             'create policy ' || pg_catalog.quote_ident(p.polname) || ' on ' || ${q}
+             'create policy ' || pg_catalog.quote_ident(p.polname) || ' on ' || ${qualifiedName}
              || ' as ' || case when p.polpermissive then 'permissive' else 'restrictive' end
              || ' for ' || case p.polcmd when 'r' then 'select' when 'a' then 'insert'
                                          when 'w' then 'update' when 'd' then 'delete'
@@ -89,11 +88,11 @@ select
            from pg_catalog.pg_policy p where p.polrelid = c.oid
          ), '')
   end as ddl,
-  c.relkind::text as kind
+  c.relkind::text as kind,
+  c.relname::text as name
 from pg_catalog.pg_class c
 join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-where n.nspname = ${quoteLiteral(schema)} and c.relname = ${quoteLiteral(table)};`;
-};
+where ${where}`;
 
 export async function tableDefinition(
   token: string,
@@ -104,7 +103,7 @@ export async function tableDefinition(
   const rows = await readOnlyQuery<{ ddl: string | null; kind: string }>(
     token,
     ref,
-    ddlSql(schema, table),
+    `${ddlSql(`n.nspname = ${quoteLiteral(schema)} and c.relname = ${quoteLiteral(table)}`)};`,
   );
   const row = rows[0];
   if (!row?.ddl) return null;
@@ -112,4 +111,19 @@ export async function tableDefinition(
   // Partitioned parents lose their partitioning clause here, so the output is labelled as partial
   // rather than offered as something that would recreate the table.
   return { ddl: row.ddl, complete: row.kind !== "p" };
+}
+
+/**
+ * Every table in a schema, one after another — the Schema Visualizer's Copy as SQL. One statement,
+ * because this endpoint returns only the last result set. Views are left out, as they are from the
+ * graph; partitioned parents are included and lose their partitioning clause, as they do above.
+ */
+export async function schemaDefinition(token: string, ref: string, schema: string): Promise<string> {
+  const filter = `n.nspname = ${quoteLiteral(schema)} and c.relkind in ('r', 'p') and not c.relispartition`;
+  const rows = await readOnlyQuery<{ ddl: string | null }>(
+    token,
+    ref,
+    `select string_agg(d.ddl, E'\\n\\n' order by d.name) as ddl from (${ddlSql(filter)}) d;`,
+  );
+  return rows[0]?.ddl ?? "";
 }

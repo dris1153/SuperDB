@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "The catalog read"
-status: pending
+status: completed
 priority: P2
 effort: "2h"
 dependencies: []
@@ -26,6 +26,6 @@ One statement per schema, one part, and a pure module that turns its answer into
 
 ## Success Criteria
 
-- [ ] A test pins nodes, edges and the one shared label node for a cross-schema key.
-- [ ] A two-column foreign key yields two edges.
-- [ ] Malformed input yields an empty graph, not a throw.
+- [x] A test pins nodes, edges and the one shared label node for a cross-schema key.
+- [x] A two-column foreign key yields two edges.
+- [x] Malformed input yields an empty graph, not a throw.

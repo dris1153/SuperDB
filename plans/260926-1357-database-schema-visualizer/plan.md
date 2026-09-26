@@ -1,6 +1,6 @@
 ---
 title: "Database, against the original: a section, and the Schema Visualizer first"
-status: pending
+status: in-progress  # built; drawn from real data in a local preview, not clicked through signed in
 created: 2026-09-26
 blockedBy: []
 blocks: []
@@ -21,10 +21,10 @@ Read from the original's source, not only the screenshot:
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [The section: nav, redirect, what happens to the dashboard](phase-01-section.md) | pending | ~2h | — |
-| 2 | [The catalog read](phase-02-catalog.md) | pending | ~2h | — |
-| 3 | [The canvas](phase-03-canvas.md) | pending | ~5h | 1, 2 |
-| 4 | [Copy and download](phase-04-export.md) | pending | ~3h | 3 |
+| 1 | [The section: nav, redirect, what happens to the dashboard](phase-01-section.md) | in-progress | ~2h | — |
+| 2 | [The catalog read](phase-02-catalog.md) | **completed** | ~2h | — |
+| 3 | [The canvas](phase-03-canvas.md) | in-progress | ~5h | 1, 2 |
+| 4 | [Copy and download](phase-04-export.md) | in-progress | ~3h | 3 |
 
 ## Settled decisions
 
@@ -60,3 +60,16 @@ enum's own name (`factor_type`). Foreign keys into another schema arrive with th
   loaded on this page only, and the other routes' first load measured after the build.
 - **A schema with hundreds of tables** is the original's problem too; it pages. This does not in the
   first version.
+
+## Built 2026-09-26
+
+All four phases are in the tree. **How far each was checked**, because it differs:
+
+- The canvas was drawn from SuperDB's real `public` graph — read once, read only — in a throwaway
+  route, built and screenshotted in headless Chrome, then the route was deleted. It matched the
+  original's arrangement: one tall column, `auth.users.id` once, minimap, legend.
+- `tableDefinition` and the new `schemaDefinition` were run against SuperDB through the app's own
+  module: the per-table output is unchanged by the refactor and appears verbatim in the schema's.
+- After the build the xyflow chunk (237 KB) is in the schemas page's client manifest and no other.
+- **Not checked:** anything that needs a click — dragging and reloading, Auto layout, the menus, the
+  downloads — and the section signed in. Those wait for a browser.
