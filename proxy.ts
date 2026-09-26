@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
+import { isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { aalClaim, needsMfaChallenge } from "@/lib/mfa-gate";
+import { safeNext } from "@/lib/safe-next";
 
 // /reset-password is deliberately absent: /auth/confirm establishes the recovery session first, so
 // reaching it without one should bounce to /login.
@@ -33,8 +35,21 @@ export async function proxy(request: NextRequest) {
     },
   });
 
+  // A redirect is a new response: without the cookies getUser() may have just refreshed, the browser
+  // keeps a refresh token Auth has already rotated away.
+  const redirect = (url: URL) => {
+    const moved = NextResponse.redirect(url);
+    for (const cookie of response.cookies.getAll()) moved.cookies.set(cookie);
+    return moved;
+  };
+
   // getUser() revalidates the JWT against Supabase — getSession() would trust the cookie blindly.
-  const { data } = await supabase.auth.getUser();
+  // A network failure or a 5xx is not a sign-out, so it gets one more try before being taken for one.
+  let { data, error } = await supabase.auth.getUser();
+  if (error && isAuthRetryableFetchError(error)) ({ data, error } = await supabase.auth.getUser());
+  if (!data.user && error && error.name !== "AuthSessionMissingError") {
+    console.warn(`[proxy] signed out for ${request.nextUrl.pathname}: ${error.name} ${error.status ?? ""} ${error.message}`);
+  }
   const isPublic = PUBLIC.some((p) => request.nextUrl.pathname.startsWith(p));
 
   if (!data.user && !isPublic) {
@@ -43,14 +58,16 @@ export async function proxy(request: NextRequest) {
     // JSON parse error. The handlers do their own `requireUser`; this only decides the shape.
     if (isReadApi(request.nextUrl.pathname)) return refuse(401, "Not authenticated");
 
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+    // The page asked for rides along as `next`, whole — keeping only its query and dropping its path
+    // is how `/connections?edit=…` used to come back as `/?edit=…`.
+    const asked = request.nextUrl.clone();
+    asked.searchParams.delete("_rsc");
+    const url = new URL("/login", request.url);
+    url.searchParams.set("next", asked.pathname + asked.search);
+    return redirect(url);
   }
   if (data.user && SIGNED_OUT_ONLY.includes(request.nextUrl.pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    return NextResponse.redirect(url);
+    return redirect(new URL(safeNext(request.nextUrl.searchParams.get("next")), request.url));
   }
 
   // Only users who actually enrolled a factor are sent here, so MFA stays opt-in per account. /mfa
@@ -73,7 +90,7 @@ export async function proxy(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/mfa";
       url.search = "";
-      return NextResponse.redirect(url);
+      return redirect(url);
     }
   }
 

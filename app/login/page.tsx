@@ -7,12 +7,14 @@ import { Input } from "@/components/ui/input";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
+  const { error, next } = await searchParams;
 
   return (
     <AuthCard title="Sign in to reach your Supabase accounts.">
       <form action={signInWithPassword} className="mt-6 space-y-3">
+        {/* Checked again by the action: a hidden field is whatever the browser sends. */}
+        <input type="hidden" name="next" value={next ?? ""} />
         <Input name="email" type="email" placeholder="you@example.com" autoComplete="username" required />
         <Input name="password" type="password" placeholder="Password" autoComplete="current-password" required />
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
