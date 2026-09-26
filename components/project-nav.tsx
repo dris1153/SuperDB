@@ -129,8 +129,14 @@ export function ProjectNav({ projectRef, mode: initial }: { projectRef: string; 
           open ? "w-60 px-2" : "w-12 items-center",
         )}
       >
-        {/* The way back to the board is in the topbar, not here. */}
-        <nav className={cn("flex flex-col gap-1 overflow-y-auto", open ? null : "items-center")}>
+        {/* The way back to the board is in the topbar, not here. `overflow-x-hidden` is needed:
+            `overflow-y-auto` alone makes x `auto` too, and labels overflow while the width animates. */}
+        <nav
+          className={cn(
+            "flex flex-col gap-1 overflow-x-hidden overflow-y-auto",
+            open ? null : "items-center",
+          )}
+        >
           {SECTIONS.map((section, index) => (
             <div key={index} className={cn("flex flex-col gap-1", open ? null : "items-center")}>
               {index > 0 ? (
