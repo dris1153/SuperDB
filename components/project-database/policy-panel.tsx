@@ -112,7 +112,7 @@ export function PolicyPanel({ target, onClose, projectRef, projectName, schema, 
               </div>
             </div>
 
-            {showTemplates ? <PolicyTemplatesPanel command={editing ? editing.command : null} onPick={pick} /> : null}
+            {showTemplates ? <PolicyTemplatesPanel command={editing ? editing.command : null} schema={schema} table={draft?.table ?? target?.table ?? ""} onPick={pick} /> : null}
           </div>
         </SheetContent>
       </Sheet>
