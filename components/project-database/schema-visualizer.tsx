@@ -127,7 +127,8 @@ function SchemaCanvas({ projectRef, schema, graph }: { projectRef: string; schem
       proOptions={{ hideAttribution: true }}
     >
       <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#2e2e2e" />
-      <MiniMap pannable zoomable className="rounded-md border border-border" />
+      {/* overflow-hidden: the mask is a square SVG and otherwise paints over the rounded corners. */}
+      <MiniMap pannable zoomable className="overflow-hidden rounded-md border border-border" />
     </ReactFlow>
   );
 }

@@ -87,7 +87,7 @@ export function SchemaToolbar({
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2">
       <Select value={schema} onValueChange={onSchema}>
-        <SelectTrigger size="sm" className="w-52" aria-label="Schema">
+        <SelectTrigger size="sm" className="min-w-40 justify-start [&>svg]:ml-auto" aria-label="Schema">
           <span className="text-muted-foreground">schema</span>
           <SelectValue />
         </SelectTrigger>
