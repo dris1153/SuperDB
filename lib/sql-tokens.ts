@@ -26,12 +26,12 @@ export type SqlToken = { kind: SqlTokenKind; text: string };
 const KEYWORDS = new Set([
   "add", "all", "alter", "and", "array", "as", "asc", "begin", "bigint", "boolean", "by", "cascade",
   "check", "collate", "column", "commit", "constraint", "create", "current_timestamp", "date",
-  "default", "delete", "desc", "distinct", "do", "double", "drop", "enable", "end", "exists",
-  "false", "foreign", "from", "function", "generated", "grant", "group", "having", "identity",
-  "if", "in", "index", "insert", "int", "integer", "into", "is", "join", "jsonb", "key", "language",
+  "default", "definer", "delete", "desc", "distinct", "do", "double", "drop", "enable", "end", "exists",
+  "false", "for", "foreign", "from", "function", "generated", "grant", "group", "having", "identity",
+  "if", "in", "index", "insert", "int", "integer", "interval", "into", "is", "join", "jsonb", "key", "language",
   "level", "like", "limit", "not", "null", "numeric", "on", "or", "order", "policy", "precision",
-  "primary", "procedure", "references", "returns", "revoke", "row", "schema", "security", "select",
-  "sequence", "set", "smallint", "table", "text", "then", "time", "timestamp", "timestamptz", "to",
+  "primary", "procedure", "references", "replace", "returns", "revoke", "row", "schema", "security", "select",
+  "sequence", "set", "setof", "smallint", "stable", "table", "text", "then", "time", "timestamp", "timestamptz", "to",
   "trigger", "true", "type", "unique", "update", "using", "uuid", "values", "varchar", "view",
   "when", "where", "with", "without", "zone",
 ]);

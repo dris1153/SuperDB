@@ -4,9 +4,9 @@ import { useState } from "react";
 import { HoverCard } from "radix-ui";
 import { IconCheck, IconCopy, IconSearch } from "@tabler/icons-react";
 import type { PolicyCommand } from "@/lib/policy-statements";
+import { tokenizeSql, type SqlTokenKind } from "@/lib/sql-tokens";
 import { POLICY_TEMPLATES, type PolicyTemplate } from "@/lib/policy-templates";
 import { Input } from "@/components/ui/input";
-import { SqlCode } from "@/components/table-editor/sql-code";
 import { cn } from "@/lib/utils";
 
 /** The original's colour per command on a template card. */
@@ -61,7 +61,11 @@ export function PolicyTemplatesPanel({ command, schema, table, onPick }: {
             </HoverCard.Trigger>
             <HoverCard.Portal>
               <HoverCard.Content side="left" align="start" sideOffset={12}
-                className="z-50 w-[30rem] max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-popover p-3 shadow-lg">
+                className={cn(
+                  "z-50 w-[34rem] max-w-[calc(100vw-2rem)] origin-(--radix-hover-card-content-transform-origin) rounded-xl border border-border bg-card shadow-xl",
+                  "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-right-2",
+                  "data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:slide-out-to-right-2",
+                )}>
                 <Preview code={t.statement(schema, table)} />
               </HoverCard.Content>
             </HoverCard.Portal>
@@ -71,6 +75,16 @@ export function PolicyTemplatesPanel({ command, schema, table, onPick }: {
     </aside>
   );
 }
+
+/** The original's preview palette: keywords blue, names and strings green, the rest plain. */
+const PREVIEW_COLOURS: Record<SqlTokenKind, string> = {
+  keyword: "text-sky-400",
+  string: "text-emerald-400",
+  quoted: "text-emerald-400",
+  comment: "text-subtle italic",
+  number: "text-orange-400",
+  plain: "",
+};
 
 /** The statement a template stands for, as the original previews it on hover, with a copy. */
 function Preview({ code }: { code: string }) {
@@ -86,9 +100,13 @@ function Preview({ code }: { code: string }) {
   };
   return (
     <div className="relative">
-      <SqlCode code={code} />
+      <pre className="overflow-x-auto px-6 py-5 pr-14 font-mono text-sm leading-6 text-foreground">
+        {tokenizeSql(code).map((token, i) => (
+          <span key={i} className={PREVIEW_COLOURS[token.kind]}>{token.text}</span>
+        ))}
+      </pre>
       <button type="button" onClick={copy} aria-label="Copy SQL"
-        className="absolute top-2 right-2 rounded-md border border-border bg-popover p-1.5 text-muted-foreground hover:text-foreground">
+        className="absolute top-3 right-3 rounded-md border border-border bg-muted/40 p-1.5 text-muted-foreground transition-colors hover:text-foreground">
         {copied ? <IconCheck size={14} className="text-primary" /> : <IconCopy size={14} />}
       </button>
     </div>
