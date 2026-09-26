@@ -89,11 +89,11 @@ export function EnumTypeSheet({
           </SheetHeader>
 
           <div className="space-y-5 px-6 py-6">
-            <label className="block space-y-2.5">
+            <label className="block space-y-2">
               <span className="block text-sm text-foreground">Name</span>
               <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9" />
             </label>
-            <label className="block space-y-2.5">
+            <label className="block space-y-2">
               <span className="block text-sm text-foreground">Description</span>
               <Input value={comment} onChange={(e) => setComment(e.target.value)} className="h-9" />
               <span className="block text-sm text-muted-foreground">Optional</span>
