@@ -108,3 +108,18 @@ above and below it.
 
 The browser, including the one thing worth looking at: that Emails and OAuth Apps still look exactly
 as they did.
+
+## Adjusted after looking at it, 2026-09-26
+
+Full-bleed was read as "no padding anywhere", and it is not: the grid runs to both edges, the chrome
+around it does not.
+
+- The title and filter strips go from `px-6 py-2.5` to `px-8 py-3.5`, matching the gutter in the
+  original rather than the narrowest thing that still counted as padding.
+- **`Total: 1 user` moves into the title strip**, opposite the title. It answers "how many are
+  there", which is a question about the page — at the bottom it only arrived after scrolling past
+  the answer.
+- The footer keeps the paging and nothing else.
+- The empty, failed and loading states share the strips' gutter instead of their own `p-6`.
+
+The grid itself was already flush and unrounded; that part of the complaint was a confirmation.

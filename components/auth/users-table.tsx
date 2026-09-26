@@ -133,11 +133,14 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="shrink-0 border-b border-border px-6 py-3.5">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-8 py-4">
         <h1 className="text-base text-foreground">Users</h1>
+        {/* Up here rather than under the table: it answers "how many are there", which is a question
+            about the page, and at the bottom it only arrived after scrolling past the answer. */}
+        <span className="text-sm text-muted-foreground">{data ? userCount(data.total) : ""}</span>
       </header>
 
-      <div className="shrink-0 border-b border-border px-6 py-2.5">
+      <div className="shrink-0 border-b border-border px-8 py-3.5">
         <UsersToolbar
           field={field}
           onField={reset(setField)}
@@ -161,7 +164,7 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
       </div>
 
       {selected.length > 0 ? (
-        <div className="shrink-0 border-b border-border px-6 py-2">
+        <div className="shrink-0 border-b border-border px-8 py-2.5">
           <BulkDeleteBar
             projectRef={projectRef}
             selected={selected}
@@ -176,17 +179,17 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
           and the footer still while eight columns move under them. */}
       <div className="min-h-0 flex-1 overflow-auto">
         {isWaiting(state) ? (
-          <div className="space-y-2 p-6">
+          <div className="space-y-2 px-8 py-6">
             {Array.from({ length: 8 }, (_, i) => (
               <Skeleton key={i} className="h-8 w-full" />
             ))}
           </div>
         ) : state.status !== "ready" ? (
-          <div className="p-6">
+          <div className="px-8 py-6">
             <Empty>{reasonOf(state)}</Empty>
           </div>
         ) : users.length === 0 ? (
-          <div className="p-6">
+          <div className="px-8 py-6">
             <Empty>
               {filter
                 ? field === "id"
@@ -291,9 +294,7 @@ export function UsersTable({ projectRef }: { projectRef: string }) {
         )}
       </div>
 
-      <footer className="flex shrink-0 items-center justify-between border-t border-border px-6 py-2 text-sm text-muted-foreground">
-        <span>{data ? userCount(data.total) : ""}</span>
-
+      <footer className="flex shrink-0 items-center justify-end border-t border-border px-8 py-2 text-sm text-muted-foreground">
         <span className="flex items-center gap-2">
           <span>
             Page {page} of {pageCount(data?.total ?? null)}
