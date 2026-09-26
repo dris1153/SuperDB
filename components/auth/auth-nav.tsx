@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-type Row = { slug: string; label: string; endpoint: string; ready?: boolean };
+type Row = { slug: string; label: string; endpoint: string; ready?: boolean; beta?: boolean };
 
 /**
  * Authentication's own second-level nav.
@@ -44,6 +44,13 @@ const GROUPS: { title: string; rows: Row[] }[] = [
     title: "Configuration",
     rows: [
       { slug: "providers", label: "Sign In / Providers", endpoint: "config/auth: external_*" },
+      {
+        slug: "oauth-server",
+        label: "OAuth Server",
+        endpoint: "GET,PATCH /v1/projects/{ref}/config/auth: oauth_server_*",
+        ready: true,
+        beta: true,
+      },
       { slug: "sessions", label: "Sessions", endpoint: "config/auth: sessions_*" },
       { slug: "rate-limits", label: "Rate Limits", endpoint: "config/auth: rate_limit_*" },
       { slug: "mfa", label: "Multi-Factor", endpoint: "config/auth: mfa_*" },
@@ -82,7 +89,7 @@ export function AuthNav({ projectRef }: { projectRef: string }) {
         <div key={title} className="space-y-1">
           <div className="px-2.5 pb-1 text-[11px] tracking-wider text-subtle uppercase">{title}</div>
 
-          {rows.map(({ slug, label, endpoint, ready }) => {
+          {rows.map(({ slug, label, endpoint, ready, beta }) => {
             const href = slug ? `${base}/${slug}` : base;
 
             if (!ready) {
@@ -111,7 +118,12 @@ export function AuthNav({ projectRef }: { projectRef: string }) {
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                 )}
               >
-                {label}
+                <span className="flex-1">{label}</span>
+                {beta ? (
+                  <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 text-[10px] tracking-wide text-amber-600 uppercase dark:text-amber-400">
+                    beta
+                  </span>
+                ) : null}
               </Link>
             );
           })}

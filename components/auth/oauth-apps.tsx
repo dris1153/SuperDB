@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { IconArrowUpRight, IconInfoSquareRounded, IconPlus, IconSearch } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { timestamp } from "@/lib/format";
@@ -107,11 +108,9 @@ export function OAuthApps({ projectRef }: { projectRef: string }) {
                   </p>
                 </div>
               </div>
-              {/* The one way to use this page at all, so it exists — unlike the other buttons this
-                  app declined to copy — and it says it leaves the app. */}
-              <External href={`https://supabase.com/dashboard/project/${projectRef}/auth/providers`}>
-                OAuth Server Settings
-              </External>
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/p/${projectRef}/auth/oauth-server`}>OAuth Server Settings</Link>
+              </Button>
             </div>
           )}
 
@@ -236,7 +235,7 @@ const Head = ({ children }: { children: React.ReactNode }) => (
 );
 
 /** A button that leaves the app, and shows that it does rather than pretending to navigate. */
-function External({ href, children }: { href: string; children: React.ReactNode }) {
+export function External({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <Button asChild variant="outline" size="sm" className="gap-1.5">
       <a href={href} target="_blank" rel="noreferrer">

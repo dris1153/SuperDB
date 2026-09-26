@@ -39,6 +39,7 @@ async function oneUserAsPage(ref: string, id: string): Promise<UserPage> {
   }
 }
 import { pickEmailConfig, type EmailConfig } from "./auth-config";
+import { pickOAuthServer, type OAuthServerConfig } from "./oauth-server";
 import { buildUserLogsSql, parseUserLog, sortEvents, type UserEvent, type UserLogRow } from "./auth-audit";
 import { avatarOf, displayNameOf, isUserId, isUserSort, providersOf, PER_PAGE } from "./auth-users";
 import {
@@ -500,6 +501,20 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
    */
   "auth-config": async (t, ref): Promise<EmailConfig> =>
     pickEmailConfig(await getAuthConfig(t, ref)),
+
+  /**
+   * The OAuth Server page: three fields and `site_url`, picked for the same reason as above. The
+   * discovery document is public and a failure there costs the endpoints card, not the form.
+   */
+  "oauth-server": async (t, ref): Promise<OAuthServerConfig> => {
+    const [raw, discovery] = await Promise.all([
+      getAuthConfig(t, ref),
+      fetch(`https://${ref}.supabase.co/auth/v1/.well-known/openid-configuration`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+    ]);
+    return pickOAuthServer(raw, discovery);
+  },
 
   logs: async (t, ref, search) => {
     const minutes = windowMinutes(asInterval(search.get("interval")));

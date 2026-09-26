@@ -62,6 +62,8 @@ export const PART_NAMES = [
   "oauth-clients",
   // The Emails page: about twenty-five fields of `/config/auth`, picked out of 243.
   "auth-config",
+  // The OAuth Server page: its three `/config/auth` fields, `site_url`, and the public endpoints.
+  "oauth-server",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];

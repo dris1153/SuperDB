@@ -79,8 +79,8 @@ for rather than an error.
 Turning it on needs both `oauth_server_enabled` and `oauth_server_authorization_path` in one PATCH —
 either alone is refused — and **GoTrue takes about a minute to notice**. A page that enabled it and
 listed in the same breath would show "disabled" over a setting just turned on, so the banner says
-so. The page links to the setting rather than offering the switch: becoming an identity provider is
-a configuration decision, not a step in creating an app.
+so. Its "OAuth Server Settings" button leads to the page below rather than putting the switch here:
+becoming an identity provider is a configuration decision, not a step in creating an app.
 
 The list answers `{}` when empty and `{"clients":[…]}` when not, so `body.clients ?? []` is not
 enough — the same trap `listSigningKeys` has a test for, arriving a second time.
@@ -88,6 +88,23 @@ enough — the same trap `listSigningKeys` has a test for, arriving a second tim
 `client_secret` is **not** in the list. It is in the 201 from create and in a single-client read, so
 the create dialog is the only place this app shows it — and says that, rather than claiming the
 secret is unrecoverable. It is deliberately never written to the audit line.
+
+## OAuth Server
+
+Three fields of `/config/auth` and `site_url`, plus the project's public discovery document for the
+endpoints card. Measured on a scratch project, 2026-09-26:
+
+```
+{enabled: true,  path: "oauth/consent"}   400 "…must be a valid URL path starting with "/""
+{enabled: true,  path: ""}                400 "…must be set when OAUTH_SERVER_ENABLED is true"
+{enabled: false, path: "/oauth/consent"}  200, and the path reads back
+{allow_dynamic_registration: true}        200 on its own
+```
+
+`lib/oauth-server.ts` refuses the first two before sending, and every save carries all three fields.
+**Clients survive a disable**: one registered before it was listed again after re-enabling, so the
+confirm says "deactivated" as the original does. The discovery document answers 200 with no key while
+the server is off; the endpoints come from its `issuer` rather than from a URL assembled here.
 
 ## A user's audit trail
 

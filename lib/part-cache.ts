@@ -57,6 +57,7 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   "auth-user": 0,
   // Written from the page that shows it, so a cached copy would show the state before the save.
   "auth-config": 0,
+  "oauth-server": 0,
   "oauth-clients": 0,
   // Read once when the tab is opened. The logs endpoint throttles, so nothing polls it.
   "auth-user-logs": 0,
