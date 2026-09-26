@@ -1,7 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { IconLock } from "@tabler/icons-react";
+import { Select as SelectPrimitive } from "radix-ui";
+import { IconCircleCheckFilled, IconLock } from "@tabler/icons-react";
 import { COMMANDS, takesCheck, takesUsing, type PolicySpec } from "@/lib/policy-statements";
 import { FOREGROUND, KEYWORD } from "@/components/sql-editor/editor-theme";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,12 @@ const Label = ({ text, keyword }: { text: string; keyword?: string }) => (
     {keyword ? <><code className="rounded border border-border bg-muted px-1 font-mono text-xs">{keyword}</code> clause</> : null}
   </span>
 );
+
+/** The original's behaviours, each with the line it explains itself with. */
+const BEHAVIOURS = [
+  { value: "permissive", label: "Permissive", description: 'Policies are combined using the "OR" Boolean operator' },
+  { value: "restrictive", label: "Restrictive", description: 'Policies are combined using the "AND" Boolean operator' },
+];
 
 /** One fixed line of the frame: its number, a keyword, and the rest. */
 const Fixed = ({ n, keyword, rest }: { n: number; keyword: string; rest?: string }) => (
@@ -72,9 +79,20 @@ export function PolicyDetails({ draft, set, tables, roles, editing, version }: {
           <Label text="Policy Behavior" keyword="as" />
           <Select value={draft.permissive ? "permissive" : "restrictive"} onValueChange={(v) => set({ permissive: v === "permissive" })} disabled={editing}>
             <SelectTrigger className="h-10 w-full"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="permissive">Permissive</SelectItem>
-              <SelectItem value="restrictive">Restrictive</SelectItem>
+            <SelectContent position="popper" align="start" className="p-1">
+              {/* Only the label is ItemText, so the trigger shows the name and not its explanation. */}
+              {BEHAVIOURS.map((b) => (
+                <SelectPrimitive.Item key={b.value} value={b.value}
+                  className="flex cursor-default gap-3 rounded-md px-2 py-2 outline-hidden select-none focus:bg-accent">
+                  <span className="mt-0.5 size-4 shrink-0">
+                    <SelectPrimitive.ItemIndicator><IconCircleCheckFilled size={16} /></SelectPrimitive.ItemIndicator>
+                  </span>
+                  <span>
+                    <span className="block text-sm text-foreground"><SelectPrimitive.ItemText>{b.label}</SelectPrimitive.ItemText></span>
+                    <span className="block text-sm text-muted-foreground">{b.description}</span>
+                  </span>
+                </SelectPrimitive.Item>
+              ))}
             </SelectContent>
           </Select>
         </div>
