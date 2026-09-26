@@ -1,6 +1,6 @@
 ---
 title: "Database › Tables, against the original"
-status: pending
+status: in-progress  # built and measured; not clicked through signed in
 created: 2026-09-26
 blockedBy: []
 blocks: []
@@ -18,10 +18,10 @@ Read from the original's source: `Database/Tables/TableList.tsx`, `ColumnList.ts
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [The list](phase-01-list.md) | pending | ~3h | — |
-| 2 | [A table's columns](phase-02-columns.md) | pending | ~2h | 1 |
-| 3 | [Edit table](phase-03-edit.md) | pending | ~3h | 1 |
-| 4 | [Duplicate table](phase-04-duplicate.md) | pending | ~3h | 1 |
+| 1 | [The list](phase-01-list.md) | in-progress | ~3h | — |
+| 2 | [A table's columns](phase-02-columns.md) | in-progress | ~2h | 1 |
+| 3 | [Edit table](phase-03-edit.md) | in-progress | ~3h | 1 |
+| 4 | [Duplicate table](phase-04-duplicate.md) | in-progress | ~3h | 1 |
 
 ## Already measured (2026-09-26, read only, SuperDB `public`)
 
@@ -53,3 +53,17 @@ is why the old list's "Rows (est.)" had to be read with a pinch of salt. The pub
 1. `alter publication supabase_realtime add table` / `drop table` — accepted by the write endpoint?
 2. Duplicate: `create table … (like … including all)` keeps what, loses what (foreign keys are
    documented as lost); `insert … select` against identity and generated columns.
+
+## Built 2026-09-26
+
+- **Both gates answered on ZKVault**, through the app's own builders, and everything dropped after —
+  see `docs/database.md`. One thing the plan did not foresee: `pg_get_constraintdef` leaves a
+  referenced table unqualified when its schema is on the search path, so the facts read now sets
+  `search_path` to empty for its own transaction.
+- The reads were run against SuperDB (read only): 8 relations, `connections` with 17 columns and
+  `text[]` for an array, a missing table answering `found: false`.
+- The list and the columns page were rendered from that real data in a throwaway route, screenshot
+  in headless Chrome, and the route deleted.
+- **Not clicked:** the menus, the sheets, the confirms — they need a signed-in browser.
+- Removed as orphans: the stand-in `tables-card.tsx`, and the whole-database `tables` part with its
+  query, which nothing reads now.

@@ -3,7 +3,6 @@
 import "@xyflow/react/dist/style.css";
 import { useMemo, type CSSProperties } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Background, BackgroundVariant, MiniMap, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { IconDiamond, IconDiamondFilled, IconFingerprint, IconHash, IconKey } from "@tabler/icons-react";
 import { toGraph, type SchemaGraph } from "@/lib/schema-graph";
@@ -11,6 +10,7 @@ import { place, positionsKey, readPositions } from "@/lib/schema-layout";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty-state";
 import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
+import { useSchemaParam } from "./schema-select";
 import { SchemaToolbar } from "./schema-toolbar";
 import { ProjectRefContext, TableNode } from "./table-node";
 
@@ -32,23 +32,11 @@ const graphIds = new WeakMap<object, number>();
 let nextGraphId = 0;
 const idOf = (graph: object) => graphIds.get(graph) ?? (graphIds.set(graph, ++nextGraphId), nextGraphId);
 
-/**
- * The Schema Visualizer, laid out as the original has it. The schema lives in the URL, written with
- * the history API as the Emails tab is, so a reload or a shared link opens the same one.
- */
+/** The Schema Visualizer, laid out as the original has it. */
 export function SchemaVisualizer({ projectRef }: { projectRef: string }) {
-  const params = useSearchParams();
-  const schema = params.get("schema") || "public";
-
-  const schemas = useProjectPart<{ schemas: string[] }>(projectRef, "schemas");
+  const [schema, setSchema] = useSchemaParam();
   const state = useProjectPart<SchemaGraph>(projectRef, "schema-graph", { schema });
   const graph = state.status === "ready" ? state.data : null;
-
-  const setSchema = (next: string) => {
-    const query = new URLSearchParams(params);
-    query.set("schema", next);
-    window.history.replaceState(null, "", `?${query.toString()}`);
-  };
 
   return (
     <ProjectRefContext.Provider value={projectRef}>
@@ -57,7 +45,6 @@ export function SchemaVisualizer({ projectRef }: { projectRef: string }) {
           <SchemaToolbar
             projectRef={projectRef}
             schema={schema}
-            schemas={schemas.status === "ready" ? schemas.data.schemas : [schema]}
             graph={graph}
             onSchema={setSchema}
           />

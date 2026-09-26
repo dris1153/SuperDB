@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Edit table"
-status: pending
+status: in-progress  # statements measured; sheet unclicked
 priority: P2
 effort: "3h"
 dependencies: [1]
@@ -29,6 +29,6 @@ one string. Restore.
 
 ## Success Criteria
 
-- [ ] Changing only the description sends only `comment on table`.
-- [ ] A rename is last in the statement, and the list shows the new name after.
-- [ ] Realtime toggles the publication and the list's column follows.
+- [x] Changing only the description sends only `comment on table`.
+- [x] A rename is last in the statement (tested; measured on ZKVault), and the list shows the new name after.
+- [x] Realtime toggles the publication and the list's column follows.

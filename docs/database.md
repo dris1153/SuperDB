@@ -41,3 +41,36 @@ nodes' bounds for the capture. Node menus carry `data-export-hidden` and are fil
 
 `@xyflow/react`, `@dagrejs/dagre` and `html-to-image` load on this route only — after the build, the
 xyflow chunk (237 KB) is referenced by the schemas page's client manifest and no other.
+
+## Tables
+
+**One catalog statement per schema** (`lib/schema-entities-sql.ts`) gives every row of the list, and
+on SuperDB `public` its numbers matched the original's page exactly. Rows are
+`pg_stat_get_live_tuples` — what pg-meta reads. **Not `reltuples`**: it answered `-1` for six of
+eight tables that had never been analysed. Size is `pg_size_pretty`, so it reads `48 kB` as the
+original does; realtime is membership of the `supabase_realtime` publication. Search and the Entity
+Type filter run in the browser.
+
+The columns page (`/database/tables/[table]?schema=`) is read only; a table that is not there says
+so rather than showing an empty list.
+
+**Edit and Duplicate** read the table's facts with `set local search_path = ''` first. Without it
+`pg_get_constraintdef` leaves a referenced table unqualified whenever its schema is on the search
+path — measured: `REFERENCES superdb_probe_parent(id)` — and a copy's foreign key would then depend
+on the write session's search path matching the read's. Both statements go through `run` in
+`lib/ddl-run.ts`: rebuilt on the server from the catalog as it is then, and audited.
+
+Measured on ZKVault, 2026-09-26, through the app's own builders, then dropped:
+
+- **Edit** — comment, `disable row level security`, `alter publication supabase_realtime add
+  table`, and the rename, in one string with the rename last: all applied. `drop table` from the
+  publication applied too.
+- **Duplicate with data** — a source with an `always` identity, a stored generated column, a unique
+  key, a foreign key, RLS, a comment and a policy. The copy had the 3 rows, the generated values
+  recomputed, RLS on, the comment, the primary, unique and foreign keys, both indexes, **no policy**
+  (as in the original, and the confirm says so), and the next insert took id 4 — the sequence had
+  been moved past the copied maximum.
+
+Not measured, but documented Postgres behaviour: a `serial` column's default still names the source's
+sequence after `like … including all`, so the two tables share it. The original has the same
+recipe and the same result; it is not worked around.

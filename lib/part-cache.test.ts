@@ -102,14 +102,14 @@ test("a write to a project drops every user's copy of it", () => {
   clearPartCache();
   const ref = "abcdefghijklmnopqrst";
   writeCached(partKey("user-1", ref, "columns", "schema=public"), "a", 60_000, REF, generationOf(REF));
-  writeCached(partKey("user-2", ref, "tables", ""), "b", 60_000, REF, generationOf(REF));
-  writeCached(partKey("user-1", "zzzzzzzzzzzzzzzzzzzz", "tables", ""), "elsewhere", 60_000, REF, generationOf(REF));
+  writeCached(partKey("user-2", ref, "schemas", ""), "b", 60_000, REF, generationOf(REF));
+  writeCached(partKey("user-1", "zzzzzzzzzzzzzzzzzzzz", "schemas", ""), "elsewhere", 60_000, REF, generationOf(REF));
 
   dropProject(ref);
 
   assert.equal(cachedCount(), 1, "only the other project's entry survives");
   assert.deepEqual(
-    readCached(partKey("user-1", "zzzzzzzzzzzzzzzzzzzz", "tables", ""), 60_000),
+    readCached(partKey("user-1", "zzzzzzzzzzzzzzzzzzzz", "schemas", ""), 60_000),
     { value: "elsewhere" },
   );
 });
@@ -131,7 +131,7 @@ test("re-writing a key keeps it from being evicted as old", () => {
   // Counts sit under the per-user bound on purpose: this is about eviction *order*, and a run that
   // tripped the bound would pass for the wrong reason.
   clearPartCache();
-  const kept = partKey("u", REF, "tables", "");
+  const kept = partKey("u", REF, "schemas", "");
   writeCached(kept, "first", 60_000, REF, generationOf(REF));
   for (let i = 0; i < 60; i += 1) {
     writeCached(partKey("u", REF, "columns", `table=t${i}`), i, 60_000, REF, generationOf(REF));

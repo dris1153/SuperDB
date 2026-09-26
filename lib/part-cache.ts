@@ -38,9 +38,8 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   pooler: 60_000,
   health: 60_000,
 
-  // Live figures — database size, connection count, the table inventory.
+  // Live figures — database size, connection count.
   overview: 30_000,
-  tables: 30_000,
 
   // Catalog. Short, and dropped outright by any write to this project.
   schemas: 30_000,
@@ -60,6 +59,9 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   // Read on opening the page and on a click; a cached copy would outlive the migration just run.
   "schema-graph": 0,
   "schema-definition": 0,
+  "schema-entities": 0,
+  "table-columns": 0,
+  "table-facts": 0,
   "oauth-clients": 0,
   // Read once when the tab is opened. The logs endpoint throttles, so nothing polls it.
   "auth-user-logs": 0,

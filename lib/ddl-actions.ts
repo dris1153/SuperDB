@@ -1,7 +1,7 @@
 "use server";
 
 import { resolveProject } from "./inventory";
-import { readOnlyQuery, writeQuery } from "./mgmt-api";
+import { readOnlyQuery } from "./mgmt-api";
 import { quoteIdent, quoteQualified } from "./sql-ident";
 import {
   addColumn as buildAddColumn,
@@ -14,7 +14,7 @@ import {
 import type { ColumnChange, NewColumn } from "./ddl-build";
 import { listTypes } from "./ddl-types";
 import { describeTable } from "./table-editor";
-import { recordWrite } from "./write-audit";
+import { run, type DdlResult } from "./ddl-run";
 
 /**
  * Schema changes.
@@ -27,54 +27,6 @@ import { recordWrite } from "./write-audit";
  * DDL reports no row count, so the result says only whether it ran. Every attempt is audited, the
  * failures included, for the same reason the row writes are.
  */
-
-export type DdlResult = { ok: true } | { ok: false; reason: string };
-
-/**
- * `needsTypes` keeps the catalog read off the paths that do not name a type. Without it a broken or
- * throttled read-only endpoint would block `disable RLS` and `drop table` — the two things most
- * likely to be wanted when something is wrong — over a list neither of them looks at.
- */
-async function run(
-  ref: string,
-  schema: string,
-  table: string,
-  what: string,
-  needsTypes: boolean,
-  build: (types: string[]) => string,
-): Promise<DdlResult> {
-  const found = await resolveProject(ref);
-  if (!found) return { ok: false, reason: "Project not found." };
-
-  let sql = "";
-  try {
-    sql = build(needsTypes ? await listTypes(found.token, ref) : []);
-    await writeQuery(found.token, ref, sql);
-    // Trimmed to fit: `connection_events.detail` is capped at 500 characters, and a wide CREATE
-    // TABLE would otherwise lose its tail to a silent cut rather than a deliberate one.
-    await recordWrite({
-      ref,
-      schema,
-      table,
-      what,
-      outcome: `ran: ${sql.replace(/\s+/g, " ").slice(0, 300)}`,
-    });
-    return { ok: true };
-  } catch (error) {
-    // Postgres explains a refused schema change better than this code could — a dependent view, a
-    // constraint, a type it cannot convert — so its message is surfaced rather than replaced.
-    const reason = error instanceof Error ? error.message : "The change failed.";
-    const attempted = sql === "" ? what : sql.replace(/\s+/g, " ");
-    await recordWrite({
-      ref,
-      schema,
-      table,
-      what,
-      outcome: `failed: ${reason.slice(0, 200)} — ${attempted.slice(0, 200)}`,
-    });
-    return { ok: false, reason: reason.slice(0, 400) };
-  }
-}
 
 /** The type names a column may be given on this project, for the pickers and the preview. */
 export async function listColumnTypes(ref: string): Promise<string[]> {

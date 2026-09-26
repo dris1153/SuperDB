@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "A table's columns"
-status: pending
+status: in-progress  # rendered from real data
 priority: P2
 effort: "2h"
 dependencies: [1]
@@ -18,10 +18,11 @@ dependencies: [1]
 
 ## Architecture
 
-The `columns` part the Table Editor already reads (`describeTable`) carries what this needs; the
-page only draws it.
+~~The `columns` part the Table Editor already reads (`describeTable`) carries what this needs.~~ It
+does not: no comment, no unique or identity flag. A `table-columns` part reads them, with `found` so a
+missing table can be told from an empty one.
 
 ## Success Criteria
 
-- [ ] `public.connections` lists its 17 columns with the right constraints.
-- [ ] A table that does not exist answers 404.
+- [x] `public.connections` lists its 17 columns with the right constraints.
+- [x] A table that does not exist says so — `found: false`, drawn as a message rather than a 404, because the check needs the project's catalog and the page shell does not read it.

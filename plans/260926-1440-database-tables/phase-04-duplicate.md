@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Duplicate table"
-status: pending
+status: in-progress  # statements measured; dialog unclicked
 priority: P2
 effort: "3h"
 dependencies: [1]
@@ -37,6 +37,6 @@ without data; compare; drop both.
 
 ## Success Criteria
 
-- [ ] The copy has the source's columns, constraints, indexes and foreign keys.
-- [ ] With data: the rows match, and the next identity value does not collide.
-- [ ] The confirm names what is not copied.
+- [x] The copy has the source's columns, constraints, indexes and foreign keys.
+- [x] With data: the rows match, and the next identity value does not collide.
+- [x] The confirm names what is not copied.

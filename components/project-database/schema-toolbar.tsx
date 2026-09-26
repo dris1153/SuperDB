@@ -20,21 +20,19 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { downloadGraph } from "./schema-export";
+import { SchemaSelect } from "./schema-select";
 import { copy } from "./table-node";
 
 /** Schema, Find table, Copy as SQL and its menu, Auto layout — the original's bar, left to right. */
 export function SchemaToolbar({
   projectRef,
   schema,
-  schemas,
   graph,
   onSchema,
 }: {
   projectRef: string;
   schema: string;
-  schemas: string[];
   graph: SchemaGraph | null;
   onSchema: (schema: string) => void;
 }) {
@@ -86,19 +84,7 @@ export function SchemaToolbar({
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-      <Select value={schema} onValueChange={onSchema}>
-        <SelectTrigger size="sm" className="min-w-40 justify-start [&>svg]:ml-auto" aria-label="Schema">
-          <span className="text-muted-foreground">schema</span>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {(schemas.includes(schema) ? schemas : [schema, ...schemas]).map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <SchemaSelect projectRef={projectRef} schema={schema} onChange={onSchema} />
 
       <Popover open={finding} onOpenChange={setFinding}>
         <PopoverTrigger asChild>

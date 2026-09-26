@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "The list"
-status: pending
+status: in-progress  # rendered from real data; interactions unclicked
 priority: P2
 effort: "3h"
 dependencies: []
@@ -28,6 +28,6 @@ dependencies: []
 
 ## Success Criteria
 
-- [ ] SuperDB `public` shows the eight rows with the measured numbers.
+- [x] SuperDB `public` shows the eight rows with the measured numbers.
 - [ ] Unticking *Table* empties the list and says why; *Select only* leaves one type.
 - [ ] Delete asks for the name and is audited, as in the Table Editor.

@@ -18,7 +18,6 @@ import {
   queryLogs,
   MgmtError,
 } from "./mgmt-api";
-import { listTables } from "./db-introspect";
 import { getUser, listFactors, listOAuthClients, listUsers, type UserPage } from "./auth-api";
 import { sortClients } from "./oauth-clients";
 
@@ -40,6 +39,8 @@ async function oneUserAsPage(ref: string, id: string): Promise<UserPage> {
 import { pickEmailConfig, type EmailConfig } from "./auth-config";
 import { pickOAuthServer, type OAuthServerConfig } from "./oauth-server";
 import { readGraph } from "./schema-graph-sql";
+import { listEntities, listTableColumns } from "./schema-entities-sql";
+import { tableFacts } from "./table-facts-sql";
 import { buildUserLogsSql, parseUserLog, sortEvents, type UserEvent, type UserLogRow } from "./auth-audit";
 import { avatarOf, displayNameOf, isUserId, isUserSort, providersOf, PER_PAGE } from "./auth-users";
 import {
@@ -117,7 +118,6 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   pooler: (t, ref) => getPoolerConfig(t, ref),
   health: (t, ref) => getHealth(t, ref),
   overview: (t, ref) => dbOverview(t, ref),
-  tables: (t, ref) => listTables(t, ref),
   /**
    * The settings page's wider shape: type, description and prefix for every key, plus the value of
    * the two that are meant to be public.
@@ -256,6 +256,12 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   "schema-graph": (t, ref, search) => readGraph(t, ref, schemaOf(search)),
 
   "schema-definition": (t, ref, search) => schemaDefinition(t, ref, schemaOf(search)),
+
+  "schema-entities": (t, ref, search) => listEntities(t, ref, schemaOf(search)),
+
+  "table-columns": (t, ref, search) => listTableColumns(t, ref, schemaOf(search), tableOf(search)),
+
+  "table-facts": (t, ref, search) => tableFacts(t, ref, schemaOf(search), tableOf(search)),
 
   columns: (t, ref, search) => describeTable(t, ref, schemaOf(search), tableOf(search)),
 

@@ -20,11 +20,9 @@ export const PART_NAMES = [
   "pooler",
   "health",
   "overview",
-  "tables",
   "metrics",
   "logs",
-  // The table editor. `tables` above is the database page's inventory of the whole database; these
-  // are one schema, one table, one page of rows.
+  // The table editor: one schema, one table, one page of rows.
   "schemas",
   "schema-tables",
   "columns",
@@ -65,6 +63,11 @@ export const PART_NAMES = [
   // The Schema Visualizer: one schema's tables, columns and foreign keys, and its DDL for Copy as SQL.
   "schema-graph",
   "schema-definition",
+  // Database › Tables: one schema's relations with their sizes, and one relation's columns.
+  "schema-entities",
+  "table-columns",
+  // Edit and Duplicate table: RLS, realtime, comment, and what a copy needs — foreign keys, columns.
+  "table-facts",
 ] as const;
 
 export type Part = (typeof PART_NAMES)[number];
