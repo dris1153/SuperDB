@@ -3,22 +3,19 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  IconChevronLeft,
-  IconDiamond,
-  IconDiamondFilled,
-  IconFingerprint,
-  IconHash,
-  IconKey,
-  IconLink,
-  IconSearch,
-} from "@tabler/icons-react";
-import type { TableColumn } from "@/lib/table-entities";
+import { IconChevronLeft, IconPlus, IconSearch } from "@tabler/icons-react";
+import { isWritableTable, type TableColumns as ColumnsPart } from "@/lib/table-entities";
+import type { ColumnInfo } from "@/lib/table-view";
+import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { isWaiting, reasonOf, useProjectPart } from "@/components/use-project-part";
+import { AddColumnSheet } from "@/components/table-editor/add-column-sheet";
+import { ColumnEditSheet } from "@/components/table-editor/column-edit-sheet";
+import { ColumnRowActions } from "./column-row-actions";
+import { ConstraintTokens, TypeIcon } from "./column-tokens";
 
 const Head = ({ children }: { children?: React.ReactNode }) => (
   <TableHead className="font-mono text-[11px] font-normal tracking-widest whitespace-nowrap text-muted-foreground uppercase">
@@ -26,97 +23,136 @@ const Head = ({ children }: { children?: React.ReactNode }) => (
   </TableHead>
 );
 
-const Token = ({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) => (
-  <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-xs text-muted-foreground">
-    {icon}
-    {children}
-  </span>
-);
-
-/** One table's columns, read only, as the original's columns page lists them. */
-export function TableColumns({ projectRef, table }: { projectRef: string; table: string }) {
+/**
+ * One table's columns, laid out as the original has them. New column, Edit and Delete are the
+ * Table Editor's own sheets and confirms — only offered on an ordinary or partitioned table.
+ */
+export function TableColumns({ projectRef, projectName, table }: { projectRef: string; projectName: string; table: string }) {
   const schema = useSearchParams().get("schema") || "public";
   const [filter, setFilter] = useState("");
-  const state = useProjectPart<{ found: boolean; columns: TableColumn[] }>(projectRef, "table-columns", { schema, table });
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<ColumnInfo | null>(null);
+
+  const state = useProjectPart<ColumnsPart>(projectRef, "table-columns", { schema, table });
+  const data = state.status === "ready" ? state.data : null;
+  const writable = !!data?.kind && isWritableTable(data.kind);
+  // The edit sheet takes the Table Editor's description of a column; read only where it can be used.
+  const described = useProjectPart<ColumnInfo[]>(projectRef, "columns", { schema, table }, { enabled: writable });
+  const infos = described.status === "ready" ? described.data : [];
 
   const needle = filter.trim().toLowerCase();
-  const columns = state.status === "ready" ? state.data.columns.filter((c) => c.name.toLowerCase().includes(needle)) : [];
+  const columns = data ? data.columns.filter((c) => c.name.toLowerCase().includes(needle)) : [];
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-1">
+    <div className="space-y-8">
+      <header className="space-y-3">
         <Link
           href={`/p/${projectRef}/database/tables?schema=${encodeURIComponent(schema)}`}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <IconChevronLeft size={14} /> Tables
         </Link>
-        <h1 className="text-2xl text-foreground">
-          <span className="text-muted-foreground">{schema}.</span>
-          {table}
-        </h1>
+        <h1 className="text-2xl text-foreground">{table}</h1>
       </header>
 
-      <div className="relative w-52">
-        <IconSearch className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-subtle" />
-        <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter columns" className="h-8 pl-8" />
-      </div>
-
-      {isWaiting(state) ? (
-        <div className="space-y-2">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-11 w-full" />
-          ))}
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="relative w-64">
+            <IconSearch className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-subtle" />
+            <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter columns" className="h-8 pl-8" />
+          </div>
+          {writable ? (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAdding(true)}>
+              <IconPlus size={14} /> New column
+            </Button>
+          ) : null}
         </div>
-      ) : state.status !== "ready" ? (
-        <Empty>{reasonOf(state)}</Empty>
-      ) : !state.data.found ? (
-        <Empty>There is no table {schema}.{table}.</Empty>
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <Head>Name</Head>
-                <Head>Type</Head>
-                <Head>Constraints</Head>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {columns.length === 0 ? (
+
+        {isWaiting(state) ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }, (_, i) => (
+              <Skeleton key={i} className="h-14 w-full" />
+            ))}
+          </div>
+        ) : !data ? (
+          <Empty>{reasonOf(state)}</Empty>
+        ) : !data.found ? (
+          <Empty>There is no table {schema}.{table}.</Empty>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border">
+            <Table>
+              <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={3} className="py-10 text-center text-sm text-muted-foreground">
-                    {needle ? `No results found for "${filter.trim()}"` : "This table has no columns"}
-                  </TableCell>
+                  <Head />
+                  <Head>Name</Head>
+                  <Head>Type</Head>
+                  <Head>Constraints</Head>
+                  <Head />
                 </TableRow>
-              ) : (
-                columns.map((c) => (
-                  <TableRow key={c.name}>
-                    <TableCell className="max-w-72">
-                      <div className="truncate text-foreground">{c.name}</div>
-                      {c.comment ? <div className="truncate text-xs text-muted-foreground">{c.comment}</div> : null}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{c.type}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1.5">
-                        {c.primary ? <Token icon={<IconKey size={12} />}>Primary key</Token> : null}
-                        {c.foreign ? <Token icon={<IconLink size={12} />}>Foreign key</Token> : null}
-                        {c.unique ? <Token icon={<IconFingerprint size={12} />}>Unique</Token> : null}
-                        {c.identity ? <Token icon={<IconHash size={12} />}>Identity</Token> : null}
-                        {c.nullable ? (
-                          <Token icon={<IconDiamond size={12} />}>Nullable</Token>
-                        ) : (
-                          <Token icon={<IconDiamondFilled size={12} />}>Non-nullable</Token>
-                        )}
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {columns.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                      {needle ? `No results found for "${filter.trim()}"` : `There are no columns in "${schema}.${table}"`}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                ) : (
+                  columns.map((c) => {
+                    const info = infos.find((i) => i.name === c.name) ?? null;
+                    return (
+                      <TableRow key={c.name} className="h-[73px]">
+                        <TableCell className="w-0 pr-1 pl-6">
+                          <TypeIcon type={c.type} />
+                        </TableCell>
+                        <TableCell className="max-w-72">
+                          <div className="truncate text-foreground">{c.name}</div>
+                          {c.comment ? <div className="truncate text-xs text-muted-foreground">{c.comment}</div> : null}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{c.type}</TableCell>
+                        <TableCell>
+                          <ConstraintTokens column={c} />
+                        </TableCell>
+                        <TableCell className="pr-4">
+                          {writable ? (
+                            <ColumnRowActions
+                              projectRef={projectRef}
+                              projectName={projectName}
+                              schema={schema}
+                              table={table}
+                              column={c.name}
+                              columnCount={data.columns.length}
+                              onEdit={info ? () => setEditing(info) : null}
+                            />
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+            <div className="border-t border-border px-5 py-4 text-sm text-muted-foreground">
+              {columns.length} {columns.length === 1 ? "column" : "columns"}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {writable ? (
+        <>
+          <AddColumnSheet open={adding} onOpenChange={setAdding} projectRef={projectRef} projectName={projectName} schema={schema} table={table} />
+          <ColumnEditSheet
+            column={editing}
+            onClose={() => setEditing(null)}
+            projectRef={projectRef}
+            projectName={projectName}
+            schema={schema}
+            table={table}
+            columnCount={data?.columns.length ?? 0}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

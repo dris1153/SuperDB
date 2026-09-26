@@ -1,7 +1,7 @@
 import "server-only";
 import { readOnlyQuery } from "./mgmt-api";
 import { quoteLiteral } from "./sql-ident";
-import { readEntities, readTableColumns, type Entity, type TableColumn } from "./table-entities";
+import { readEntities, readTableColumns, type Entity, type TableColumns } from "./table-entities";
 
 /**
  * One schema's relations for the Tables list.
@@ -40,7 +40,7 @@ export async function listEntities(token: string, ref: string, schema: string): 
  */
 const columnsSql = (schema: string, table: string) => `
 with t as (
-  select c.oid
+  select c.oid, c.relkind::text as kind
   from pg_catalog.pg_class c
   join pg_catalog.pg_namespace n on n.oid = c.relnamespace
   where n.nspname = ${quoteLiteral(schema)} and c.relname = ${quoteLiteral(table)}
@@ -48,6 +48,7 @@ with t as (
 )
 select json_build_object(
   'found', exists (select 1 from t),
+  'kind', (select kind from t),
   'columns', coalesce((
     select json_agg(json_build_object(
       'name', a.attname::text,
@@ -76,7 +77,7 @@ export async function listTableColumns(
   ref: string,
   schema: string,
   table: string,
-): Promise<{ found: boolean; columns: TableColumn[] }> {
+): Promise<TableColumns> {
   const rows = await readOnlyQuery<{ result: unknown }>(token, ref, columnsSql(schema, table));
   return readTableColumns(rows[0]?.result);
 }

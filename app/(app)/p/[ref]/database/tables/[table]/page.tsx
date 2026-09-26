@@ -12,11 +12,12 @@ export async function generateMetadata({ params }: { params: Promise<{ table: st
 
 export default async function TableColumnsPage({ params }: { params: Promise<{ ref: string; table: string }> }) {
   const { ref, table } = await params;
-  if (!(await resolveProject(ref))) notFound();
+  const found = await resolveProject(ref);
+  if (!found) notFound();
 
   return (
     <div className="mx-auto max-w-7xl p-8">
-      <TableColumns projectRef={ref} table={table} />
+      <TableColumns projectRef={ref} projectName={found.project.name} table={table} />
     </div>
   );
 }

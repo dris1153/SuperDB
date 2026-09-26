@@ -79,14 +79,17 @@ export type TableColumn = {
   identity: boolean;
 };
 
-/** `found` false is the table not existing — a 404 on the page, not an empty list. */
-export function readTableColumns(raw: unknown): { found: boolean; columns: TableColumn[] } {
+export type TableColumns = { found: boolean; kind: EntityKind | null; columns: TableColumn[] };
+
+/** `found` false is the table not existing — said on the page, not drawn as an empty list. */
+export function readTableColumns(raw: unknown): TableColumns {
   const doc = (raw ?? {}) as Record<string, unknown>;
   const list = Array.isArray(doc.columns) ? doc.columns : [];
   const text = (v: unknown) => (typeof v === "string" ? v : null);
 
   return {
     found: doc.found === true,
+    kind: isKind(doc.kind) ? doc.kind : null,
     columns: list.flatMap((c) => {
       const col = (c ?? {}) as Record<string, unknown>;
       if (typeof col.name !== "string") return [];
@@ -106,3 +109,17 @@ export function readTableColumns(raw: unknown): { found: boolean; columns: Table
     }),
   };
 }
+
+export type TypeAffordance = "number" | "time" | "text" | "json" | "bool" | "other";
+
+const AFFORDANCES: Record<string, TypeAffordance> = {
+  int2: "number", int4: "number", int8: "number", float4: "number", float8: "number", numeric: "number",
+  json: "json", jsonb: "json",
+  text: "text", varchar: "text", uuid: "text",
+  date: "time", time: "time", timetz: "time", timestamp: "time", timestamptz: "time",
+  bool: "bool",
+};
+
+/** The original's icon family for a type, from its own type list; an array is read as its element. */
+export const typeAffordance = (type: string): TypeAffordance =>
+  AFFORDANCES[type.replaceAll('"', "").replace(/\[\]$/, "")] ?? "other";

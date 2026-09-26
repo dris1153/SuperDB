@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { duplicateTable, editTable, readTableFacts } from "./ddl-table-statements.ts";
-import { ENTITY_TYPES, filterEntities, noneFoundSentence, readEntities, readTableColumns } from "./table-entities.ts";
+import { ENTITY_TYPES, filterEntities, noneFoundSentence, readEntities, readTableColumns, typeAffordance } from "./table-entities.ts";
 
 const state = { name: "events", comment: "", rls: true, realtime: false };
 
@@ -69,4 +69,14 @@ test("search and the entity filter narrow together, and an empty filter says wha
   assert.deepEqual(filterEntities(list, "", ["v"]).map((e) => e.name), ["user_view"]);
   assert.equal(noneFoundSentence(["r", "v"], "public"), `No tables and views found in the schema "public"`);
   assert.equal(noneFoundSentence(ENTITY_TYPES.map((t) => t.kind).slice(0, 3), "x"), `No tables, views and materialized views found in the schema "x"`);
+});
+
+test("a column's icon family follows the original's type list, arrays read as their element", () => {
+  assert.equal(typeAffordance("int8"), "number");
+  assert.equal(typeAffordance("uuid"), "text");
+  assert.equal(typeAffordance("text[]"), "text");
+  assert.equal(typeAffordance("timestamptz"), "time");
+  assert.equal(typeAffordance("factor_type"), "other");
+  assert.equal(readTableColumns({ found: true, kind: "v", columns: [] }).kind, "v");
+  assert.equal(readTableColumns({ found: true, kind: "zz", columns: [] }).kind, null);
 });
