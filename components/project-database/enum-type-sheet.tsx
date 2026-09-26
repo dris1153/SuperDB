@@ -99,8 +99,8 @@ export function EnumTypeSheet({
               <span className="block text-sm text-muted-foreground">Optional</span>
             </label>
 
-            <div className="space-y-2">
-              <span className="text-sm text-foreground">Values</span>
+            <div className="space-y-4">
+              <span className="block text-sm text-foreground">Values</span>
               <div className="flex gap-3 rounded-lg border border-border bg-muted/30 p-4">
                 <IconAlertCircle size={18} className="mt-0.5 shrink-0 text-muted-foreground" />
                 <div className="space-y-2">
