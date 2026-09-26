@@ -4,7 +4,7 @@ import type { Project, ServiceHealth } from "@/lib/mgmt-api";
 
 // shadcn's Badge has no outline-plus-tone variant, so the tone rides in via className. Pill radius
 // comes from DESIGN.md ("tags: 9999px").
-const PILL = "rounded-full";
+export const PILL = "rounded-full";
 
 const PROJECT_TONE: Record<string, string> = {
   ACTIVE_HEALTHY: "border-brand-border text-primary",

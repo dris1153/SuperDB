@@ -1,6 +1,6 @@
 ---
 title: "Project drag ordering"
-status: pending
+status: completed
 created: 2026-09-11
 blockedBy: [260910-0934-connection-ordering]
 blocks: []
@@ -87,3 +87,11 @@ whichever lands second resolves a conflict. That phase is P3 and deferred.
 - No optimistic order is ever left on screen after a failed write.
 - **The connections drag behaves identically after phase 3.**
 - `pnpm test` (285 today), `pnpm typecheck`, `pnpm lint`, `pnpm build` stay green.
+
+## Closed 2026-09-26
+
+Verified in the code: `reorder_projects(text[])` is in `supabase/schema.sql`, `lib/project-order.ts`
+calls it, and `components/sortable-projects.tsx` shares
+`components/use-optimistic-order.ts` with the connections board — which is the second of the two
+locations phase 3 offered, and why an audit looking only for `lib/use-optimistic-order.ts` reported
+it missing.

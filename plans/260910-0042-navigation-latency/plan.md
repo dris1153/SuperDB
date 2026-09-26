@@ -1,6 +1,6 @@
 ---
 title: "Navigation latency: cut redundant round trips, then stream"
-status: pending
+status: in-progress
 created: 2026-09-10
 blockedBy: []
 blocks: []
@@ -27,12 +27,12 @@ Diagnosis, rejected alternatives, and why client components + API routes would m
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [Measure and baseline](phase-01-measure-baseline.md) | pending | ~1h | — |
+| 1 | [Measure and baseline](phase-01-measure-baseline.md) | **in-progress** | ~1h | — |
 | 2 | [Cache requireUser](phase-02-cache-require-user.md) | **in-progress** | ~30m | — |
 | 3 | [MFA gate: authoritative factors](phase-03-proxy-auth-roundtrip.md) | **in-progress** | ~3h | 2 |
 | 4 | [Streaming and skeletons](phase-04-streaming-skeletons.md) | **in-progress** | ~3h | — |
-| 5 | [Region alignment](phase-05-region-alignment.md) | pending | ~30m | 1 |
-| 6 | [Management API cache](phase-06-mgmt-api-cache.md) | pending | ~2h | 4 |
+| 5 | [Region alignment](phase-05-region-alignment.md) | **blocked** | ~30m | 1 |
+| 6 | [Management API cache](phase-06-mgmt-api-cache.md) | **in-progress** | ~2h | 4 |
 
 Phase 2 is the whole latency win on the auth path. Phase 3 turned out to be a security fix rather
 than a performance one and no longer gates Phase 4 — the original "proxy before skeletons" ordering
@@ -78,3 +78,38 @@ new implementation before hardening is called done. Cross-reference added there.
 - Cold production FCP on `/p/[ref]/tables`: skeleton visible **under 800 ms**, full content under 2 s.
 - No white screen on any navigation.
 - `pnpm test` green — 262 today (253 prior + 9 MFA gate). ✅
+
+## Audited 2026-09-26
+
+Against the code, not from memory.
+
+**Phases 2, 3 and 4 have shipped.** `requireUser` is `cache()`-wrapped in `lib/supabase/server.ts`;
+`proxy.ts` reads factors from the `getUser()` response rather than from `session.user.factors` in
+the cookie; the project pages render behind `Suspense` with skeletons. None of them has been *timed*,
+which is what phase 1 was for, so they stay `in-progress` rather than completed.
+
+**Phases 1 and 5 are blocked, though not on what this section first said.** The access token in
+this repo's `.env` does not own `kupekvmyzqypwrtnjlid`, the project backing SuperDB itself:
+`GET /v1/projects` returns two projects and it is neither, and the project answers
+`Missing required permission(s): database_read`. That is true, and it is not the blocker — the
+region is written in phase 5 already.
+
+**Corrected an hour later:** phase 5 was never blocked on the region. That phase already carried it
+— `ap-southeast-2`, corrected into the file on 2026-09-10 — and the project owner has since
+confirmed it. The audit above read the phase's `status: pending` and reached for the nearest
+explanation instead of reading the phase.
+
+What phase 5 is actually blocked on is that **nothing is deployed**: no `.vercel/` link, no
+deployment workflow, `SITE_URL` still `localhost`. It is an A/B between two deployments and there
+are none. Its mechanism question is now settled though — `preferredRegion` is deprecated in this
+version of Next and rejects region codes on Vercel, so `vercel.json` is the only lever.
+
+Phase 1 remains blocked on the same thing for its timings; the region half of its question is
+answered.
+
+**Phase 6 is not started deliberately.** Its own text says not to begin until phases 2–4 are
+measured and shown insufficient, and the failure it risks is a cross-tenant data leak rather than a
+slow page. Measurement is blocked, so the gate has not opened. Note that
+`lib/part-cache.ts` and the owner memo in `lib/inventory.ts` have since landed for other reasons,
+both keyed on the connection rather than on a token, which is a large part of what phase 6 wanted —
+whoever picks it up should re-scope it rather than implement it as written.

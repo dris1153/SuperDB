@@ -15,7 +15,8 @@ import { quoteIdent, quoteLiteral } from "./sql-ident.ts";
  *   is refused, never quoted in — quoting a type name does not make an unknown one safe, it makes it
  *   an unknown one in quotes.
  * - **Defaults** are executable by design and cannot be escaped at all. A default therefore says
- *   which kind it is, and `raw` is only ever passed by a caller whose UI labels the field as SQL.
+ *   which kind it is. The column panel's rule — brackets run as written, anything else is quoted —
+ *   is in `column-statements.ts`, and its statement is shown in full before it runs.
  */
 
 /** Offered first in a type picker. The rest of the catalog list sits behind a search. */
@@ -42,9 +43,7 @@ export type ColumnDefault =
   /** From `DEFAULT_EXPRESSIONS`, and checked against it. Interpolated as written, because it runs. */
   | { kind: "expression"; value: string }
   /** A plain value, quoted as a literal. */
-  | { kind: "literal"; value: string }
-  /** Free SQL. Only from a field the user was told is SQL, and only after they saw the statement. */
-  | { kind: "raw"; value: string };
+  | { kind: "literal"; value: string };
 
 export type NewColumn = {
   name: string;
@@ -54,13 +53,6 @@ export type NewColumn = {
   primaryKey: boolean;
   identity?: boolean;
   default?: ColumnDefault | null;
-};
-
-export type ColumnChange = {
-  rename?: string;
-  type?: string;
-  nullable?: boolean;
-  default?: ColumnDefault | null | "drop";
 };
 
 /**
@@ -96,7 +88,7 @@ export function defaultClause(d: ColumnDefault): string {
     }
     return d.value;
   }
-  return d.kind === "literal" ? quoteLiteral(d.value) : d.value;
+  return quoteLiteral(d.value);
 }
 
 /** `"name" type [identity] [default …] [not null]` — the shape both create and add need. */

@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AddColumnSheet } from "./add-column-sheet";
+import { ColumnPanel } from "./column-panel";
 import { useRefreshTable } from "./use-refresh-table";
 import { useTableUrl } from "./url";
 import { DdlConfirm } from "./ddl-confirm";
@@ -118,9 +118,10 @@ export function TableMenu({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AddColumnSheet
+      <ColumnPanel
         open={adding}
-        onOpenChange={setAdding}
+        column={null}
+        onClose={() => setAdding(false)}
         projectRef={projectRef}
         projectName={projectName}
         schema={schema}

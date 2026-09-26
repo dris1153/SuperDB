@@ -54,6 +54,12 @@ typing the project name, and audited like every other write.
 that account and the mailbox behind it. Encrypted in your browser, never in plaintext on the server.
 See [Security](#security).
 
+**Open in Supabase** — every project page links to the same page in the original dashboard. The
+account chip beside the project's name says which account holds it and copies what signs in to it:
+email, account and mailbox passwords, the database password, the ref and the URL. The original keeps
+one account signed in per browser, so a project from another account needs a sign-out first — which
+is what the copy buttons are for.
+
 **Naming and tags** — rename any connection; tag projects freely with a creatable picker.
 
 **Account safety** — TOTP two-factor, an append-only connection event log, and self-service account

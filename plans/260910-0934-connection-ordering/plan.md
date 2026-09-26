@@ -1,6 +1,6 @@
 ---
 title: "Connection ordering: manual order plus column sort"
-status: pending
+status: completed
 created: 2026-09-10
 blockedBy: []
 blocks: [260911-0910-project-drag-ordering]
@@ -19,10 +19,10 @@ Design, the alternatives weighed, and the recommendation the user overrode:
 
 | # | Phase | Status | Effort | Depends on |
 |---|---|---|---|---|
-| 1 | [Schema](phase-01-schema.md) | pending | ~2h | — |
-| 2 | [Read path](phase-02-read-path.md) | pending | ~1h | 1 |
-| 3 | [Reorder action](phase-03-reorder-action.md) | pending | ~1h | 1 |
-| 4 | [Ordering UI](phase-04-ordering-ui.md) | pending | ~4h | 2, 3 |
+| 1 | [Schema](phase-01-schema.md) | completed | ~2h | — |
+| 2 | [Read path](phase-02-read-path.md) | completed | ~1h | 1 |
+| 3 | [Reorder action](phase-03-reorder-action.md) | completed | ~1h | 1 |
+| 4 | [Ordering UI](phase-04-ordering-ui.md) | completed | ~4h | 2, 3 |
 
 **Phases 1–3 are worth shipping alone.** They give a stable, controllable order — settable by hand in
 SQL — before any drag UI exists, and they pull in no new dependency. Phase 4 is the only phase that
@@ -85,3 +85,13 @@ makes any later bug ambiguous between the two plans.
 - A newly connected account appears last; re-authorizing an existing one does not move it.
 - Re-running `supabase/schema.sql` against a populated database is a no-op.
 - `pnpm test` (262 today), `pnpm typecheck`, `pnpm lint`, `pnpm build` stay green.
+
+## Closed 2026-09-26
+
+Audited against the code rather than from memory, and every phase had shipped:
+`reorder_connections(uuid[])` and the `sort_order` converge block are in `supabase/schema.sql`,
+`lib/connections.ts` orders by `sort_order` with nulls last and calls the RPC, and
+`components/sortable-connections.tsx` drives it through `components/use-optimistic-order.ts`.
+
+The statuses were never updated when it landed. The schema half is in the file; whether it has been
+applied to this app's own database is a separate question — see `plans/README.md`.

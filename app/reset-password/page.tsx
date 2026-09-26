@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { updatePassword } from "@/lib/auth-actions";
 import { AuthCard } from "@/components/auth-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+export const metadata: Metadata = { title: "Reset password" };
 
 // Not listed as public in proxy.ts on purpose: /auth/confirm establishes the recovery session before
 // redirecting here, so anyone reaching this page without one is bounced to /login.

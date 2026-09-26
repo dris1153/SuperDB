@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { safeNext } from "./safe-next";
 import { createClient } from "./supabase/server";
 
 // Header-derived origins are attacker-influenced and VERCEL_URL is the deployment URL rather than the
@@ -18,11 +19,12 @@ function fail(path: string, message: string): never {
 export async function signInWithPassword(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const next = safeNext(String(formData.get("next") ?? ""));
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) fail("/login", error.message);
-  redirect("/");
+  if (error) redirect(`/login?error=${encodeURIComponent(error.message)}&next=${encodeURIComponent(next)}`);
+  redirect(next);
 }
 
 export async function signUpWithPassword(formData: FormData) {

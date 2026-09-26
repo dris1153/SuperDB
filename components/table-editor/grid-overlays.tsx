@@ -3,7 +3,7 @@
 import type { RowRecord } from "@/lib/table-rows";
 import type { ColumnInfo } from "@/lib/table-view";
 import { CellEditDialog, type PendingEdit } from "./cell-editor";
-import { ColumnEditSheet } from "./column-edit-sheet";
+import { ColumnPanel } from "./column-panel";
 import { RowPanel } from "./row-panel";
 
 /**
@@ -51,14 +51,14 @@ export function GridOverlays({
         editable={editable}
         onClose={onCloseRow}
       />
-      <ColumnEditSheet
-        column={editingColumn}
+      <ColumnPanel
+        open={editingColumn !== null}
+        column={editingColumn?.name ?? null}
         onClose={onCloseColumn}
         projectRef={projectRef}
         projectName={projectName}
         schema={schema}
         table={table}
-        columnCount={columns.length}
       />
       <CellEditDialog
         projectRef={projectRef}

@@ -1,6 +1,6 @@
 ---
 title: "Icon rail, breadcrumb, and settings as its own panel"
-status: pending
+status: in-progress
 created: 2026-09-15
 blockedBy: []
 blocks: []
@@ -91,3 +91,7 @@ than assume they still hold.
 - Settings renders as rail + nav panel + content, with both groups.
 - The usage carousel still measures `data-content-area` and bleeds the same distance.
 - `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` stay green — 410 tests today.
+
+## Status
+
+Audited 2026-09-26: all five phases' code has shipped. Every remaining criterion is a keyboard, touch or visual check that needs the running app.

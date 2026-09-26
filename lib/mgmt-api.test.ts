@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { afterEach, test } from "node:test";
-import { MgmtError, listProjects, readOnlyQuery, restoreProject } from "./mgmt-api.ts";
+import { MgmtError, listProjects, listSigningKeys, readOnlyQuery, restoreProject } from "./mgmt-api.ts";
 
 const real = globalThis.fetch;
 afterEach(() => {
@@ -71,4 +71,18 @@ test("a long explanation reaches the error intact, JSON and all", async () => {
       return true;
     },
   );
+});
+
+test("signing keys come wrapped in an object, and are unwrapped", async () => {
+  // Measured 2026-09-25: this endpoint answers {keys: [...]} where /api-keys beside it answers a
+  // bare array. A reader written from the neighbour's habit reads undefined and renders nothing.
+  replyWith(200, JSON.stringify({ keys: [{ id: "a", algorithm: "ES256", status: "in_use" }] }));
+  const keys = await listSigningKeys("token", "ref");
+  assert.equal(keys[0].id, "a");
+});
+
+test("a bare array from this endpoint yields nothing rather than throwing", async () => {
+  // The shape of the mistake: if the envelope is ever dropped, this is what arrives.
+  replyWith(200, "[]");
+  assert.deepEqual(await listSigningKeys("token", "ref"), []);
 });

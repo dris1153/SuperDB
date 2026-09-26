@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Schema and RPC"
-status: in-progress
+status: completed
 priority: P1
 effort: "2h"
 dependencies: []

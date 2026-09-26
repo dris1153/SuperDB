@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
@@ -5,6 +6,16 @@ import { NAV_MODE_COOKIE, parseNavMode } from "@/lib/nav-mode";
 import { ProjectNav } from "@/components/project-nav";
 import { ProjectTopbar } from "@/components/project-topbar";
 import { QueryProvider } from "@/components/query-provider";
+
+/**
+ * The project in every tab's title, so several open projects can be told apart. `absolute` for this
+ * segment's own title — the root's template would otherwise wrap it a second time.
+ */
+export async function generateMetadata({ params }: { params: Promise<{ ref: string }> }): Promise<Metadata> {
+  const { ref } = await params;
+  const name = (await resolveProject(ref))?.project.name ?? ref;
+  return { title: { absolute: `${name} | SuperDB`, template: `%s | ${name} | SuperDB` } };
+}
 
 // resolveProject is cache()d, so this call and the one inside the page share a single fan-out.
 export default async function ProjectLayout({
@@ -35,7 +46,7 @@ export default async function ProjectLayout({
         and refuses to shrink, which pushes the page taller instead of scrolling inside it.
       */}
       <div className="flex h-dvh flex-col">
-        <ProjectTopbar projectName={found.project.name} />
+        <ProjectTopbar projectRef={ref} projectName={found.project.name} account={found.connection.display_name} />
 
         <div className="flex min-h-0 flex-1">
           <ProjectNav projectRef={ref} mode={mode} />

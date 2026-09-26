@@ -12,4 +12,14 @@
 - [null means error, not loading](project_null_reads_as_error_not_loading.md) — recurring; definition.tsx and sql-editor/results.tsx still print an answer while a query is in flight
 - [Module state splits per Next layer](project_module_state_splits_per_next_layer.md) — a lib/ Map is compiled once per layer; route handlers and server actions never share it
 - [identity has no part cache](project_identity_has_no_part_cache.md) — dropProject cannot invalidate a project name; only the owners memo holds it, and nothing exports a way to clear it
+- [Mgmt paths are unencoded](project_mgmt_path_interpolation_is_unencoded.md) — fetch collapses `../`, so an unvalidated id in a server action reaches any API path; resolveProject only guards the ref
 - [rotateVault covers one table](project_rotatevault_covers_one_table.md) — a master-password change orphans every vault blob outside connection_secrets; seal() returning undefined is the same boundary
+- [Repo is not prettier-formatted](project_repo_is_not_prettier_formatted.md) — no dep, no config; running prettier on a subset diverges from house style and lint never catches it
+- [A refused refetch unmounts dialogs](project_refused_refetch_unmounts_dialogs.md) — a refusal is 200+ok:false, so ready→refused mid-write; early-return branches drop open confirms
+- [Storage config PATCH merges by key](project_storage_config_patch_merges_by_key.md) — but a feature sub-object is validated in full, so send it whole or not at all
+- [Project credential in process](project_project_credential_now_in_process.md) — service_role now lives in a globalThis memo; reads of it are unaudited and its bound flushes every user
+- [Two parts, one gate](project_cross_part_dependency_renders_early.md) — a component reading two parts gates on one; the other's empty fallback renders as a confident lie
+- [Lint misses unused symbols](project_lint_misses_unused_symbols.md) — green lint+typecheck prove nothing about dead imports; no-unused-vars and noUnusedLocals are both off
+- [No error boundary above project layout](project_no_error_boundary_above_project_layout.md) — p/[ref]/error.tsx wraps the page only; a topbar/nav throw crashes the whole app
+- [Server actions dispatch serially](project_server_actions_dispatch_serially.md) — an action used as a read queues behind runSql; client reads belong in route handlers
+- [QueryClient dies with the project layout](project_query_client_scoped_to_project_layout.md) — staleTime freshness claims hold only if the observer remounts; focus refetch is off

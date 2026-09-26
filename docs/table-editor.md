@@ -54,10 +54,28 @@ type name, so they are matched against a list read from the project's own `pg_ty
 the three schemas a bare type name can resolve to on the write role's `search_path` — deduplicated
 with `pg_catalog` first, which is the order the resolver itself uses.
 
-**Default expressions are executable by design** and cannot be escaped, so a default declares which
-of three kinds it is (`ColumnDefault` in `lib/ddl-build.ts`): one of a fixed list, a value that gets
-quoted as a literal, or raw SQL. The last is only produced by the column-edit sheet, whose field is
-labelled as SQL and whose statement is shown in full first.
+**Default expressions are executable by design** and cannot be escaped. The new-table sheet offers
+a fixed list or a value it quotes (`ColumnDefault` in `lib/ddl-build.ts`). The column panel uses the
+original's rule instead (`lib/column-statements.ts`): a value in brackets runs as written, anything
+else is quoted as a literal — and the statement is shown in full before it runs either way.
+
+**The column panel** (`column-panel.tsx`) is the original's, for adding and editing alike: General,
+Data Type, Foreign Keys, Constraints. Data Privacy is left out — a dashboard-side masking flag with
+no Postgres object and no Management API endpoint behind it. The server re-reads the column
+(`column-facts-sql.ts`, with `search_path` emptied so every reference comes back qualified) and
+rebuilds the statement from what the catalog says then. Measured on a scratch project, 2026-09-26:
+
+- **One `alter table` is atomic, and so is the whole request.** A `set not null` with a CHECK the
+  rows fail and a comment after it: nothing of it landed.
+- **An identity needs `not null` first** — `must be declared NOT NULL before identity can be added`
+  — so the panel sets it, and the builder orders it before the identity. A new identity's sequence
+  starts at 1 over rows that already hold values; the next insert took 1 beside an existing 1, so the
+  sequence is moved past the maximum in the same request.
+- A primary key toggled on a table that has one is `drop constraint` and `add primary key` with the
+  new set, in one statement: `(a)` → `(a, b)` → `(b)`, each applied.
+- Adding a column with a constant default **and** unique to a table with rows fails with a duplicate
+  key — every row gets the same default. Postgres says so; the panel does not pre-empt it.
+- Constraints spanning several columns are not the panel's to edit; it counts them and says so.
 
 ## Preview, confirm, execute, record
 
@@ -123,7 +141,7 @@ catalog they read themselves.
 
 **`components/table-editor/` — the UI.** The grid (`grid.tsx` with `column-model.tsx`,
 `grid-banner.tsx`, `grid-overlays.tsx`), the two confirmation dialogs, the sheets that collect input
-(`insert-sheet`, `column-edit-sheet`, `new-table-sheet`, `add-column-sheet`, `import-sheet`), and the
+(`insert-sheet`, `column-panel`, `new-table-sheet`, `import-sheet`), and the
 shared bits (`guarded-schema.tsx`, `value-input.tsx`, `type-picker.tsx`, `column-form.tsx`).
 
 ## CSV import is an insert, not a new path

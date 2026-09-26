@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -49,6 +50,8 @@ import {
 } from "@/lib/connection-sort";
 import { SortableConnections, type ConnectionRow } from "@/components/sortable-connections";
 
+export const metadata: Metadata = { title: "Connections" };
+
 export const dynamic = "force-dynamic";
 
 const HEAD = "text-xs font-normal text-subtle";
@@ -64,7 +67,7 @@ const SORT_LABELS: Record<SortColumn, string> = {
 export default async function ConnectionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; edit?: string }>;
 }) {
   const [connections, availableTags, secrets, query] = await Promise.all([
     listConnections(),
@@ -177,6 +180,7 @@ export default async function ConnectionsPage({
               tags={c.tags}
               availableTags={availableTags}
               secret={secretByConnection.get(c.id) ?? null}
+              startOnCredentials={query.edit === c.id}
               action={saveConnection}
             />
             <DisconnectConnection

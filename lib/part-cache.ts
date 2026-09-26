@@ -24,6 +24,9 @@ import type { Part } from "./project-part-names";
  * precisely then, and would be handed the version from before the change.
  */
 export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
+  // Never held: sign-in details edited on /connections must show on the next open.
+  access: 0,
+
   // Quota, not speed: one slot of ten per minute, per user, per project.
   metrics: 60_000,
 
@@ -37,11 +40,9 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
   disk: 60_000,
   pooler: 60_000,
   health: 60_000,
-  "api-keys": 60_000,
 
-  // Live figures — database size, connection count, the table inventory.
+  // Live figures — database size, connection count.
   overview: 30_000,
-  tables: 30_000,
 
   // Catalog. Short, and dropped outright by any write to this project.
   schemas: 30_000,
@@ -51,6 +52,43 @@ export const PART_TTL_MS: Record<Exclude<Part, "identity">, number> = {
 
   rows: 0,
   logs: 0,
+  // A page of users, which the same page bans, deletes and invites. A cached list would show the
+  // state from before the click.
+  "auth-users": 0,
+  "auth-user": 0,
+  // Written from the page that shows it, so a cached copy would show the state before the save.
+  "auth-config": 0,
+  "oauth-server": 0,
+  // Read on opening the page and on a click; a cached copy would outlive the migration just run.
+  "schema-graph": 0,
+  "schema-definition": 0,
+  "schema-entities": 0,
+  "table-columns": 0,
+  "table-facts": 0,
+  "column-facts": 0,
+  "enum-types": 0,
+  "db-functions": 0,
+  "db-policies": 0,
+  "oauth-clients": 0,
+  // Read once when the tab is opened. The logs endpoint throttles, so nothing polls it.
+  "auth-user-logs": 0,
+  // Carries real key values for the public key types. Sixty seconds of a credential sitting in this
+  // process buys nothing on a page somebody opens to read one thing.
+  "api-key-rows": 0,
+  // A flag, not a credential — but it is toggled from this page and a stale copy would show the
+  // switch in the position it was in before the click.
+  "legacy-api-keys": 0,
+  // Same reason, and it holds no credential at all: the JWT keys page is built around writes, so a
+  // cached list would show the state from before the click.
+  "signing-keys": 0,
+  // Written from the storage settings tab, and the flags decide what three other pages offer.
+  "storage-config": 0,
+  // Created, edited and deleted from the page that lists them.
+  buckets: 0,
+  // The thing the reader is looking at, and the thing they are changing.
+  objects: 0,
+  // Written from the Policies tab.
+  "storage-policies": 0,
   definition: 0,
   "saved-queries": 0,
 };

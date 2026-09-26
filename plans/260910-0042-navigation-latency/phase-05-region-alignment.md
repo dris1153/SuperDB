@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Region alignment"
-status: pending
+status: blocked  # needs a syd1 preview to compare against; see baseline.md
 priority: P2
 effort: "30m"
 dependencies: [1]
@@ -51,15 +51,18 @@ The corrected rule: **with N serial round trips split across backends in differe
 no single "next to the data" — measure both placements.** The original one-backend rule only applies
 when all N share a destination.
 
-Two mechanisms exist; confirm which applies before editing. Check
-`node_modules/next/dist/docs/` per `AGENTS.md` — this Next version's conventions may differ from
-training data:
+**Settled 2026-09-26 against `node_modules/next/dist/docs/`.** Only one mechanism is left:
 
-1. `vercel.json` with a top-level `"regions"` array — applies to all functions.
-2. Next's per-segment `export const preferredRegion` — finer-grained, useful only if different routes
-   want different regions. Not needed here; every route hits the same backend.
+1. `vercel.json` with a top-level `"regions"` array — applies to all functions. **This is the one.**
+2. ~~`export const preferredRegion`~~ — **deprecated in this version of Next**, and on Vercel it now
+   accepts only `'auto'`, `'global'` and `'home'`. A region code like `'syd1'` *throws*. The plan
+   offered it as the finer-grained option; it no longer exists as one.
 
-Prefer option 1: one file, one line, no per-route drift.
+So the change, when it is made, is one file:
+
+```json
+{ "regions": ["syd1"] }
+```
 
 **Cost to be honest about:** users far from the chosen region pay a longer browser-to-server hop.
 That is one round trip against the five-plus saved on the backend side. If Phase 1 shows backend
@@ -76,7 +79,7 @@ Region is known (`ap-southeast-2`), so this is now an A/B measurement, not a loo
 
 1. Complete Phase 1 on the current `iad1` deployment, with the per-stage timings split into the two
    destination groups above. That split is the whole point — a single total cannot decide this.
-2. Confirm the region config mechanism against `node_modules/next/dist/docs/`.
+2. ~~Confirm the region config mechanism~~ — done, see above.
 3. Add `vercel.json` → `{"regions": ["syd1"]}` and deploy to a **preview**, leaving production on
    `iad1`.
 4. Re-run the same measurements against the preview.
@@ -108,3 +111,24 @@ not only in the plan.
 
 **Cold starts in a lower-traffic region.** A less-used region can show more cold starts. Minor for
 this workload, but watch it in the preview measurement rather than assuming.
+
+## Where this stands 2026-09-26
+
+The region was never the missing piece: it is in this file, and the project owner confirmed it —
+`ap-southeast-2`, Vercel's `syd1`.
+
+**There is a deployment after all** — `https://database.drisdev.io`, which the checkout gives no sign
+of. Measured in [`baseline.md`](baseline.md): `x-vercel-id: hkg1::iad1::…`, so functions do run in
+`iad1` and the premise of this phase holds.
+
+What is missing is the *second* deployment. This is an A/B, and the numbers now say why it cannot be
+skipped: authenticated Management API reads answer 200–400 ms slower than the same host's
+edge-answered 401, which is a round trip to an origin outside Asia. Moving to `syd1` wins the ~800 ms
+database group and the browser hop, and risks giving it back across five Management API calls.
+
+The honest next step is not this phase at all — it is **phase 6**, which removes Management API
+calls rather than relocating them, and which is built. Measure the board with the memo warm first;
+if the Management API group shrinks enough, this phase's trade changes shape.
+
+When it is run: `{ "regions": ["syd1"] }` on a preview, production left on `iad1`, and two runs of
+`baseline.md` compared group by group.

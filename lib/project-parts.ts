@@ -1,8 +1,8 @@
 import "server-only";
 import { dbOverview } from "./db-introspect";
 import { resolveProject } from "./inventory";
-import type { ApiKey } from "./mgmt-api";
 import {
+  getLegacyKeys,
   getDiskUtil,
   getHealth,
   getMetricsText,
@@ -12,29 +12,71 @@ import {
   listBackups,
   listBranches,
   listMigrations,
+  listSigningKeys,
+  getAuthConfig,
+  getStorageConfig,
   queryLogs,
+  MgmtError,
 } from "./mgmt-api";
-import { listTables } from "./db-introspect";
+import { getUser, listFactors, listOAuthClients, listUsers, type UserPage } from "./auth-api";
+import { sortClients } from "./oauth-clients";
+
+/**
+ * One user, shaped like a page of them, so the table renders a lookup the same way it renders a
+ * search. A malformed id is an empty result rather than a request, and an id that matches nothing
+ * is an empty result rather than an error — both are "no users match", which is what the box asked.
+ */
+async function oneUserAsPage(ref: string, id: string): Promise<UserPage> {
+  if (!isUserId(id)) return { users: [], total: 0, hasNext: false };
+
+  try {
+    const user = await getUser(ref, id);
+    return { users: [user], total: 1, hasNext: false };
+  } catch {
+    return { users: [], total: 0, hasNext: false };
+  }
+}
+import { pickEmailConfig, type EmailConfig } from "./auth-config";
+import { pickOAuthServer, type OAuthServerConfig } from "./oauth-server";
+import { readGraph } from "./schema-graph-sql";
+import { listEntities, listTableColumns } from "./schema-entities-sql";
+import { tableFacts } from "./table-facts-sql";
+import { columnFacts } from "./column-facts-sql";
+import { listEnums } from "./enum-types-sql";
+import { listFunctions } from "./functions-sql";
+import { listTablePolicies } from "./policies-sql";
+import { buildUserLogsSql, parseUserLog, sortEvents, type UserEvent, type UserLogRow } from "./auth-audit";
+import { avatarOf, displayNameOf, isUserId, isUserSort, providersOf, PER_PAGE } from "./auth-users";
 import {
   asInterval,
-  buildServiceLogsSql,
+  buildFiguresSql,
+  buildSampleSql,
   bucketUnit,
+  figuresFor,
+  parseLogTime,
+  SAMPLE_LIMIT,
   toCards,
   windowMinutes,
-  type LogRow,
+  type FigureRow,
+  type LogEntry,
 } from "./logs-sql";
 import { generationOf, partKey, PART_TTL_MS, readCached, writeCached } from "./part-cache";
+import { toRow, type KeyRow } from "./api-keys";
+import type { SigningKeysPart } from "./signing-keys";
 import type { Part } from "./project-part-names";
 import { memoryUsedPercent, parseMetrics } from "./prometheus";
 import { savedQueries } from "./saved-queries";
-import { describeTable, listPolicies, listSchemas, listTablesIn } from "./table-editor";
-import { tableDefinition } from "./table-ddl";
+import { describeTable, listPolicies, listSchemas, listTablesIn, type Policy } from "./table-editor";
+import { bucketNameProblem, countBucketPolicies, type BucketRow } from "./buckets";
+import type { StorageObject } from "./storage-objects";
+import { listObjects, listStorageBuckets } from "./storage-api";
+import { schemaDefinition, tableDefinition } from "./table-ddl";
 import { rowCount, selectRows, type RowCount } from "./table-rows";
 import { parseFilters } from "./table-filter";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZES, parseSort } from "./table-view";
 import { clampInt } from "./sql-ident";
-import { highlight } from "./highlight";
 import { getExposedSchemas } from "./mgmt-api";
+import { readProjectAccess } from "./project-access";
 import { attempt, type Attempt } from "./safe";
 import { requireUser } from "./supabase/server";
 
@@ -51,8 +93,8 @@ import { requireUser } from "./supabase/server";
  *
  * **A reader that reaches a credential must pick its fields, not pass the response through.**
  * `listApiKeys` returns the real key values even at `reveal=false` — measured, and recorded on the
- * `ApiKey` type in `mgmt-api.ts` — so the flag is not a boundary and never was. The `api-keys`
- * reader names the four fields the UI shows, and the secret never leaves the server.
+ * `ApiKey` type in `mgmt-api.ts` — so the flag is not a boundary and never was. The `api-key-rows`
+ * reader draws that line through `toRow`, and a secret key's value never leaves the server.
  *
  * The rest pass through what the app already models, which is a weaker claim and worth stating as
  * one: their bodies were read and none carries a credential the page does not already show. The
@@ -65,23 +107,14 @@ import { requireUser } from "./supabase/server";
 type Reader = (token: string, ref: string, search: URLSearchParams) => Promise<unknown>;
 
 /**
- * What an API key looks like once it has left the server.
- *
- * `api_key?: never` is the point of the type. Without it, `ApiKey[]` is structurally assignable to a
- * `Pick<...>[]`, so annotating the reader would not stop someone returning the upstream array
- * verbatim — and the upstream array carries the real key value even at `reveal=false`. With it, that
- * mistake does not compile, which is the only thing standing between a service-role secret and a
- * browser that no test can reach.
- */
-export type KeySummary = Pick<ApiKey, "id" | "name" | "prefix"> & { api_key?: never };
-
-/**
  * `Record<Exclude<Part, "identity">, Reader>` rather than a loose object: a name in
  * `project-part-names.ts` with no reader here fails to build, and a reader whose name is not on that
  * list fails too. Identity is excluded because it needs no upstream call — `resolveProject` already
  * has it.
  */
 const READERS: Record<Exclude<Part, "identity">, Reader> = {
+  // Identity fields and two ciphertexts — see `project-access.ts`. The token is not used.
+  access: (_t, ref) => readProjectAccess(ref),
   // Only the selected ones: the response also carries the whole purchasable catalogue with prices,
   // which the page never reads.
   addons: async (t, ref) => ({ selected_addons: (await listAddons(t, ref)).selected_addons }),
@@ -92,17 +125,132 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   pooler: (t, ref) => getPoolerConfig(t, ref),
   health: (t, ref) => getHealth(t, ref),
   overview: (t, ref) => dbOverview(t, ref),
-  tables: (t, ref) => listTables(t, ref),
   /**
-   * The four fields the UI shows, picked by hand.
+   * The settings page's wider shape: type, description and prefix for every key, plus the value of
+   * the two that are meant to be public.
    *
-   * `reveal=false` does **not** hide the key: `mgmt-api.ts` records that the API returns `api_key`
-   * either way, and `framework-actions.ts` depends on exactly that. Passing this response through
-   * would have put the service-role secret — the one that bypasses RLS — in a plain GET any signed-in
-   * browser could issue. The flag was never the boundary; this list is.
+   * `toRow` is where the line is drawn, and it has tests.
    */
-  "api-keys": async (t, ref): Promise<KeySummary[]> =>
-    (await listApiKeys(t, ref)).map(({ id, name, prefix }) => ({ id, name, prefix })),
+  "api-key-rows": async (t, ref): Promise<KeyRow[]> => (await listApiKeys(t, ref)).map(toRow),
+
+  /**
+   * Passed through rather than picked, unlike its neighbours.
+   *
+   * The body carries `purgeCache`, `capabilities` and `external.upstreamTarget`, none of which this
+   * app models and none of which is a credential — measured 2026-09-25. Picking fields here would
+   * mean this page shows less of a project's storage config than the project has, for no gain.
+   */
+  "storage-config": (t, ref) => getStorageConfig(t, ref),
+
+  /**
+   * One folder of one bucket.
+   *
+   * `t` is unused: this is the project's own Storage API, which does not accept the account token —
+   * `lib/project-key.ts` supplies the credential instead.
+   *
+   * The parameters come from a browser, so they are bounded here as well as escaped downstream. A
+   * prefix and a search term travel in the request body rather than the URL, so neither can escape
+   * the bucket — but neither needs to be a megabyte either.
+   */
+  objects: async (_t, ref, search): Promise<StorageObject[]> => {
+    const bucket = search.get("bucket") ?? "";
+    if (bucketNameProblem(bucket)) return [];
+
+    const listed = await listObjects(ref, bucket, {
+      prefix: (search.get("prefix") ?? "").slice(0, 1024),
+      search: (search.get("q") ?? "").slice(0, 200) || undefined,
+      limit: PAGE,
+    });
+
+    // Picked rather than passed through, for the reason the reader below states: `call()` casts
+    // over `JSON.parse`, so the declared type is a subset of the body and not a filter.
+    return listed.map(({ name, id, created_at, updated_at, metadata }) => ({
+      name,
+      id,
+      created_at,
+      updated_at,
+      metadata: metadata ? { size: metadata.size, mimetype: metadata.mimetype } : null,
+    }));
+  },
+
+  /**
+   * The policies on both storage tables.
+   *
+   * Two reads, resolved together. They are separate tables and neither is optional: `objects` holds
+   * everything about who may touch a file, `buckets` holds the much rarer policies about listing
+   * buckets at all, and the tab shows both because the original does.
+   */
+  "storage-policies": async (t, ref): Promise<{ objects: Policy[]; buckets: Policy[] }> => {
+    const [objects, buckets] = await Promise.all([
+      listPolicies(t, ref, "storage", "objects"),
+      listPolicies(t, ref, "storage", "buckets"),
+    ]);
+
+    return { objects, buckets };
+  },
+
+  /**
+   * Buckets, each with the number of policies naming it.
+   *
+   * Two sources, and neither is optional: the buckets come from the project's Storage API, which is
+   * the only thing that knows their settings, and the policy count is a SQL question about
+   * `storage.objects`. Resolved together so the browser makes one request rather than walking a
+   * chain — the rule the table editor set.
+   *
+   * The policy read is allowed to fail on its own: a connection that cannot run SQL should still
+   * see its buckets, with the count left at zero.
+   */
+  buckets: async (t, ref): Promise<BucketRow[]> => {
+    const [buckets, policies] = await Promise.all([
+      listStorageBuckets(ref),
+      listPolicies(t, ref, "storage", "objects").catch(() => []),
+    ]);
+
+    // Fields picked rather than spread. `call()` casts over `JSON.parse`, so `StorageBucket` is a
+    // subset of the body and not a filter — the measured response also carries `owner`, which this
+    // page has no use for.
+    return buckets.map(
+      ({ id, name, public: isPublic, type, file_size_limit, allowed_mime_types, created_at, updated_at }) => ({
+        id,
+        name,
+        public: isPublic,
+        type,
+        file_size_limit,
+        allowed_mime_types,
+        created_at,
+        updated_at,
+        policies: countBucketPolicies(policies, id),
+      }),
+    );
+  },
+
+  /** A single boolean, and the only thing this endpoint holds. */
+  "legacy-api-keys": (t, ref) => getLegacyKeys(t, ref),
+
+  /**
+   * Signing keys carry no credential: `private_jwk` is accepted when one is created and never
+   * returned on a read — measured 2026-09-25 — and `public_jwk` is served from the project's public
+   * JWKS anyway. The fields are picked all the same, because a `SigningKey` type is a subset of the
+   * body and not a filter: `call()` passes whatever arrived straight through. `public_jwk` is left
+   * out because nothing renders it.
+   */
+  "signing-keys": async (t, ref): Promise<SigningKeysPart> => {
+    // Two calls, one part. The browser never walks a chain: `jwt_exp` decides what the revoke
+    // confirm says about how long old tokens live, and a second round trip for one integer would
+    // put that sentence on screen after the dialog it belongs in.
+    const [keys, jwtExp] = await Promise.all([listSigningKeys(t, ref), safeJwtExp(t, ref)]);
+
+    return {
+      keys: keys.map(({ id, algorithm, status, created_at, updated_at }) => ({
+        id,
+        algorithm,
+        status,
+        created_at,
+        updated_at,
+      })),
+      jwtExp,
+    };
+  },
   metrics: async (t, ref) => ({ memoryPercent: memoryUsedPercent(parseMetrics(await getMetricsText(t, ref))) }),
   /** What the sidebar lists, and whether PostgREST serves the schema the user is looking at. */
   schemas: async (t, ref) => {
@@ -112,6 +260,25 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
 
   "schema-tables": (t, ref, search) => listTablesIn(t, ref, schemaOf(search)),
 
+  "schema-graph": (t, ref, search) => readGraph(t, ref, schemaOf(search)),
+
+  "schema-definition": (t, ref, search) => schemaDefinition(t, ref, schemaOf(search)),
+
+  "schema-entities": (t, ref, search) => listEntities(t, ref, schemaOf(search)),
+
+  "table-columns": (t, ref, search) => listTableColumns(t, ref, schemaOf(search), tableOf(search)),
+
+  "table-facts": (t, ref, search) => tableFacts(t, ref, schemaOf(search), tableOf(search)),
+
+  "enum-types": (t, ref, search) => listEnums(t, ref, schemaOf(search)),
+
+  "db-functions": (t, ref, search) => listFunctions(t, ref, schemaOf(search)),
+
+  "db-policies": (t, ref, search) => listTablePolicies(t, ref, schemaOf(search)),
+
+  "column-facts": (t, ref, search) =>
+    columnFacts(t, ref, schemaOf(search), tableOf(search), search.get("column") ?? ""),
+
   columns: (t, ref, search) => describeTable(t, ref, schemaOf(search), tableOf(search)),
 
   policies: (t, ref, search) => listPolicies(t, ref, schemaOf(search), tableOf(search)),
@@ -119,9 +286,10 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
   definition: async (t, ref, search) => {
     const built = await tableDefinition(t, ref, schemaOf(search), tableOf(search));
     if (!built) return null;
-    // Highlighted here, not in the browser: `lib/highlight.ts` is server-only precisely so Shiki's
-    // grammars and WASM never ship, and colouring one tab is not worth a megabyte on this route.
-    return { ddl: built.ddl, html: await highlight(built.ddl, "sql"), complete: built.complete };
+    // Not highlighted here. `lib/highlight.ts` is Shiki, and importing it from this module put its
+    // grammars on the route every reader shares: 12.7 MB traced against 2.0 MB without, measured
+    // 2026-09-26. The definition tab colours the text itself, from `lib/sql-tokens.ts`.
+    return { ddl: built.ddl, complete: built.complete };
   },
 
   /**
@@ -203,20 +371,184 @@ const READERS: Record<Exclude<Part, "identity">, Reader> = {
       throw new Error("Saved queries are unavailable on this instance.");
     }),
 
+  /**
+   * One page of users, filtered by the server.
+   *
+   * Fields picked rather than passed through: `call()` casts over `JSON.parse`, so `AuthUser` is a
+   * claim about the body and not a filter, and the real body carries more of a person's record than
+   * a table of eight columns needs.
+   */
+  "auth-users": async (_t, ref, search): Promise<UserPage> => {
+    const page = Math.max(1, Math.floor(Number(search.get("page"))) || 1);
+    const filter = (search.get("filter") ?? "").slice(0, 200).trim();
+    const sortRaw = search.get("sort");
+    const sort = isUserSort(sortRaw) ? sortRaw : undefined;
+
+    // Searching by UID is a lookup, not a search. There is one `?filter=` and it is a substring
+    // match over the searchable columns; an id is exact and has its own endpoint, so asking for a
+    // user by id fetches that user instead of scanning pages for text that looks like one.
+    const read = search.get("by") === "id" ? await oneUserAsPage(ref, filter) : await listUsers(ref, {
+      page,
+      perPage: PER_PAGE,
+      filter: filter || undefined,
+      sort,
+    });
+
+    return {
+      ...read,
+      users: read.users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        phone: u.phone,
+        created_at: u.created_at,
+        last_sign_in_at: u.last_sign_in_at,
+        email_confirmed_at: u.email_confirmed_at ?? null,
+        banned_until: u.banned_until ?? null,
+        app_metadata: { providers: providersOf(u) },
+        // Two fields of it, not the object: `user_metadata` is whatever the project put there, and
+        // this table shows a name and a picture.
+        user_metadata: {
+          display_name: displayNameOf(u) ?? undefined,
+          avatar_url: avatarOf(u) ?? undefined,
+        },
+      })),
+    };
+  },
+
+  /**
+   * One user and their MFA factors.
+   *
+   * **Passed through whole, unlike every other reader here.** The panel's Raw JSON tab is the
+   * point: it shows what GoTrue holds about this person, and picking fields would make it a
+   * curated view that quietly omits whatever was added upstream. The body carries no secret —
+   * there is no password hash in it — and this is the project owner reading their own project.
+   *
+   * The factors are read alongside because the panel offers to remove them, and `[]` is the common
+   * answer: a user with no MFA is not an error.
+   */
+  "auth-user": async (_t, ref, search) => {
+    const id = search.get("id") ?? "";
+    if (!isUserId(id)) throw new Error("That is not a user.");
+
+    const [user, factors] = await Promise.all([
+      getUser(ref, id),
+      // Offered only when there are factors, so failing to read them must not fail the panel.
+      listFactors(ref, id).catch(() => []),
+    ]);
+
+    return { user, factors };
+  },
+
+  /**
+   * One user's auth events.
+   *
+   * Parsed here rather than in the panel: `event_message` is JSON inside a string, and the rows
+   * carry an `ip_address` and an actor. A row that does not parse is dropped rather than failing
+   * the tab — it is a log line, not a record the page depends on.
+   */
+  "auth-user-logs": async (t, ref, search): Promise<UserEvent[]> => {
+    const id = search.get("id") ?? "";
+    if (!isUserId(id)) throw new Error("That is not a user.");
+
+    const to = Date.now();
+    // A day, which is all a free project keeps anyway.
+    const from = to - 24 * 3_600_000;
+
+    const rows = await queryLogs<UserLogRow>(
+      t,
+      ref,
+      buildUserLogsSql(id),
+      new Date(from).toISOString(),
+      new Date(to).toISOString(),
+    );
+
+    return sortEvents(
+      rows
+        .map((row) => parseUserLog(row, id))
+        .filter((event): event is UserEvent => event !== null),
+    );
+  },
+
+  /**
+   * OAuth clients, with the disabled server reported rather than thrown.
+   *
+   * Fields picked, as everywhere else here — and one of them cannot be: `client_secret` is not in
+   * this response at all. It exists only in the 201 from create, which is why the create dialog is
+   * the one place it can be copied from.
+   */
+  "oauth-clients": async (_t, ref) => {
+    const { enabled, clients } = await listOAuthClients(ref);
+
+    return {
+      enabled,
+      clients: sortClients(clients).map(
+        ({ client_id, client_name, client_type, registration_type, redirect_uris, created_at }) => ({
+          client_id,
+          client_name,
+          client_type,
+          registration_type,
+          redirect_uris,
+          created_at,
+        }),
+      ),
+    };
+  },
+
+  /**
+   * The Emails page.
+   *
+   * Picked, hard. The response carries every configured OAuth provider's client secret alongside
+   * the mail settings, so a pass-through here would ship a project's secrets to a browser to render
+   * six subject lines. `smtp_pass` is excluded even though it reads back null.
+   */
+  "auth-config": async (t, ref): Promise<EmailConfig> =>
+    pickEmailConfig(await getAuthConfig(t, ref)),
+
+  /**
+   * The OAuth Server page: three fields and `site_url`, picked for the same reason as above. The
+   * discovery document is public and a failure there costs the endpoints card, not the form.
+   */
+  "oauth-server": async (t, ref): Promise<OAuthServerConfig> => {
+    const [raw, discovery] = await Promise.all([
+      getAuthConfig(t, ref),
+      fetch(`https://${ref}.supabase.co/auth/v1/.well-known/openid-configuration`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+    ]);
+    return pickOAuthServer(raw, discovery);
+  },
+
   logs: async (t, ref, search) => {
     const minutes = windowMinutes(asInterval(search.get("interval")));
     const to = Date.now();
     const from = to - minutes * 60_000;
     const unit = bucketUnit(minutes);
 
-    const rows = await queryLogs<LogRow>(
-      t,
-      ref,
-      buildServiceLogsSql(unit),
-      new Date(from).toISOString(),
-      new Date(to).toISOString(),
-    );
-    return { from, to, cards: toCards(rows, { from, to, unit }) };
+    const ask = <T>(sql: string) =>
+      queryLogs<T>(t, ref, sql, new Date(from).toISOString(), new Date(to).toISOString());
+
+    // Two requests, not one: the figures are counted over the whole window and the rows are only
+    // the shape of it. They cannot be the same statement — the row read is capped at 1000 and the
+    // aggregate is not.
+    const [rows, entries] = await Promise.all([
+      ask<FigureRow>(buildFiguresSql()),
+      ask<LogEntry>(buildSampleSql()),
+    ]).catch((e: unknown) => {
+      // `ThrottlerException: Too Many Requests` is all the endpoint says, and a reader cannot act on
+      // that. Nothing retries into it, so waiting is the whole fix.
+      if (e instanceof MgmtError && e.status === 429) {
+        throw new Error("Log queries are rate limited. Wait a minute, then reload.");
+      }
+      throw e;
+    });
+
+    const figures = figuresFor(rows);
+    // Exactly the cap means the window was cut, and the sample arrives newest first, so its last
+    // row is where the bars really begin.
+    const sampledFrom =
+      entries.length >= SAMPLE_LIMIT ? parseLogTime(entries[entries.length - 1].timestamp) : null;
+
+    return { from, to, sampledFrom, cards: toCards(entries, { from, to, unit }, figures) };
   },
 };
 
@@ -257,7 +589,7 @@ export async function readPart(
 }
 
 /** Identity is the one part that needs no upstream call: `resolveProject` already has it. */
-/** What the `identity` part answers with. `import type` from here is erased, as `KeySummary` is. */
+/** What the `identity` part answers with. `import type` from here is erased. */
 export type Identity = NonNullable<Awaited<ReturnType<typeof readIdentity>>>;
 
 export async function readIdentity(ref: string) {
@@ -274,12 +606,36 @@ export async function readIdentity(ref: string) {
     connection: connection.display_name,
   };
 }
+/**
+ * An unreadable `jwt_exp` is `null`, not a default.
+ *
+ * The revoke confirm turns this into "tokens expire within an hour"; guessing 3600 when the config
+ * could not be read would put a specific promise in front of the one irreversible action here.
+ */
+const safeJwtExp = (t: string, ref: string) =>
+  getAuthConfig(t, ref).then(
+    // Checked, not just defaulted. `call()` casts over `JSON.parse`, so a `jwt_exp` that is not a
+    // number would otherwise reach the confirm and be printed — "last NaN hours" is worse than
+    // admitting the value could not be read.
+    (config) => (typeof config?.jwt_exp === "number" && Number.isFinite(config.jwt_exp) ? config.jwt_exp : null),
+    () => null,
+  );
+
 /** The sidebar renders an unknown exposure as no icon at all rather than guessing. */
 const safeExposed = (t: string, ref: string) =>
   getExposedSchemas(t, ref).then(
     (schemas) => schemas,
     () => null,
   );
+
+/**
+ * One folder's worth.
+ *
+ * A folder with more objects than this is truncated, and the browser says so rather than implying
+ * the listing is complete. There is no pager: `/object/list` takes an offset, but a folder that
+ * needs paging is a folder nobody should be reading through a settings page.
+ */
+const PAGE = 200;
 
 const schemaOf = (search: URLSearchParams) => search.get("schema") ?? "public";
 const tableOf = (search: URLSearchParams) => search.get("table") ?? "";

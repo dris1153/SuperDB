@@ -77,3 +77,7 @@ is small and last.
 - Unknown `part` → 404. Unowned `ref` → 404.
 - A revisit inside the stale window issues no new requests.
 - Before/after numbers by phase 1's method, not impressions.
+
+## Status
+
+Audited 2026-09-26: the read endpoints, the query client and every page listed here have shipped. `lib/table-query.ts` appears in phase 7 as a file that was deliberately deleted, not one that is missing. The phases stay `in-progress` because the re-measurement in phase 6 has not been run.

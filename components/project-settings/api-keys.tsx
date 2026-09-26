@@ -1,0 +1,299 @@
+"use client";
+
+import { useEffect, useRef, useState, useTransition } from "react";
+import { IconEye, IconEyeOff, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
+import { createKey, removeKey, renameKey, revealApiKey } from "@/lib/api-key-actions";
+import type { KeyRow } from "@/lib/api-keys";
+import { CopyButton } from "@/components/copy-button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Empty } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { isWaiting, reasonOf, useProjectPart, useRefetchPart } from "@/components/use-project-part";
+import { DeleteKeyConfirm, KeyForm } from "./key-dialogs";
+import { LegacyKeysSwitch } from "./legacy-keys";
+import { Tab } from "@/components/tab";
+
+/**
+ * The project's API keys, in the two tabs the Supabase dashboard uses.
+ *
+ * **One request, not two.** `GET /api-keys` returns every key with a `type`; the tabs are a filter
+ * over that one list. `/api-keys/legacy` holds nothing but an `{enabled}` flag, which is the switch
+ * in a later phase rather than a second source of keys.
+ */
+export function ApiKeys({
+  projectRef,
+  projectName,
+}: {
+  projectRef: string;
+  projectName: string;
+}) {
+  const keys = useProjectPart<KeyRow[]>(projectRef, "api-key-rows");
+  const refetch = useRefetchPart(projectRef, "api-key-rows");
+  const [tab, setTab] = useState<"current" | "legacy">("current");
+  const [creating, setCreating] = useState<"publishable" | "secret" | null>(null);
+
+  const all = keys.status === "ready" && Array.isArray(keys.data) ? keys.data : [];
+  const shown = all.filter((k) => (tab === "legacy" ? k.type === "legacy" : k.type !== "legacy"));
+
+  return (
+    <section className="space-y-4">
+      <div className="flex gap-4 border-b border-border">
+        <Tab active={tab === "current"} onClick={() => setTab("current")}>
+          Publishable and secret API keys
+        </Tab>
+        <Tab active={tab === "legacy"} onClick={() => setTab("legacy")}>
+          Legacy anon, service_role API keys
+        </Tab>
+      </div>
+
+      {tab === "current" ? (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => setCreating("publishable")}>
+            <IconPlus size={13} stroke={1.5} />
+            New publishable key
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCreating("secret")}>
+            <IconPlus size={13} stroke={1.5} />
+            New secret key
+          </Button>
+        </div>
+      ) : null}
+
+      {isWaiting(keys) ? (
+        <Card className="space-y-3 p-4">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </Card>
+      ) : keys.status !== "ready" ? (
+        <Empty>
+          Could not read this project&apos;s API keys.
+          <span className="mt-1 block text-xs">{reasonOf(keys)}</span>
+        </Empty>
+      ) : shown.length === 0 ? (
+        <Empty>
+          {tab === "legacy"
+            ? "This project has no legacy keys. Projects created since late 2025 do not get them."
+            : "No publishable or secret keys yet."}
+        </Empty>
+      ) : (
+        <Card className="divide-y divide-border p-0">
+          {shown.map((key) => (
+            <Row key={key.id ?? key.name} row={key} projectRef={projectRef} onChanged={refetch} />
+          ))}
+        </Card>
+      )}
+
+      {tab === "legacy" ? (
+        <LegacyKeysSwitch projectRef={projectRef} projectName={projectName} />
+      ) : null}
+
+      <KeyForm
+        open={creating !== null}
+        onOpenChange={(next) => setCreating(next ? creating : null)}
+        title={creating === "secret" ? "New secret key" : "New publishable key"}
+        submitLabel="Create key"
+        onSubmit={async (name, description) => {
+          const result = await createKey(projectRef, creating ?? "publishable", name, description);
+          // The list is refetched rather than patched: the API assigns the id, the prefix and the
+          // mask, and guessing any of them here would put a row on screen that is not the row.
+          if (result.ok) await refetch();
+          return result;
+        }}
+      />
+    </section>
+  );
+}
+
+/**
+ * What a row may show depends entirely on the key.
+ *
+ * `toRow` has already decided: `value` is present for the two types meant to be public and null for
+ * the two that are not. This component never sees a `service_role` or `secret` value, which is why
+ * it cannot leak one by accident — the decision is upstream and tested, not repeated here.
+ */
+/** Long enough to copy and paste, short enough that a page left open is not a page holding a key. */
+const REVEAL_WINDOW_MS = 60_000;
+
+function Row({
+  row,
+  projectRef,
+  onChanged,
+}: {
+  row: KeyRow;
+  projectRef: string;
+  onChanged: () => Promise<unknown>;
+}) {
+  const dangerous = row.type === "secret" || row.name === "service_role";
+  // The legacy pair are not editable: their id is their own name, and the API has no PATCH for them.
+  const editable = row.type !== "legacy";
+  const [renaming, setRenaming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  /**
+   * Local state, deliberately — not a query cache.
+   *
+   * A revealed key in TanStack's cache would outlive the click that asked for it, survive navigating
+   * away and back, and be readable by anything else holding the client. Here it belongs to this row
+   * and dies with it.
+   *
+   * **Hiding conceals; it does not discard.** That is a change from the first version, and worth
+   * stating because the button's label implies otherwise: within the window below, toggling is free
+   * and costs no round trip. The countdown runs from the *reveal*, not from the last hide, so a key
+   * cannot be kept alive by clicking at it.
+   */
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const expiry = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Without this a timer outlives the row and calls setState on something that is gone.
+  useEffect(() => () => {
+    if (expiry.current) clearTimeout(expiry.current);
+  }, []);
+
+  const shown = row.value ?? (visible ? revealed : null);
+
+  const toggle = () => {
+    if (revealed) {
+      setVisible((v) => !v);
+      return;
+    }
+
+    startTransition(async () => {
+      setProblem(null);
+      try {
+        const result = await revealApiKey(projectRef, row.id ?? "");
+        if (!result.ok) return setProblem(result.reason);
+
+        setRevealed(result.value);
+        setVisible(true);
+        if (expiry.current) clearTimeout(expiry.current);
+        expiry.current = setTimeout(() => {
+          setRevealed(null);
+          setVisible(false);
+        }, REVEAL_WINDOW_MS);
+      } catch {
+        setProblem("Could not reach the server.");
+      }
+    });
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 p-4 sm:flex-nowrap">
+      <div className="min-w-0 sm:w-56">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm text-foreground">{row.name}</span>
+          {dangerous ? (
+            <Badge variant="outline" className="border-destructive/40 text-destructive">
+              secret
+            </Badge>
+          ) : null}
+        </div>
+        <p className="mt-0.5 truncate text-xs text-subtle">{row.description ?? "No description"}</p>
+      </div>
+
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-2">
+          {pending ? (
+            <Skeleton className="h-[30px] min-w-0 flex-1" />
+          ) : (
+            <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-xs text-muted-foreground">
+              {/* `display` rather than the prefix: for the legacy pair the prefix is an unrelated
+                  identifier, and rendering it looked like a short complete key. */}
+              {shown ?? row.display}
+            </code>
+          )}
+
+          {row.value ? null : (
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={toggle}
+              disabled={pending || !row.id}
+              aria-label={revealed ? `Hide ${row.name}` : `Reveal ${row.name}`}
+            >
+              {visible ? <IconEyeOff size={13} stroke={1.5} /> : <IconEye size={13} stroke={1.5} />}
+            </Button>
+          )}
+
+          {shown ? <CopyButton value={shown} /> : null}
+
+          {editable ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setRenaming(true)}
+                aria-label={`Rename ${row.name}`}
+              >
+                <IconPencil size={13} stroke={1.5} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setDeleting(true)}
+                aria-label={`Delete ${row.name}`}
+                className="text-subtle hover:text-destructive"
+              >
+                <IconTrash size={13} stroke={1.5} />
+              </Button>
+            </>
+          ) : null}
+        </div>
+
+        {!shown && !pending ? (
+          <p className="text-xs text-subtle">
+            <span className="text-warn">Hidden.</span> Use the eye to reveal it — the value is not on
+            this page until you do.
+          </p>
+        ) : null}
+
+        {problem ? (
+          // Not styled as an error: a connection that may not read secrets is a fact about the
+          // connection, and the sentence says what to change rather than that something broke.
+          <p className="text-xs text-subtle">{problem}</p>
+        ) : null}
+
+        {!shown && !problem && row.name === "service_role" ? (
+          <p className="text-xs text-subtle">Bypasses Row Level Security. Never put it in a browser.</p>
+        ) : null}
+      </div>
+
+      <KeyForm
+        open={renaming}
+        onOpenChange={setRenaming}
+        title={`Rename ${row.name}`}
+        submitLabel="Save"
+        initialName={row.name}
+        initialDescription={row.description ?? ""}
+        onSubmit={async (name, description) => {
+          const result = await renameKey(projectRef, row.id ?? "", name, description);
+          if (result.ok) await onChanged();
+          return result;
+        }}
+      />
+
+      <DeleteKeyConfirm
+        open={deleting}
+        onOpenChange={setDeleting}
+        name={row.name}
+        onConfirm={() =>
+          startTransition(async () => {
+            const result = await removeKey(projectRef, row.id ?? "");
+            if (result.ok) {
+              await onChanged();
+              setDeleting(false);
+            } else {
+              setProblem(result.reason);
+              setDeleting(false);
+            }
+          })
+        }
+      />
+    </div>
+  );
+}

@@ -21,8 +21,6 @@ export function GeneralSettings({ projectRef }: { projectRef: string }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-sm text-muted-foreground">General settings</h2>
-
       <Card className="divide-y divide-border p-0">
         <Row label="Project name" hint="Displayed throughout the dashboard.">
           {project ? (

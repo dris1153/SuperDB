@@ -1,6 +1,6 @@
 ---
 title: "The database password"
-status: pending
+status: in-progress
 created: 2026-09-11
 blockedBy: []
 blocks: []
@@ -115,6 +115,12 @@ the summaries.
 
 ## Cross-plan notes
 
+**[260925-0239-api-keys-page](../260925-0239-api-keys-page/plan.md)** adds an API Keys row to
+`components/project-settings/settings-nav.tsx` and a route beside the two this plan created. It also
+rewrites the comment on `KeySummary` in `lib/project-parts.ts`: measured 2026-09-25, `reveal=false`
+masks the *new* secret key but leaves the legacy `service_role` JWT complete, so the guard is right
+and the reason recorded for it was only half right.
+
 **[260915-2303-icon-rail-and-settings-panel](../260915-2303-icon-rail-and-settings-panel/plan.md)**
 rewrites `app/(app)/p/[ref]/settings/layout.tsx` and `components/project-settings/settings-nav.tsx`,
 both created by phase 3 here, and rebuilds `components/project-nav.tsx` around the row list phase 3
@@ -149,3 +155,7 @@ Whichever lands second rebases onto the other.
 - The connection credentials form behaves identically after phase 2.
 - `pnpm test` (**396** today), `pnpm typecheck`, `pnpm lint`, `pnpm build` stay green. The suite is
   `lib/**/*.test.ts` with no DOM harness, so every UI criterion in phases 3-7 is a manual check.
+
+## Status
+
+Audited 2026-09-26: phases 1, 5, 6 and 7 are code-complete and blocked on the same thing — `supabase/schema.sql` has not been applied to this app's own database, so the tables the password manager writes to may not exist there. See `docs/deploying-the-schema.md`.

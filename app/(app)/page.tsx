@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { IconAlertTriangle } from "@tabler/icons-react";
@@ -7,6 +8,8 @@ import { ProjectsBoard } from "@/components/projects-board";
 import { Card } from "@/components/ui/card";
 import { Empty } from "@/components/ui/empty-state";
 import { Stat } from "@/components/ui/stat";
+
+export const metadata: Metadata = { title: "Projects" };
 
 export const dynamic = "force-dynamic";
 

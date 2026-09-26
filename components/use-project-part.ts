@@ -64,7 +64,12 @@ export function useProjectPart<T>(
    * one is chosen.
    */
   params?: PartParams,
-  options?: { enabled?: boolean; keepPrevious?: boolean },
+  options?: {
+    enabled?: boolean;
+    keepPrevious?: boolean;
+    /** Attempts after the first. Zero for a part behind a limit a retry would only push further out. */
+    retry?: number;
+  },
 ): PartState<T> {
   const key = queryOf(params);
   const enabled = options?.enabled ?? true;
@@ -75,6 +80,7 @@ export function useProjectPart<T>(
     // Keep the last answer on screen while a new key is in flight. Without it, every sort, page and
     // filter drops the grid to "no data" for the length of a round trip, which reads as an error.
     placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
+    retry: options?.retry,
   });
 
   // A disabled query stays `pending` for ever in TanStack v5, which is indistinguishable from slow
@@ -109,6 +115,20 @@ export function useSetPart<T>(ref: string, part: Part, params?: PartParams) {
     await client.cancelQueries({ queryKey });
     client.setQueryData(queryKey, { ok: true, data });
   };
+}
+
+/** One read for an action — a Copy button — rather than for something on screen. Throws the refusal. */
+export async function readPartOnce<T>(ref: string, part: Part, params?: PartParams): Promise<T> {
+  const body = await fetchPart(ref, part, params);
+  if (!body.ok) throw new Error(body.reason);
+  return body.data as T;
+}
+
+/** Reads a part ahead of the component that shows it; a fresh copy already cached is left alone. */
+export function usePrefetchPart(ref: string, part: Part, params?: PartParams) {
+  const client = useQueryClient();
+  const queryKey = ["project", ref, part, queryOf(params)];
+  return () => client.prefetchQuery({ queryKey, queryFn: () => fetchPart(ref, part, params) });
 }
 
 /** For when the server says the caller's copy is out of date; the next read is the only fix. */

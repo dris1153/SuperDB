@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { resolveProject } from "@/lib/inventory";
 import { TableEditor } from "@/components/table-editor/editor";
+
+export const metadata: Metadata = { title: "Table Editor" };
 
 // Load-bearing even though this page fetches nothing: the editor reads `useSearchParams` without a
 // Suspense boundary of its own, and Next fails the production build for that on a prerendered route.

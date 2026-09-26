@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Measure and baseline"
-status: pending
+status: in-progress  # browser-side numbers recorded in baseline.md; server timings need instrumentation
 priority: P1
 effort: "1h"
 dependencies: []
@@ -89,3 +89,23 @@ Mitigation: the final step is a `git diff` check, and it is a success criterion.
 
 **Cold vs warm confusion.** A second navigation reuses connections and looks artificially fast.
 Mitigation: record cold explicitly; note in `baseline.md` which numbers are cold.
+
+## Half of this is answered 2026-09-26
+
+**The region question is closed.** The project backing SuperDB is in `ap-southeast-2` — AWS Sydney,
+Vercel's `syd1` — confirmed by the project's owner. That is the input phase 5 was waiting on.
+
+**The timings are not, and cannot be from this checkout.** They are per-stage measurements of a cold
+*production* navigation, and there is no deployment: no `.vercel/` link, no deployment workflow, and
+`SITE_URL` is `http://localhost:3000`. Local numbers would answer a different question — the whole
+point of the split in phase 5 is the distance between Vercel's region and each backend, which does
+not exist on a laptop.
+
+## Partly done 2026-09-26
+
+`baseline.md` now exists, measured against `https://database.drisdev.io`. It settles where things
+run — edge `hkg1`, functions `iad1`, database `ap-southeast-2` — and records cold and warm page
+timings plus the two backends' latency from Vietnam.
+
+What it cannot contain is the per-stage server breakdown, which needs instrumentation this phase
+forbids shipping, and an authenticated navigation, which needs a session.
