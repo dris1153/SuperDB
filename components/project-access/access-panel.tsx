@@ -51,12 +51,29 @@ export function AccessPanel({ projectRef, access }: { projectRef: string; access
   const edit = `/connections?edit=${access.connectionId}`;
   const signInSaved = access.method || access.email || access.accountBlob;
 
+  // Unknown method: both rows, so "Not saved" says what is missing. A known one shows what it needs.
+  const showSupabase = !method || method.supabasePassword || !!account.value.supabase_password;
+  const showEmail = !method || method.emailPassword || !!account.value.email_password;
+
+  // Two groups under one unlock: what signs in to the account, and what connects to this database.
   const passwords = (
-    <div>
-      {method?.supabasePassword || account.value.supabase_password ? <Row label="Supabase password" value={account.value.supabase_password} secret /> : null}
-      {method?.emailPassword || account.value.email_password ? <Row label="Email password" value={account.value.email_password} secret /> : null}
-      <Row label="Database password" value={db.value.db_password} secret />
-      {account.message || db.message ? <p className="pt-1 text-xs text-destructive">{account.message ?? db.message}</p> : null}
+    <div className="space-y-5">
+      <section className="space-y-2">
+        <Heading>Account password</Heading>
+        {showSupabase || showEmail ? (
+          <div>
+            {showSupabase ? <Row label="Supabase password" value={account.value.supabase_password} secret /> : null}
+            {showEmail ? <Row label="Email password" value={account.value.email_password} secret /> : null}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Signs in with {method?.label} — no account password to copy.</p>
+        )}
+      </section>
+      <section className="space-y-2">
+        <Heading>Database password</Heading>
+        <Row label="Database password" value={db.value.db_password} secret />
+      </section>
+      {account.message || db.message ? <p className="text-xs text-destructive">{account.message ?? db.message}</p> : null}
     </div>
   );
 
@@ -84,13 +101,7 @@ export function AccessPanel({ projectRef, access }: { projectRef: string; access
         )}
       </section>
 
-      <section className="space-y-2">
-        <Heading>Passwords</Heading>
-        {method && !method.supabasePassword && !method.emailPassword ? (
-          <p className="text-sm text-muted-foreground">Signs in with {method.label} — no account password to copy.</p>
-        ) : null}
-        {access.accountBlob || access.dbBlob ? <VaultGate>{passwords}</VaultGate> : passwords}
-      </section>
+      {access.accountBlob || access.dbBlob ? <VaultGate>{passwords}</VaultGate> : passwords}
 
       <section className="space-y-2">
         <Heading>Project</Heading>
