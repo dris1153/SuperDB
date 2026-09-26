@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Popover as PopoverPrimitive } from "radix-ui";
 import { IconExternalLink } from "@tabler/icons-react";
 import { METHODS } from "@/lib/credential-methods";
 import { dashboardUrl } from "@/lib/dashboard-url";
@@ -21,7 +22,14 @@ const Heading = ({ children }: { children: React.ReactNode }) => (
 );
 
 /** A copyable line; a password copies without ever being painted. */
-function Row({ label, value, secret, copy = true }: { label: string; value: string | null | undefined; secret?: boolean; copy?: boolean }) {
+function Row({ label, value, secret, copy = true, missing }: {
+  label: string;
+  value: string | null | undefined;
+  secret?: boolean;
+  copy?: boolean;
+  /** What stands in for an unsaved value, when there is somewhere to go and save it. */
+  missing?: React.ReactNode;
+}) {
   return (
     <div className="flex min-h-8 items-center gap-3">
       <span className="w-36 shrink-0 text-sm text-muted-foreground">{label}</span>
@@ -31,7 +39,7 @@ function Row({ label, value, secret, copy = true }: { label: string; value: stri
           <Copyable value={value} />
         </>
       ) : (
-        <span className="flex-1 text-sm text-subtle">Not saved</span>
+        <span className="flex-1 text-sm text-subtle">Not saved{missing}</span>
       )}
     </div>
   );
@@ -71,7 +79,13 @@ export function AccessPanel({ projectRef, access }: { projectRef: string; access
       </section>
       <section className="space-y-2">
         <Heading>Database password</Heading>
-        <Row label="Database password" value={db.value.db_password} secret />
+        {/* Postgres keeps only a SCRAM hash and the API has no read for it, so a password nobody saved
+            can only be replaced — which the Passwords page does, into the vault. */}
+        <Row label="Database password" value={db.value.db_password} secret missing={
+          <> · <PopoverPrimitive.Close asChild>
+            <Link href={`/p/${projectRef}/settings/passwords`} className="text-foreground underline underline-offset-4">Set one</Link>
+          </PopoverPrimitive.Close></>
+        } />
       </section>
       {account.message || db.message ? <p className="text-xs text-destructive">{account.message ?? db.message}</p> : null}
     </div>

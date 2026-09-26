@@ -90,3 +90,16 @@ sign-in to hand. This puts both one click from any project page.
   once the project page is idle (`requestIdleCallback`, a timer on Safari); measured in a throwaway
   route: chunks and `/access` requested ~140ms after load, before any click.
 - First-load JS: `/p/[ref]/settings` 659,454 bytes, Overview 838,018.
+
+## The database password cannot be read — measured 2026-09-26
+
+- Postgres keeps a SCRAM verifier, not the password. The Management API spec's only password
+  endpoint is `PATCH /v1/projects/{ref}/database/password`, answering `{ message }`. An unsaved
+  password can only be replaced, so the panel links *Set one* to Settings › Passwords, which resets it
+  and stores it in the vault.
+- Considered and not built: `POST /v1/projects/{ref}/cli/login-role` (beta, scope `database:write`).
+  On ZKVault it answered 201 with `cli_login_supabase_read_only_user` (`read_only: true`) or
+  `cli_login_postgres`, a 32-character password and `ttl_seconds: 300`; both connected through the
+  pooler (5432, 6543) and directly; neither could create a table in `public` as connected;
+  `DELETE` removed every CLI login role (`user not found` after). Five minutes, beta, and a DELETE
+  that would also cut off a running Supabase CLI.
